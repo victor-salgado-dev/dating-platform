@@ -1,0 +1,29 @@
+# Entorno
+.env
+.env.local
+.env.*.local
+
+# Go
+backend/tmp/
+backend/*.log
+**/*.exe
+
+# Node / Next.js
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/npm-debug.log*
+frontend/.env*.local
+
+# Datos locales (storage local, uploads)
+data/
+uploads/
+
+# SO / editores
+.DS_Store
+*.swp
+.vscode/
+.idea/
+
+# Docker
+docker-compose.override.yml
