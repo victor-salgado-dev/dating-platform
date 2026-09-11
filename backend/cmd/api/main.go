@@ -22,6 +22,7 @@ import (
 	"dating-platform/backend/internal/email"
 	"dating-platform/backend/internal/profiles"
 	"dating-platform/backend/internal/redisclient"
+	"dating-platform/backend/internal/search"
 	"dating-platform/backend/internal/server"
 	"dating-platform/backend/internal/storage"
 	"dating-platform/backend/internal/users"
@@ -83,6 +84,10 @@ func main() {
 	profilesService := profiles.NewService(profilesRepo, fileStorage)
 	profilesHandler := profiles.NewHandler(profilesService)
 
+	searchRepo := search.NewPostgresRepository(pool)
+	searchService := search.NewService(searchRepo)
+	searchHandler := search.NewHandler(searchService)
+
 	router := server.NewRouter(server.Dependencies{
 		DB:              pool,
 		Redis:           rdb,
@@ -90,6 +95,7 @@ func main() {
 		AuthHandler:     authHandler,
 		SessionCookie:   cfg.Auth.CookieName,
 		ProfilesHandler: profilesHandler,
+		SearchHandler:   searchHandler,
 	})
 
 	addr := cfg.Backend.Host + ":" + cfg.Backend.Port

@@ -9,11 +9,12 @@ import (
 	"dating-platform/backend/internal/auth"
 	"dating-platform/backend/internal/health"
 	"dating-platform/backend/internal/profiles"
+	"dating-platform/backend/internal/search"
 )
 
 // Dependencies agrupa todo lo que necesita el router para construir las
 // rutas de los distintos módulos de dominio. Se amplía a medida que se
-// añaden módulos en fases futuras (search, messages, ...), evitando que
+// añaden módulos en fases futuras (messages, ...), evitando que
 // NewRouter acumule un parámetro por dependencia.
 type Dependencies struct {
 	DB    *pgxpool.Pool
@@ -24,6 +25,7 @@ type Dependencies struct {
 	SessionCookie string
 
 	ProfilesHandler *profiles.Handler
+	SearchHandler   *search.Handler
 }
 
 // NewRouter construye el árbol de rutas de la aplicación.
@@ -68,6 +70,12 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/profiles/me/photos", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListPhotos)))
 	mux.Handle("GET /api/v1/profiles/me/photos/{id}/file", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ServePhoto)))
 	mux.Handle("DELETE /api/v1/profiles/me/photos/{id}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.DeletePhoto)))
+
+	// --- Search (Fase 5) ------------------------------------------------
+	// Devuelve fichas resumidas (sin bio/intereses/idiomas completos ni
+	// fotos servibles entre usuarios): la vista de perfil público
+	// detallada, con sus reglas de privacidad, llega en la Fase 6.
+	mux.Handle("GET /api/v1/search/profiles", requireAuth(http.HandlerFunc(deps.SearchHandler.Search)))
 
 	var handler http.Handler = mux
 	handler = withRecover(handler)

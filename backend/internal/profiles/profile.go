@@ -62,10 +62,15 @@ type Profile struct {
 // Age calcula la edad actual a partir de la fecha de nacimiento. No se
 // almacena en la base de datos para evitar que quede desactualizada.
 func (p *Profile) Age() int {
-	return ageAt(p.BirthDate, time.Now())
+	return AgeAt(p.BirthDate, time.Now())
 }
 
-func ageAt(birthDate, now time.Time) int {
+// AgeAt calcula la edad a partir de una fecha de nacimiento, a fecha
+// `now`. Exportada porque otros módulos (p. ej. search, para traducir
+// filtros de edad en rangos de fecha de nacimiento) necesitan la misma
+// lógica exacta: debe haber un único sitio que decida qué es "cumplir
+// años".
+func AgeAt(birthDate, now time.Time) int {
 	age := now.Year() - birthDate.Year()
 	hadBirthdayThisYear := now.Month() > birthDate.Month() ||
 		(now.Month() == birthDate.Month() && now.Day() >= birthDate.Day())

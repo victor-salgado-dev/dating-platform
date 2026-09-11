@@ -112,6 +112,33 @@ hijos, deseo de hijos, bio, intereses) se guardan como `NULL` cuando no
 se han indicado, nunca con un valor por defecto inventado. La Fase 5
 (búsqueda) debe respetar esta distinción al filtrar.
 
+## API de búsqueda (Fase 5)
+
+`GET /api/v1/search/profiles` — requiere sesión. Devuelve fichas
+resumidas (no el perfil completo: eso es la Fase 6) de otros perfiles,
+paginadas.
+
+| Parámetro | Formato | Descripción |
+|---|---|---|
+| `gender` | `female,male` (repetible o por comas) | Filtra por género |
+| `min_age`, `max_age` | entero (18–120) | Rango de edad |
+| `country` | `ES` | Código de país ISO 3166-1 alpha-2 |
+| `language` | `es,en` (repetible o por comas) | Habla al menos uno de estos idiomas |
+| `relationship_goal` | uno de `casual\|long_term\|friendship\|marriage\|not_sure` | Objetivo de relación |
+| `has_children`, `wants_children` | `true\|false` | Información familiar |
+| `interests` | `chess,hiking` (repetible o por comas) | Coincide con al menos uno |
+| `sort` | `recent` (por defecto) \| `age_asc` \| `age_desc` | Orden |
+| `page`, `page_size` | entero | Paginación (`page_size` máx. 50) |
+
+**Regla de los datos faltantes aplicada a la búsqueda:** si se envía un
+filtro (p. ej. `language=fr`) y un perfil no ha indicado ese dato
+(`languages IS NULL`), ese perfil **no** aparece en los resultados. Si
+el filtro no se envía, el perfil aparece con normalidad aunque le falte
+ese dato. La implementación se apoya en que SQL nunca evalúa a `TRUE`
+una comparación contra `NULL`, así que esto ocurre automáticamente en
+cada cláusula, sin lógica especial por campo (ver comentarios en
+`backend/internal/search/postgres_repository.go`).
+
 ## Tests
 
 Se añadirán en la Fase 12 (Tests y calidad).
@@ -142,6 +169,7 @@ Nunca se sube `.env` (con secretos reales) a Git.
 │   │   ├── auth/                 # Registro, login, sesiones, tokens, email de verificación/reset
 │   │   ├── email/                # Abstracción de envío de email (driver "noop" en V1)
 │   │   ├── profiles/              # Perfil propio: datos estructurados + fotos
+│   │   ├── search/                 # Búsqueda de perfiles con filtros estructurados
 │   │   └── storage/               # Abstracción de almacenamiento de ficheros (driver "local" en V1)
 │   └── migrations/            # Migraciones SQL versionadas
 └── frontend/                 # Next.js (App Router, TypeScript)

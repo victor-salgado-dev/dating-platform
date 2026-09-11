@@ -36,6 +36,18 @@ var allowedRelationshipGoals = map[RelationshipGoal]bool{
 	RelationshipMarriage: true, RelationshipNotSure: true,
 }
 
+// IsValidGender indica si g es uno de los valores de género permitidos.
+// Expuesta para que otros módulos (p. ej. search, al validar filtros)
+// no dupliquen esta lista.
+func IsValidGender(g Gender) bool {
+	return allowedGenders[g]
+}
+
+// IsValidRelationshipGoal indica si g es un objetivo de relación permitido.
+func IsValidRelationshipGoal(g RelationshipGoal) bool {
+	return allowedRelationshipGoals[g]
+}
+
 // allowedPhotoTypes mapea content-types de imagen aceptados a su extensión
 // de fichero. Cualquier otro tipo se rechaza antes de tocar storage.
 var allowedPhotoTypes = map[string]string{
@@ -279,7 +291,7 @@ func validateBirthDate(t time.Time) error {
 	if t.IsZero() {
 		return invalidField("birth_date", "es obligatorio")
 	}
-	if ageAt(t, time.Now()) < MinAge {
+	if AgeAt(t, time.Now()) < MinAge {
 		return invalidField("birth_date", "debes tener al menos 18 años para usar la plataforma")
 	}
 	return nil
