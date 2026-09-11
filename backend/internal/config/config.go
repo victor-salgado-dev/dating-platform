@@ -6,6 +6,8 @@ package config
 import (
 	"fmt"
 	"os"
+	"strconv"
+	"time"
 )
 
 // Config contiene toda la configuración de la aplicación, agrupada por área.
@@ -18,6 +20,7 @@ type Config struct {
 	Redis    RedisConfig
 	Storage  StorageConfig
 	Email    EmailConfig
+	Auth     AuthConfig
 }
 
 type BackendConfig struct {
@@ -62,9 +65,21 @@ type StorageConfig struct {
 }
 
 // EmailConfig es la configuración de la abstracción de envío de email.
-// El driver "noop" (usado en Fase 1) no envía nada, solo registra en logs.
+// El driver "noop" (usado hasta ahora) no envía nada, solo registra en logs.
 type EmailConfig struct {
 	Driver string
+	From   string
+}
+
+// AuthConfig agrupa la configuración del módulo de autenticación:
+// duración de sesiones y de los tokens de un solo uso (verificación de
+// email, reseteo de contraseña), y si las cookies deben marcarse Secure.
+type AuthConfig struct {
+	SessionTTL             time.Duration
+	EmailVerificationTTL   time.Duration
+	PasswordResetTTL       time.Duration
+	CookieSecure           bool
+	CookieName             string
 }
 
 // Load lee la configuración desde variables de entorno, aplicando valores
@@ -104,8 +119,29 @@ func Load() Config {
 
 		Email: EmailConfig{
 			Driver: getEnv("EMAIL_DRIVER", "noop"),
+			From:   getEnv("EMAIL_FROM", "no-reply@example.com"),
+		},
+
+		Auth: AuthConfig{
+			SessionTTL:           time.Duration(getEnvHours("SESSION_TTL_HOURS", 720)) * time.Hour,
+			EmailVerificationTTL: time.Duration(getEnvHours("EMAIL_VERIFICATION_TTL_HOURS", 24)) * time.Hour,
+			PasswordResetTTL:     time.Duration(getEnvHours("PASSWORD_RESET_TTL_HOURS", 1)) * time.Hour,
+			CookieSecure:         getEnv("APP_ENV", "development") == "production",
+			CookieName:           getEnv("SESSION_COOKIE_NAME", "session_id"),
 		},
 	}
+}
+
+func getEnvHours(key string, fallback int) int {
+	v, ok := os.LookupEnv(key)
+	if !ok || v == "" {
+		return fallback
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return fallback
+	}
+	return n
 }
 
 func getEnv(key, fallback string) string {

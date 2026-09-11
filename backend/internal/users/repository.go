@@ -29,4 +29,13 @@ type Repository interface {
 	// sin borrar la fila físicamente, preservando el histórico.
 	// Devuelve ErrNotFound si la cuenta no existe o ya estaba eliminada.
 	SoftDelete(ctx context.Context, id uuid.UUID) error
+
+	// MarkEmailVerified fija email_verified_at a la hora actual.
+	// Devuelve ErrNotFound si la cuenta no existe.
+	MarkEmailVerified(ctx context.Context, id uuid.UUID) error
+
+	// UpdatePasswordHash sustituye el hash de contraseña almacenado
+	// (usado en el flujo de reset de contraseña).
+	// Devuelve ErrNotFound si la cuenta no existe.
+	UpdatePasswordHash(ctx context.Context, id uuid.UUID, passwordHash string) error
 }

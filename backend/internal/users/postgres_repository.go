@@ -88,6 +88,42 @@ func (r *PostgresRepository) SoftDelete(ctx context.Context, id uuid.UUID) error
 	return nil
 }
 
+func (r *PostgresRepository) MarkEmailVerified(ctx context.Context, id uuid.UUID) error {
+	const query = `
+		UPDATE users
+		SET email_verified_at = now()
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	tag, err := r.db.Exec(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("users: marcar email verificado: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
+func (r *PostgresRepository) UpdatePasswordHash(ctx context.Context, id uuid.UUID, passwordHash string) error {
+	const query = `
+		UPDATE users
+		SET password_hash = $2
+		WHERE id = $1 AND deleted_at IS NULL
+	`
+
+	tag, err := r.db.Exec(ctx, query, id, passwordHash)
+	if err != nil {
+		return fmt.Errorf("users: actualizar contraseña: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return ErrNotFound
+	}
+
+	return nil
+}
+
 func (r *PostgresRepository) scanOne(ctx context.Context, query string, args ...any) (*User, error) {
 	var u User
 

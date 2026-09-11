@@ -60,6 +60,7 @@ services:
     volumes:
       - ./backend:/app
       - backend_go_cache:/go/pkg/mod
+      - backend_uploads:/data/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -75,6 +76,7 @@ services:
       - .env
     environment:
       NODE_ENV: development
+      INTERNAL_API_URL: http://backend:8080/api/v1
     ports:
       - "${FRONTEND_PORT:-3000}:3000"
     volumes:
@@ -101,6 +103,7 @@ volumes:
   postgres_data:
   redis_data:
   backend_go_cache:
+  backend_uploads:
   frontend_node_modules:
   frontend_next_cache:
   caddy_data:

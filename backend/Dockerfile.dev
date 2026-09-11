@@ -7,12 +7,20 @@ RUN apk add --no-cache git
 
 WORKDIR /app
 
-# Copiamos primero go.mod para aprovechar la cache de capas de Docker.
+# Copiamos primero go.mod para aprovechar la cache de capas de Docker en
+# el build inicial (no es la fuente de verdad en runtime: ver más abajo).
 COPY go.mod ./
 RUN go mod tidy || true
 
 COPY . .
 
+RUN chmod +x docker-entrypoint.dev.sh
+
 EXPOSE 8080
 
-CMD ["go", "run", "./cmd/api"]
+# IMPORTANTE: docker-entrypoint.dev.sh vuelve a ejecutar `go mod tidy` en
+# cada arranque del contenedor. El volumen ./backend:/app (docker-compose.yml)
+# sustituye el /app construido en la imagen por el código del host, que no
+# incluye go.sum, así que hay que regenerarlo ahí para no depender de una
+# resolución de red parcial cada vez que el proceso arranca.
+ENTRYPOINT ["./docker-entrypoint.dev.sh"]

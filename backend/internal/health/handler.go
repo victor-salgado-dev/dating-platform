@@ -5,12 +5,13 @@ package health
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
+
+	"dating-platform/backend/internal/httpx"
 )
 
 type Handler struct {
@@ -25,7 +26,7 @@ func NewHandler(db *pgxpool.Pool, rdb *redis.Client) *Handler {
 // Liveness responde 200 si el proceso Go está en marcha, sin comprobar
 // dependencias externas. Pensado para el healthcheck del propio contenedor.
 func (h *Handler) Liveness(w http.ResponseWriter, r *http.Request) {
-	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+	httpx.WriteJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
 
 // Readiness comprueba PostgreSQL y Redis y responde 200 solo si ambos
@@ -51,21 +52,15 @@ func (h *Handler) Readiness(w http.ResponseWriter, r *http.Request) {
 		checks["redis"] = "ok"
 	}
 
-	status := http.StatusOK
+	writeJSONStatus := http.StatusOK
 	overall := "ok"
 	if !healthy {
-		status = http.StatusServiceUnavailable
+		writeJSONStatus = http.StatusServiceUnavailable
 		overall = "degraded"
 	}
 
-	writeJSON(w, status, map[string]any{
+	httpx.WriteJSON(w, writeJSONStatus, map[string]any{
 		"status": overall,
 		"checks": checks,
 	})
-}
-
-func writeJSON(w http.ResponseWriter, status int, payload any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(payload)
 }

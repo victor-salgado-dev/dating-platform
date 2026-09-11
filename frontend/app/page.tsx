@@ -1,9 +1,7 @@
 import styles from './page.module.css';
 
 async function getBackendHealth() {
-  // Al ser un Server Component dentro de Docker, debe llamar al contenedor backend directamente
-  const apiUrl =
-    process.env.INTERNAL_API_URL ?? 'http://backend:8080/api/v1';
+  const apiUrl = process.env.INTERNAL_API_URL ?? 'http://backend:8080/api/v1';
 
   try {
     const res = await fetch(`${apiUrl}/health`, { cache: 'no-store' });
