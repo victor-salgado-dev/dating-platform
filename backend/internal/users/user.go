@@ -18,6 +18,15 @@ const (
 	StatusDeleted   Status = "deleted"
 )
 
+// Role representa el nivel de acceso de una cuenta. Necesario a partir
+// de la Fase 10 (panel de administración).
+type Role string
+
+const (
+	RoleUser  Role = "user"
+	RoleAdmin Role = "admin"
+)
+
 // User es la entidad de dominio que representa una cuenta.
 //
 // PasswordHash nunca debe serializarse hacia el exterior (API, logs).
@@ -28,6 +37,7 @@ type User struct {
 	Email           string
 	PasswordHash    string
 	Status          Status
+	Role            Role
 	EmailVerifiedAt *time.Time
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
@@ -42,4 +52,9 @@ func (u *User) IsActive() bool {
 // IsEmailVerified indica si el email de la cuenta ha sido verificado.
 func (u *User) IsEmailVerified() bool {
 	return u.EmailVerifiedAt != nil
+}
+
+// IsAdmin indica si la cuenta tiene privilegios de administración.
+func (u *User) IsAdmin() bool {
+	return u.Role == RoleAdmin
 }

@@ -28,6 +28,7 @@ export default function RootLayout({
           <Link href="/favorites">Favoritos</Link>
           <Link href="/messages">Mensajes</Link>
           <Link href="/blocked">Bloqueados</Link>
+          <Link href="/admin">Admin</Link>
         </nav>
         {children}
       </body>

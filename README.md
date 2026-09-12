@@ -251,10 +251,51 @@ de perfil que ignora las reglas de visibilidad a propósito).
 `reason` debe ser uno de: `spam`, `fake_profile`, `harassment`,
 `inappropriate_content`, `underage`, `other`. `description` es opcional
 (máx. 2000 caracteres). Los reportes quedan en estado `pending`; su
-revisión es el panel de moderación de la Fase 10, que todavía no existe.
+revisión es el panel de moderación de la Fase 10.
 
 `/blocked` en el frontend lista y permite desbloquear; `/profiles/[id]`
 tiene botones de bloquear/desbloquear y un formulario de reporte.
+
+## Administración y moderación (Fase 10)
+
+### Crear el primer administrador
+
+No hay registro público de admins. Registra una cuenta normal
+(`POST /api/v1/auth/register` o el frontend) y luego promociónala:
+
+```bash
+make admin-promote email=tu-email@example.com
+```
+
+Esto ejecuta `backend/cmd/promote-admin` dentro del contenedor del
+backend ya construido (sin tocar SQL a mano). A partir de aquí, esa
+cuenta puede usar `/admin` y las rutas `/api/v1/admin/*` con su sesión
+normal — no hay un login separado para admins.
+
+### API
+
+Estas rutas exigen sesión **y** rol `admin` (`403 forbidden` si no lo
+tienes). A diferencia del resto de la API, identifican cuentas por
+`user_id` (no `profile_id`): son herramientas internas, no cara al público.
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/v1/admin/users?status=&page=&page_size=` | Lista cuentas (incluye suspendidas/eliminadas) |
+| POST | `/api/v1/admin/users/{userID}/suspend` | Suspende una cuenta |
+| POST | `/api/v1/admin/users/{userID}/reactivate` | Reactiva una cuenta suspendida |
+| GET | `/api/v1/admin/reports?status=&page=&page_size=` | Lista reportes (`pending` por defecto si no se filtra) |
+| POST | `/api/v1/admin/reports/{reportID}/resolve` | `{"status": "reviewed"\|"dismissed"}` |
+
+**Efecto de suspender:** una cuenta suspendida deja de poder usar la
+API de inmediato, incluso con una sesión ya abierta — no hace falta
+esperar a que expire la cookie (`auth.Service.CurrentUser` comprueba el
+estado en cada petición autenticada, no solo al hacer login). Un admin
+no puede suspenderse a sí mismo (`400 cannot_act_on_self`).
+
+`/admin` en el frontend es el panel: pestañas de Reportes y Usuarios,
+con las acciones de arriba. Si tu cuenta no es admin, verás un mensaje
+de permisos en vez del panel (el backend ya lo protege; el frontend solo
+refleja el `403`).
 
 ## Tests
 
@@ -274,7 +315,9 @@ Nunca se sube `.env` (con secretos reales) a Git.
 ├── Makefile                  # Comandos de arranque y migraciones
 ├── .env.example
 ├── backend/                  # Monolito modular en Go
-│   ├── cmd/api/               # Punto de entrada
+│   ├── cmd/
+│   │   ├── api/                # Punto de entrada del servidor
+│   │   └── promote-admin/       # CLI para promocionar una cuenta a admin
 │   ├── internal/
 │   │   ├── config/             # Lectura de variables de entorno
 │   │   ├── db/                  # Pool de conexión a PostgreSQL
@@ -290,7 +333,8 @@ Nunca se sube `.env` (con secretos reales) a Git.
 │   │   ├── favorites/               # Favoritos: añadir, eliminar, listar
 │   │   ├── messaging/                # Conversaciones y mensajes 1:1
 │   │   ├── blocking/                  # Bloqueo entre usuarios y reglas de visibilidad
-│   │   ├── reports/                   # Creación de reportes (moderación: Fase 10)
+│   │   ├── reports/                   # Creación de reportes
+│   │   ├── admin/                     # Panel de administración (Fase 10)
 │   │   └── storage/               # Abstracción de almacenamiento de ficheros (driver "local" en V1)
 │   └── migrations/            # Migraciones SQL versionadas
 └── frontend/                 # Next.js (App Router, TypeScript)
@@ -299,7 +343,8 @@ Nunca se sube `.env` (con secretos reales) a Git.
     │   ├── profiles/[id]/      # Página de perfil público (Fase 6)
     │   ├── favorites/          # Lista de favoritos (Fase 7)
     │   ├── messages/           # Conversaciones y mensajes (Fase 8)
-    │   └── blocked/            # Perfiles bloqueados (Fase 9)
+    │   ├── blocked/            # Perfiles bloqueados (Fase 9)
+    │   └── admin/              # Panel de administración (Fase 10)
     ├── lib/                    # Helpers compartidos (cliente de API)
     └── messages/               # Esqueleto i18n (es/en), aún sin enrutar
 ```

@@ -125,7 +125,10 @@ func (s *Service) Logout(ctx context.Context, sessionToken string) error {
 }
 
 // CurrentUser resuelve la sesión y devuelve la cuenta asociada.
-// Devuelve ErrTokenInvalid si la sesión no existe o ha caducado.
+// Devuelve ErrTokenInvalid si la sesión no existe o ha caducado, o
+// ErrAccountSuspended si la cuenta fue suspendida después de abrir la
+// sesión (una suspensión debe cortar el acceso de inmediato, no solo
+// impedir logins nuevos).
 func (s *Service) CurrentUser(ctx context.Context, sessionToken string) (*users.User, error) {
 	sess, err := s.sessions.Get(ctx, sessionToken)
 	if err != nil {
@@ -138,6 +141,10 @@ func (s *Service) CurrentUser(ctx context.Context, sessionToken string) (*users.
 			return nil, ErrTokenInvalid
 		}
 		return nil, err
+	}
+
+	if u.Status == users.StatusSuspended {
+		return nil, ErrAccountSuspended
 	}
 
 	return u, nil

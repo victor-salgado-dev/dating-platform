@@ -38,4 +38,24 @@ type Repository interface {
 	// (usado en el flujo de reset de contraseña).
 	// Devuelve ErrNotFound si la cuenta no existe.
 	UpdatePasswordHash(ctx context.Context, id uuid.UUID, passwordHash string) error
+
+	// SetStatus cambia el estado de una cuenta (p. ej. suspender o
+	// reactivar). No toca deleted_at: para eliminar una cuenta se usa
+	// SoftDelete. Devuelve ErrNotFound si la cuenta no existe.
+	SetStatus(ctx context.Context, id uuid.UUID, status Status) error
+
+	// List pagina cuentas para el panel de administración (Fase 10).
+	// A diferencia de GetByID/GetByEmail, SÍ incluye cuentas eliminadas
+	// (el admin necesita verlas para auditoría); statusFilter es
+	// opcional.
+	List(ctx context.Context, page, pageSize int, statusFilter *Status) (*ListResult, error)
+}
+
+// ListResult es una página de cuentas para el panel de administración.
+type ListResult struct {
+	Items      []User
+	Total      int
+	Page       int
+	PageSize   int
+	TotalPages int
 }

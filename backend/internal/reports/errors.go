@@ -8,6 +8,9 @@ import (
 // ErrCannotReportSelf: no tiene sentido reportarte a ti mismo.
 var ErrCannotReportSelf = errors.New("reports: no puedes reportarte a ti mismo")
 
+// ErrNotFound: no existe ningún reporte con ese ID.
+var ErrNotFound = errors.New("reports: reporte no encontrado")
+
 // ValidationError señala un campo de reporte inválido (motivo no
 // permitido, descripción demasiado larga).
 type ValidationError struct {

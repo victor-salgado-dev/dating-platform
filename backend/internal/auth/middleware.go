@@ -28,11 +28,14 @@ func RequireAuth(svc *Service, cookieName string) func(http.Handler) http.Handle
 
 			u, err := svc.CurrentUser(r.Context(), cookie.Value)
 			if err != nil {
-				if errors.Is(err, ErrTokenInvalid) {
+				switch {
+				case errors.Is(err, ErrTokenInvalid):
 					httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Tu sesión ha caducado.")
-					return
+				case errors.Is(err, ErrAccountSuspended):
+					httpx.WriteError(w, http.StatusForbidden, "account_suspended", "Esta cuenta está suspendida.")
+				default:
+					httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo verificar la sesión.")
 				}
-				httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo verificar la sesión.")
 				return
 			}
 

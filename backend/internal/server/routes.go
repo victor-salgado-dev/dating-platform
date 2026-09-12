@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
+	"dating-platform/backend/internal/admin"
 	"dating-platform/backend/internal/auth"
 	"dating-platform/backend/internal/blocking"
 	"dating-platform/backend/internal/favorites"
@@ -34,6 +35,7 @@ type Dependencies struct {
 	MessagingHandler *messaging.Handler
 	BlockingHandler  *blocking.Handler
 	ReportsHandler   *reports.Handler
+	AdminHandler     *admin.Handler
 }
 
 // NewRouter construye el árbol de rutas de la aplicación.
@@ -116,6 +118,18 @@ func NewRouter(deps Dependencies) http.Handler {
 	// --- Reportes (Fase 9) ------------------------------------------------
 	// Solo creación aquí; revisarlos es la Fase 10 (panel de moderación).
 	mux.Handle("POST /api/v1/reports/{profileID}", requireAuth(http.HandlerFunc(deps.ReportsHandler.Create)))
+
+	// --- Administración (Fase 10) ----------------------------------------
+	// Rutas distintas de todo lo anterior: exigen rol admin, no solo
+	// sesión, y trabajan con user_id (no profile_id) porque son
+	// herramientas internas, no cara al público.
+	requireAdmin := admin.RequireAdmin(deps.AuthService, deps.SessionCookie)
+
+	mux.Handle("GET /api/v1/admin/users", requireAdmin(http.HandlerFunc(deps.AdminHandler.ListUsers)))
+	mux.Handle("POST /api/v1/admin/users/{userID}/suspend", requireAdmin(http.HandlerFunc(deps.AdminHandler.SuspendUser)))
+	mux.Handle("POST /api/v1/admin/users/{userID}/reactivate", requireAdmin(http.HandlerFunc(deps.AdminHandler.ReactivateUser)))
+	mux.Handle("GET /api/v1/admin/reports", requireAdmin(http.HandlerFunc(deps.AdminHandler.ListReports)))
+	mux.Handle("POST /api/v1/admin/reports/{reportID}/resolve", requireAdmin(http.HandlerFunc(deps.AdminHandler.ResolveReport)))
 
 	var handler http.Handler = mux
 	handler = withRecover(handler)

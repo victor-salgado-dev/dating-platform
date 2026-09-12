@@ -180,3 +180,43 @@ export const REPORT_REASONS = [
   { value: 'underage', label: 'Menor de edad' },
   { value: 'other', label: 'Otro' },
 ] as const;
+
+// --- Administración (Fase 10) --------------------------------------------
+
+export type AdminUser = {
+  id: string;
+  email: string;
+  status: string;
+  role: string;
+  email_verified: boolean;
+  created_at: string;
+  deleted_at: string | null;
+};
+
+export type AdminUsersResponse = {
+  items: AdminUser[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+};
+
+export type AdminReport = {
+  id: string;
+  reporter_id: string;
+  reporter_name: string | null;
+  reported_id: string;
+  reported_name: string | null;
+  reason: string;
+  description: string | null;
+  status: string;
+  created_at: string;
+};
+
+export type AdminReportsResponse = {
+  items: AdminReport[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+};

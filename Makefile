@@ -1,5 +1,6 @@
 .PHONY: up up-build down logs ps \
-        migrate-new migrate-up migrate-down migrate-up-one migrate-down-one migrate-version migrate-force
+        migrate-new migrate-up migrate-down migrate-up-one migrate-down-one migrate-version migrate-force \
+        admin-promote
 
 # Carga las variables de .env para poder usarlas en los comandos de migración.
 -include .env
@@ -69,3 +70,14 @@ migrate-version:
 migrate-force:
 	@if [ -z "$(VERSION)" ]; then echo "ERROR: falta VERSION. Uso: make migrate-force VERSION=3"; exit 1; fi
 	docker compose run --rm migrate -path=/migrations -database "$(DB_URL)" force $(VERSION)
+
+# ---------------------------------------------------------
+# Administración (Fase 10)
+# ---------------------------------------------------------
+
+## Promociona una cuenta YA REGISTRADA a rol admin. Es la única forma
+## soportada de crear un administrador.
+## Uso: make admin-promote email=persona@example.com
+admin-promote:
+	@if [ -z "$(email)" ]; then echo "ERROR: falta email. Uso: make admin-promote email=persona@example.com"; exit 1; fi
+	docker compose run --rm --entrypoint go backend run ./cmd/promote-admin --email=$(email)

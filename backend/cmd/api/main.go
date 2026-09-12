@@ -1,7 +1,8 @@
 // Comando api arranca el backend monolítico modular de la plataforma
 // de dating. Módulos activos: health, auth, profiles, search,
-// favorites, messaging, blocking y reports. El resto de módulos de
-// dominio (moderación/admin, ...) se irán añadiendo en fases futuras.
+// favorites, messaging, blocking, reports y admin. El resto de módulos
+// de dominio se irán añadiendo en fases futuras (seguridad, tests,
+// legal, producción).
 package main
 
 import (
@@ -14,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"dating-platform/backend/internal/admin"
 	"dating-platform/backend/internal/auth"
 	"dating-platform/backend/internal/blocking"
 	"dating-platform/backend/internal/config"
@@ -106,6 +108,9 @@ func main() {
 	reportsService := reports.NewService(reportsRepo, profilesRepo)
 	reportsHandler := reports.NewHandler(reportsService)
 
+	adminService := admin.NewService(usersRepo, reportsRepo)
+	adminHandler := admin.NewHandler(adminService)
+
 	router := server.NewRouter(server.Dependencies{
 		DB:               pool,
 		Redis:            rdb,
@@ -118,6 +123,7 @@ func main() {
 		MessagingHandler: messagingHandler,
 		BlockingHandler:  blockingHandler,
 		ReportsHandler:   reportsHandler,
+		AdminHandler:     adminHandler,
 	})
 
 	addr := cfg.Backend.Host + ":" + cfg.Backend.Port
