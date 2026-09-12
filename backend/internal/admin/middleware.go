@@ -20,7 +20,7 @@ import (
 func RequireAdmin(authSvc *auth.Service, cookieName string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			cookie, err := r.Cookie("session_id")
+			cookie, err := r.Cookie(cookieName)
 			if err != nil || cookie.Value == "" {
 				httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 				return
@@ -45,8 +45,8 @@ func RequireAdmin(authSvc *auth.Service, cookieName string) func(http.Handler) h
 			}
 
 			// Inyectar el ID de usuario en el contexto
-ctx := context.WithValue(r.Context(), auth.UserIDContextKey, u.ID)
-next.ServeHTTP(w, r.WithContext(ctx))
+			ctx := auth.ContextWithUserID(r.Context(), u.ID)
+			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
 }
