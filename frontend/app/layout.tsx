@@ -1,5 +1,7 @@
 import type { Metadata } from 'next';
+import Link from 'next/link';
 import './globals.css';
+import styles from './layout.module.css';
 
 export const metadata: Metadata = {
   title: 'Dating Platform',
@@ -17,7 +19,18 @@ export default function RootLayout({
 }) {
   return (
     <html lang="es">
-      <body>{children}</body>
+      <body>
+        <nav className={styles.nav}>
+          <Link href="/" className={styles.brand}>
+            Dating Platform
+          </Link>
+          <Link href="/discover">Descubrir</Link>
+          <Link href="/favorites">Favoritos</Link>
+          <Link href="/messages">Mensajes</Link>
+          <Link href="/blocked">Bloqueados</Link>
+        </nav>
+        {children}
+      </body>
     </html>
   );
 }

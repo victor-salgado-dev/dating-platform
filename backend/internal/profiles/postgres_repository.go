@@ -70,6 +70,37 @@ func (r *PostgresRepository) GetByUserID(ctx context.Context, userID uuid.UUID) 
 	return r.scanOne(ctx, query, userID)
 }
 
+func (r *PostgresRepository) GetPublicByID(ctx context.Context, id, viewerUserID uuid.UUID) (*Profile, error) {
+	const query = `
+		SELECT p.id, p.user_id, p.display_name, p.birth_date, p.gender, p.country_code,
+		       p.region, p.languages, p.relationship_goal, p.has_children, p.wants_children,
+		       p.bio, p.interests, p.created_at, p.updated_at
+		FROM profiles p
+		JOIN users u ON u.id = p.user_id
+		WHERE p.id = $1
+		  AND u.status = 'active' AND u.deleted_at IS NULL
+		  AND NOT EXISTS (
+		      SELECT 1 FROM blocks b
+		      WHERE (b.blocker_id = $2 AND b.blocked_id = p.user_id)
+		         OR (b.blocker_id = p.user_id AND b.blocked_id = $2)
+		  )
+	`
+
+	return r.scanOne(ctx, query, id, viewerUserID)
+}
+
+func (r *PostgresRepository) GetByIDAny(ctx context.Context, id uuid.UUID) (*Profile, error) {
+	const query = `
+		SELECT id, user_id, display_name, birth_date, gender, country_code,
+		       region, languages, relationship_goal, has_children, wants_children,
+		       bio, interests, created_at, updated_at
+		FROM profiles
+		WHERE id = $1
+	`
+
+	return r.scanOne(ctx, query, id)
+}
+
 func (r *PostgresRepository) Update(ctx context.Context, userID uuid.UUID, patch ProfilePatch) (*Profile, error) {
 	var setClauses []string
 	var args []any

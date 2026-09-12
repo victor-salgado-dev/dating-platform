@@ -74,10 +74,19 @@ type photoResponse struct {
 	CreatedAt string `json:"created_at"`
 }
 
-func toPhotoResponse(ph *Photo) photoResponse {
+func toPhotoResponseSelf(ph *Photo) photoResponse {
 	return photoResponse{
 		ID:        ph.ID.String(),
 		URL:       fmt.Sprintf("/api/v1/profiles/me/photos/%s/file", ph.ID.String()),
+		Position:  ph.Position,
+		CreatedAt: ph.CreatedAt.Format(time.RFC3339),
+	}
+}
+
+func toPhotoResponsePublic(ph *Photo, profileID uuid.UUID) photoResponse {
+	return photoResponse{
+		ID:        ph.ID.String(),
+		URL:       fmt.Sprintf("/api/v1/profiles/%s/photos/%s/file", profileID.String(), ph.ID.String()),
 		Position:  ph.Position,
 		CreatedAt: ph.CreatedAt.Format(time.RFC3339),
 	}
@@ -352,7 +361,7 @@ func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpx.WriteJSON(w, http.StatusCreated, toPhotoResponse(photo))
+	httpx.WriteJSON(w, http.StatusCreated, toPhotoResponseSelf(photo))
 }
 
 func (h *Handler) ListPhotos(w http.ResponseWriter, r *http.Request) {
@@ -370,7 +379,7 @@ func (h *Handler) ListPhotos(w http.ResponseWriter, r *http.Request) {
 
 	resp := make([]photoResponse, 0, len(photos))
 	for i := range photos {
-		resp = append(resp, toPhotoResponse(&photos[i]))
+		resp = append(resp, toPhotoResponseSelf(&photos[i]))
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, resp)
@@ -422,7 +431,106 @@ func (h *Handler) DeletePhoto(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// --- Handlers: perfiles públicos (Fase 6) --------------------------------
+//
+// A diferencia de los handlers /me, estos actúan sobre el perfil de OTRA
+// persona identificado por {profileID} en la ruta. La privacidad básica
+// de esta fase consiste en que Service.GetPublicProfile (y las llamadas
+// que dependen de ella) solo devuelven perfiles de cuentas activas: ver
+// el perfil de alguien suspendido o que se ha dado de baja da el mismo
+// 404 genérico que un ID inexistente, para no filtrar esa información.
+
+func (h *Handler) GetPublic(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	profileID, err := uuid.Parse(r.PathValue("profileID"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+		return
+	}
+
+	p, err := h.svc.GetPublicProfile(r.Context(), viewerID, profileID)
+	if err != nil {
+		writePublicProfileError(w, err)
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, toProfileResponse(p))
+}
+
+func (h *Handler) ListPublicPhotos(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	profileID, err := uuid.Parse(r.PathValue("profileID"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+		return
+	}
+
+	photos, err := h.svc.ListPublicPhotos(r.Context(), viewerID, profileID)
+	if err != nil {
+		writePublicProfileError(w, err)
+		return
+	}
+
+	resp := make([]photoResponse, 0, len(photos))
+	for i := range photos {
+		resp = append(resp, toPhotoResponsePublic(&photos[i], profileID))
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) ServePublicPhoto(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	profileID, err := uuid.Parse(r.PathValue("profileID"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+		return
+	}
+	photoID, err := uuid.Parse(r.PathValue("photoID"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de foto inválido.")
+		return
+	}
+
+	rc, ph, err := h.svc.OpenPublicPhoto(r.Context(), viewerID, profileID, photoID)
+	if err != nil {
+		writePublicProfileError(w, err)
+		return
+	}
+	defer rc.Close()
+
+	w.Header().Set("Content-Type", ph.ContentType)
+	w.Header().Set("Cache-Control", "private, max-age=86400")
+	_, _ = io.Copy(w, rc)
+}
+
 // --- Errores --------------------------------------------------------------
+
+func writePublicProfileError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, ErrNotFound):
+		httpx.WriteError(w, http.StatusNotFound, "profile_not_found", "Perfil no encontrado.")
+	case errors.Is(err, ErrPhotoNotFound):
+		httpx.WriteError(w, http.StatusNotFound, "photo_not_found", "Foto no encontrada.")
+	default:
+		httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo completar la operación.")
+	}
+}
 
 func writeProfileError(w http.ResponseWriter, err error) {
 	var valErr *ValidationError

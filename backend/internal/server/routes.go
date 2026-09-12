@@ -7,8 +7,12 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"dating-platform/backend/internal/auth"
+	"dating-platform/backend/internal/blocking"
+	"dating-platform/backend/internal/favorites"
 	"dating-platform/backend/internal/health"
+	"dating-platform/backend/internal/messaging"
 	"dating-platform/backend/internal/profiles"
+	"dating-platform/backend/internal/reports"
 	"dating-platform/backend/internal/search"
 )
 
@@ -24,8 +28,12 @@ type Dependencies struct {
 	AuthHandler   *auth.Handler
 	SessionCookie string
 
-	ProfilesHandler *profiles.Handler
-	SearchHandler   *search.Handler
+	ProfilesHandler  *profiles.Handler
+	SearchHandler    *search.Handler
+	FavoritesHandler *favorites.Handler
+	MessagingHandler *messaging.Handler
+	BlockingHandler  *blocking.Handler
+	ReportsHandler   *reports.Handler
 }
 
 // NewRouter construye el árbol de rutas de la aplicación.
@@ -71,11 +79,43 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/profiles/me/photos/{id}/file", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ServePhoto)))
 	mux.Handle("DELETE /api/v1/profiles/me/photos/{id}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.DeletePhoto)))
 
+	// --- Perfiles públicos (Fase 6) -------------------------------------
+	// Rutas de solo lectura sobre el perfil de OTRA persona. "me" es un
+	// segmento literal y siempre gana sobre {profileID} en las rutas de
+	// arriba, así que no hay ambigüedad entre ambos bloques.
+	mux.Handle("GET /api/v1/profiles/{profileID}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.GetPublic)))
+	mux.Handle("GET /api/v1/profiles/{profileID}/photos", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListPublicPhotos)))
+	mux.Handle("GET /api/v1/profiles/{profileID}/photos/{photoID}/file", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ServePublicPhoto)))
+
 	// --- Search (Fase 5) ------------------------------------------------
-	// Devuelve fichas resumidas (sin bio/intereses/idiomas completos ni
-	// fotos servibles entre usuarios): la vista de perfil público
-	// detallada, con sus reglas de privacidad, llega en la Fase 6.
+	// Devuelve fichas resumidas con el profile_id de cada resultado; la
+	// vista de perfil público detallada vive en las rutas de arriba.
 	mux.Handle("GET /api/v1/search/profiles", requireAuth(http.HandlerFunc(deps.SearchHandler.Search)))
+
+	// --- Favoritos (Fase 7) ---------------------------------------------
+	mux.Handle("GET /api/v1/favorites", requireAuth(http.HandlerFunc(deps.FavoritesHandler.List)))
+	mux.Handle("POST /api/v1/favorites/{profileID}", requireAuth(http.HandlerFunc(deps.FavoritesHandler.Add)))
+	mux.Handle("DELETE /api/v1/favorites/{profileID}", requireAuth(http.HandlerFunc(deps.FavoritesHandler.Remove)))
+	mux.Handle("GET /api/v1/favorites/{profileID}", requireAuth(http.HandlerFunc(deps.FavoritesHandler.Status)))
+
+	// --- Mensajería (Fase 8) ---------------------------------------------
+	// "to/{profileID}" inicia o continúa la conversación con esa persona
+	// (find-or-create); una vez abierta, se puede seguir escribiendo y
+	// paginando por conversationID sin volver a pasar por el perfil.
+	mux.Handle("POST /api/v1/messages/to/{profileID}", requireAuth(http.HandlerFunc(deps.MessagingHandler.SendToProfile)))
+	mux.Handle("GET /api/v1/messages/conversations", requireAuth(http.HandlerFunc(deps.MessagingHandler.ListConversations)))
+	mux.Handle("GET /api/v1/messages/conversations/{conversationID}/messages", requireAuth(http.HandlerFunc(deps.MessagingHandler.ListMessages)))
+	mux.Handle("POST /api/v1/messages/conversations/{conversationID}/messages", requireAuth(http.HandlerFunc(deps.MessagingHandler.SendInConversation)))
+
+	// --- Bloqueo (Fase 9) ------------------------------------------------
+	mux.Handle("GET /api/v1/blocks", requireAuth(http.HandlerFunc(deps.BlockingHandler.List)))
+	mux.Handle("POST /api/v1/blocks/{profileID}", requireAuth(http.HandlerFunc(deps.BlockingHandler.Add)))
+	mux.Handle("DELETE /api/v1/blocks/{profileID}", requireAuth(http.HandlerFunc(deps.BlockingHandler.Remove)))
+	mux.Handle("GET /api/v1/blocks/{profileID}", requireAuth(http.HandlerFunc(deps.BlockingHandler.Status)))
+
+	// --- Reportes (Fase 9) ------------------------------------------------
+	// Solo creación aquí; revisarlos es la Fase 10 (panel de moderación).
+	mux.Handle("POST /api/v1/reports/{profileID}", requireAuth(http.HandlerFunc(deps.ReportsHandler.Create)))
 
 	var handler http.Handler = mux
 	handler = withRecover(handler)

@@ -1,9 +1,7 @@
 // Comando api arranca el backend monolítico modular de la plataforma
-// de dating. Módulos activos: health (liveness/readiness), auth
-// (registro, login, logout, sesiones, verificación de email, reset de
-// contraseña, eliminación de cuenta) y profiles (perfil propio y fotos).
-// El resto de módulos de dominio (search, messages, ...) se irán
-// añadiendo en fases futuras.
+// de dating. Módulos activos: health, auth, profiles, search,
+// favorites, messaging, blocking y reports. El resto de módulos de
+// dominio (moderación/admin, ...) se irán añadiendo en fases futuras.
 package main
 
 import (
@@ -17,11 +15,15 @@ import (
 	"time"
 
 	"dating-platform/backend/internal/auth"
+	"dating-platform/backend/internal/blocking"
 	"dating-platform/backend/internal/config"
 	"dating-platform/backend/internal/db"
 	"dating-platform/backend/internal/email"
+	"dating-platform/backend/internal/favorites"
+	"dating-platform/backend/internal/messaging"
 	"dating-platform/backend/internal/profiles"
 	"dating-platform/backend/internal/redisclient"
+	"dating-platform/backend/internal/reports"
 	"dating-platform/backend/internal/search"
 	"dating-platform/backend/internal/server"
 	"dating-platform/backend/internal/storage"
@@ -88,14 +90,34 @@ func main() {
 	searchService := search.NewService(searchRepo)
 	searchHandler := search.NewHandler(searchService)
 
+	favoritesRepo := favorites.NewPostgresRepository(pool)
+	favoritesService := favorites.NewService(favoritesRepo, profilesRepo)
+	favoritesHandler := favorites.NewHandler(favoritesService)
+
+	blockingRepo := blocking.NewPostgresRepository(pool)
+	blockingService := blocking.NewService(blockingRepo, profilesRepo)
+	blockingHandler := blocking.NewHandler(blockingService)
+
+	messagingRepo := messaging.NewPostgresRepository(pool)
+	messagingService := messaging.NewService(messagingRepo, profilesRepo, blockingRepo)
+	messagingHandler := messaging.NewHandler(messagingService)
+
+	reportsRepo := reports.NewPostgresRepository(pool)
+	reportsService := reports.NewService(reportsRepo, profilesRepo)
+	reportsHandler := reports.NewHandler(reportsService)
+
 	router := server.NewRouter(server.Dependencies{
-		DB:              pool,
-		Redis:           rdb,
-		AuthService:     authService,
-		AuthHandler:     authHandler,
-		SessionCookie:   cfg.Auth.CookieName,
-		ProfilesHandler: profilesHandler,
-		SearchHandler:   searchHandler,
+		DB:               pool,
+		Redis:            rdb,
+		AuthService:      authService,
+		AuthHandler:      authHandler,
+		SessionCookie:    cfg.Auth.CookieName,
+		ProfilesHandler:  profilesHandler,
+		SearchHandler:    searchHandler,
+		FavoritesHandler: favoritesHandler,
+		MessagingHandler: messagingHandler,
+		BlockingHandler:  blockingHandler,
+		ReportsHandler:   reportsHandler,
 	})
 
 	addr := cfg.Backend.Host + ":" + cfg.Backend.Port

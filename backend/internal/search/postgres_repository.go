@@ -22,7 +22,14 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 var _ Repository = (*PostgresRepository)(nil)
 
 func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result, error) {
-	where := []string{"u.status = 'active'", "u.deleted_at IS NULL", "p.user_id <> $1"}
+	where := []string{
+		"u.status = 'active'", "u.deleted_at IS NULL", "p.user_id <> $1",
+		`NOT EXISTS (
+			SELECT 1 FROM blocks b
+			WHERE (b.blocker_id = $1 AND b.blocked_id = p.user_id)
+			   OR (b.blocker_id = p.user_id AND b.blocked_id = $1)
+		)`,
+	}
 	args := []any{params.ExcludeUserID}
 
 	add := func(clause string, val any) {

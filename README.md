@@ -139,6 +139,123 @@ una comparación contra `NULL`, así que esto ocurre automáticamente en
 cada cláusula, sin lógica especial por campo (ver comentarios en
 `backend/internal/search/postgres_repository.go`).
 
+## API de perfiles públicos (Fase 6)
+
+Mismo formato que `GET /api/v1/profiles/me`, pero sobre el perfil de
+otra persona, identificado por su `profile_id` (el que devuelve la
+búsqueda). Todo requiere sesión.
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/v1/profiles/{profileID}` | Perfil público de otra persona |
+| GET | `/api/v1/profiles/{profileID}/photos` | Sus fotos |
+| GET | `/api/v1/profiles/{profileID}/photos/{photoID}/file` | Contenido de una foto suya |
+
+**Privacidad básica:** solo son visibles los perfiles de cuentas
+activas (`status = 'active'`, no eliminadas). Ver el perfil de alguien
+suspendido o dado de baja devuelve el mismo `404` genérico que un ID
+inexistente, para no filtrar por qué no aparece.
+
+## Frontend: resultados y perfil (Fase 6)
+
+- `/discover` — lista paginada de resultados de `GET /api/v1/search/profiles`, con enlace a cada perfil.
+- `/profiles/[id]` — página de un perfil público (datos + fotos), con navegación de vuelta a `/discover`.
+- `frontend/lib/api.ts` — helper `apiFetch` compartido por ambas páginas (usa `NEXT_PUBLIC_API_URL`, mismo origen que el navegador vía Caddy, así que la cookie de sesión viaja sola).
+
+Estas páginas requieren una sesión iniciada (cookie `session_id`). Como
+todavía no existe una pantalla de login en el frontend (no la pide
+ninguna fase hasta ahora), para probarlas primero inicia sesión con
+`curl` guardando cookies, y usa esas mismas cookies en el navegador (o
+copia la cookie `session_id` con las herramientas de desarrollador).
+
+## API de favoritos (Fase 7)
+
+Los favoritos se referencian por `profile_id` (igual que búsqueda y
+perfiles públicos). `POST`/`DELETE` son **idempotentes**: repetir la
+misma llamada no es un error, para que el botón de favorito del cliente
+no tenga que rastrear su propio estado antes de llamar.
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/v1/favorites` | Lista mis favoritos (paginada, `page`/`page_size`) |
+| POST | `/api/v1/favorites/{profileID}` | Añade a favoritos |
+| DELETE | `/api/v1/favorites/{profileID}` | Quita de favoritos |
+| GET | `/api/v1/favorites/{profileID}` | `{"favorited": true\|false}` |
+
+No puedes añadirte a ti mismo (`400 cannot_favorite_self`), y solo se
+pueden favoritear perfiles visibles públicamente (misma regla de la
+Fase 6: `404` genérico si no existe o la cuenta no está activa). Un
+favorito hacia una cuenta que luego se suspende o elimina deja de
+aparecer en el listado automáticamente (se filtra igual que en
+búsqueda), sin necesidad de borrar la fila.
+
+`/favorites` en el frontend lista los favoritos, y la página de perfil
+(`/profiles/[id]`) incluye un botón para añadir/quitar.
+
+## API de mensajería (Fase 8)
+
+Mensajería 1:1 (sin grupos en V1). Toda ruta requiere sesión.
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/api/v1/messages/to/{profileID}` | Envía un mensaje a esa persona; crea la conversación si es la primera vez |
+| GET | `/api/v1/messages/conversations` | Lista mis conversaciones (paginada), con último mensaje y no leídos |
+| GET | `/api/v1/messages/conversations/{conversationID}/messages` | Pagina los mensajes de una conversación (más antiguo primero) |
+| POST | `/api/v1/messages/conversations/{conversationID}/messages` | Continúa una conversación ya abierta |
+
+**Lectura:** al listar los mensajes de una conversación (`GET .../messages`),
+el backend marca como leídos, como efecto secundario, todos los que te
+escribieron a ti — no hace falta un endpoint aparte para "marcar como leído".
+
+**Controles básicos:** el cuerpo del mensaje no puede estar vacío ni
+superar 2000 caracteres; no puedes escribirte a ti mismo
+(`400 cannot_message_self`); solo puedes iniciar conversación con
+perfiles visibles públicamente (misma regla de la Fase 6). El bloqueo
+de usuarios (impedir que alguien te escriba) es explícitamente la
+Fase 9, no esta.
+
+`/messages` lista las conversaciones; `/messages/[id]` es el hilo, con
+caja para responder. Desde `/profiles/[id]` hay un pequeño formulario
+para mandar el primer mensaje, que te lleva directo al hilo abierto.
+
+## API de bloqueo y reportes (Fase 9)
+
+### Bloqueo
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/v1/blocks` | Lista a quién he bloqueado yo (paginada) |
+| POST | `/api/v1/blocks/{profileID}` | Bloquea (idempotente) |
+| DELETE | `/api/v1/blocks/{profileID}` | Desbloquea (idempotente) |
+| GET | `/api/v1/blocks/{profileID}` | `{"blocked": true\|false}` |
+
+**Reglas de visibilidad (el efecto es mutuo, no solo desde quien bloquea):**
+si A bloquea a B, ninguno de los dos aparece en los resultados de
+búsqueda, la lista de favoritos ni la lista de conversaciones del otro;
+tampoco pueden verse el perfil público ni sus fotos (mismo `404`
+genérico que "no existe" o "cuenta inactiva"), ni escribirse mensajes
+nuevos — ni siquiera continuando una conversación que ya existía antes
+del bloqueo. Nada de esto borra datos: favoritos y mensajes previos
+siguen en la base de datos, solo se filtran al mostrarlos.
+
+Solo quien bloqueó puede desbloquear. Bloquear y reportar funcionan
+incluso hacia alguien que ya te ha bloqueado a ti (usan una resolución
+de perfil que ignora las reglas de visibilidad a propósito).
+
+### Reportes
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| POST | `/api/v1/reports/{profileID}` | Crea un reporte: `{"reason": "...", "description": "..."}` |
+
+`reason` debe ser uno de: `spam`, `fake_profile`, `harassment`,
+`inappropriate_content`, `underage`, `other`. `description` es opcional
+(máx. 2000 caracteres). Los reportes quedan en estado `pending`; su
+revisión es el panel de moderación de la Fase 10, que todavía no existe.
+
+`/blocked` en el frontend lista y permite desbloquear; `/profiles/[id]`
+tiene botones de bloquear/desbloquear y un formulario de reporte.
+
 ## Tests
 
 Se añadirán en la Fase 12 (Tests y calidad).
@@ -170,10 +287,20 @@ Nunca se sube `.env` (con secretos reales) a Git.
 │   │   ├── email/                # Abstracción de envío de email (driver "noop" en V1)
 │   │   ├── profiles/              # Perfil propio: datos estructurados + fotos
 │   │   ├── search/                 # Búsqueda de perfiles con filtros estructurados
+│   │   ├── favorites/               # Favoritos: añadir, eliminar, listar
+│   │   ├── messaging/                # Conversaciones y mensajes 1:1
+│   │   ├── blocking/                  # Bloqueo entre usuarios y reglas de visibilidad
+│   │   ├── reports/                   # Creación de reportes (moderación: Fase 10)
 │   │   └── storage/               # Abstracción de almacenamiento de ficheros (driver "local" en V1)
 │   └── migrations/            # Migraciones SQL versionadas
 └── frontend/                 # Next.js (App Router, TypeScript)
     ├── app/
+    │   ├── discover/           # Resultados de búsqueda (Fase 6)
+    │   ├── profiles/[id]/      # Página de perfil público (Fase 6)
+    │   ├── favorites/          # Lista de favoritos (Fase 7)
+    │   ├── messages/           # Conversaciones y mensajes (Fase 8)
+    │   └── blocked/            # Perfiles bloqueados (Fase 9)
+    ├── lib/                    # Helpers compartidos (cliente de API)
     └── messages/               # Esqueleto i18n (es/en), aún sin enrutar
 ```
 

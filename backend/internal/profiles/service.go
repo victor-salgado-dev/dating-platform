@@ -84,6 +84,44 @@ func (s *Service) GetMyProfile(ctx context.Context, userID uuid.UUID) (*Profile,
 	return s.repo.GetByUserID(ctx, userID)
 }
 
+// GetPublicProfile devuelve el perfil de otra persona para verlo (Fase 6).
+// Devuelve ErrNotFound si no existe, si su cuenta no está activa, o si
+// hay un bloqueo entre viewerUserID y esa cuenta (Fase 9).
+func (s *Service) GetPublicProfile(ctx context.Context, viewerUserID, profileID uuid.UUID) (*Profile, error) {
+	return s.repo.GetPublicByID(ctx, profileID, viewerUserID)
+}
+
+// ListPublicPhotos lista las fotos de un perfil ajeno, comprobando
+// primero que sea visible públicamente para viewerUserID.
+func (s *Service) ListPublicPhotos(ctx context.Context, viewerUserID, profileID uuid.UUID) ([]Photo, error) {
+	if _, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListPhotos(ctx, profileID)
+}
+
+// OpenPublicPhoto abre el contenido de una foto de un perfil ajeno,
+// comprobando primero que el perfil sea visible públicamente para
+// viewerUserID. El llamador es responsable de cerrar el io.ReadCloser
+// devuelto.
+func (s *Service) OpenPublicPhoto(ctx context.Context, viewerUserID, profileID, photoID uuid.UUID) (io.ReadCloser, *Photo, error) {
+	if _, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID); err != nil {
+		return nil, nil, err
+	}
+
+	ph, err := s.repo.GetPhoto(ctx, profileID, photoID)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	rc, err := s.storage.Open(ctx, ph.StorageKey)
+	if err != nil {
+		return nil, nil, fmt.Errorf("profiles: abrir fichero de foto: %w", err)
+	}
+
+	return rc, ph, nil
+}
+
 func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, in CreateProfileInput) (*Profile, error) {
 	if err := validateDisplayName(in.DisplayName); err != nil {
 		return nil, err

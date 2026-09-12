@@ -1,0 +1,59 @@
+.main {
+  max-width: 640px;
+  margin: 2rem auto;
+  padding: 0 1.5rem;
+}
+
+.error {
+  color: #b00020;
+}
+
+.list {
+  list-style: none;
+  padding: 0;
+  margin: 1rem 0;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.9rem 0.25rem;
+  border-bottom: 1px solid #eee;
+  color: inherit;
+  text-decoration: none;
+}
+
+.rowMain {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 600;
+}
+
+.preview {
+  color: #666;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 380px;
+}
+
+.badge {
+  flex: none;
+  background: #d32f2f;
+  color: white;
+  border-radius: 999px;
+  min-width: 1.4rem;
+  height: 1.4rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  padding: 0 0.35rem;
+}

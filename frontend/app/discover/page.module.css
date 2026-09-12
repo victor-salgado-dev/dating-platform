@@ -1,0 +1,60 @@
+.main {
+  max-width: 720px;
+  margin: 2rem auto;
+  padding: 0 1.5rem;
+}
+
+.error {
+  color: #b00020;
+}
+
+.grid {
+  list-style: none;
+  padding: 0;
+  margin: 1.5rem 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.cardLink {
+  display: block;
+  padding: 1rem;
+  color: inherit;
+  text-decoration: none;
+}
+
+.cardLink:hover {
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.cardName {
+  font-weight: 600;
+}
+
+.cardLocation {
+  color: #666;
+  font-size: 0.9rem;
+}
+
+.cardGoal {
+  margin-top: 0.5rem;
+  display: inline-block;
+  font-size: 0.75rem;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: #eee;
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  justify-content: center;
+}

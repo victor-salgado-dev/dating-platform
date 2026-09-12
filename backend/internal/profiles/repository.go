@@ -16,6 +16,24 @@ type Repository interface {
 	// Devuelve ErrNotFound si todavía no se ha creado.
 	GetByUserID(ctx context.Context, userID uuid.UUID) (*Profile, error)
 
+	// GetPublicByID devuelve un perfil por su ID, solo si pertenece a una
+	// cuenta activa (no suspendida, no eliminada) y no hay ningún bloqueo
+	// (en cualquier sentido) entre viewerUserID y ese perfil. Es la
+	// puerta de entrada a "perfiles públicos" (Fase 6) y a las reglas de
+	// visibilidad del bloqueo (Fase 9): deliberadamente no distingue
+	// entre "no existe", "cuenta inactiva" y "hay un bloqueo" — los tres
+	// casos devuelven ErrNotFound, para no filtrar por qué un perfil no
+	// aparece.
+	GetPublicByID(ctx context.Context, id, viewerUserID uuid.UUID) (*Profile, error)
+
+	// GetByIDAny devuelve un perfil por su ID sin aplicar ninguna regla
+	// de visibilidad (ni estado de cuenta ni bloqueos). Solo debe usarse
+	// para acciones que deben poder realizarse precisamente EN CONTRA de
+	// esas reglas: bloquear a alguien, o reportarlo, tiene que funcionar
+	// aunque esa persona ya te haya bloqueado a ti. Devuelve ErrNotFound
+	// solo si el perfil no existe en absoluto.
+	GetByIDAny(ctx context.Context, id uuid.UUID) (*Profile, error)
+
 	// Update aplica un patch parcial al perfil de userID y devuelve el
 	// perfil resultante. Devuelve ErrNotFound si no existe.
 	Update(ctx context.Context, userID uuid.UUID, patch ProfilePatch) (*Profile, error)

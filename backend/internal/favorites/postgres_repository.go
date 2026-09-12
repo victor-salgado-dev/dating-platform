@@ -1,0 +1,128 @@
+package favorites
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+
+	"dating-platform/backend/internal/profiles"
+)
+
+type PostgresRepository struct {
+	db *pgxpool.Pool
+}
+
+func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
+	return &PostgresRepository{db: db}
+}
+
+var _ Repository = (*PostgresRepository)(nil)
+
+func (r *PostgresRepository) Add(ctx context.Context, userID, profileID uuid.UUID) error {
+	const query = `
+		INSERT INTO favorites (user_id, favorite_profile_id)
+		VALUES ($1, $2)
+		ON CONFLICT (user_id, favorite_profile_id) DO NOTHING
+	`
+
+	if _, err := r.db.Exec(ctx, query, userID, profileID); err != nil {
+		return fmt.Errorf("favorites: añadir favorito: %w", err)
+	}
+	return nil
+}
+
+func (r *PostgresRepository) Remove(ctx context.Context, userID, profileID uuid.UUID) error {
+	const query = `DELETE FROM favorites WHERE user_id = $1 AND favorite_profile_id = $2`
+
+	if _, err := r.db.Exec(ctx, query, userID, profileID); err != nil {
+		return fmt.Errorf("favorites: quitar favorito: %w", err)
+	}
+	return nil
+}
+
+func (r *PostgresRepository) IsFavorited(ctx context.Context, userID, profileID uuid.UUID) (bool, error) {
+	const query = `SELECT EXISTS (SELECT 1 FROM favorites WHERE user_id = $1 AND favorite_profile_id = $2)`
+
+	var exists bool
+	if err := r.db.QueryRow(ctx, query, userID, profileID).Scan(&exists); err != nil {
+		return false, fmt.Errorf("favorites: comprobar favorito: %w", err)
+	}
+	return exists, nil
+}
+
+func (r *PostgresRepository) List(ctx context.Context, userID uuid.UUID, page, pageSize int) (*ListResult, error) {
+	const query = `
+		SELECT
+			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
+			p.relationship_goal, f.created_at,
+			EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
+			COUNT(*) OVER() AS total_count
+		FROM favorites f
+		JOIN profiles p ON p.id = f.favorite_profile_id
+		JOIN users u ON u.id = p.user_id
+		WHERE f.user_id = $1 AND u.status = 'active' AND u.deleted_at IS NULL
+		  AND NOT EXISTS (
+		      SELECT 1 FROM blocks b
+		      WHERE (b.blocker_id = $1 AND b.blocked_id = p.user_id)
+		         OR (b.blocker_id = p.user_id AND b.blocked_id = $1)
+		  )
+		ORDER BY f.created_at DESC
+		LIMIT $2 OFFSET $3
+	`
+
+	rows, err := r.db.Query(ctx, query, userID, pageSize, (page-1)*pageSize)
+	if err != nil {
+		return nil, fmt.Errorf("favorites: listar favoritos: %w", err)
+	}
+	defer rows.Close()
+
+	now := time.Now()
+	var items []ListItem
+	total := 0
+
+	for rows.Next() {
+		var (
+			item       ListItem
+			genderStr  string
+			relGoalStr *string
+			birthDate  time.Time
+			totalCount int
+		)
+
+		if err := rows.Scan(
+			&item.ProfileID, &item.DisplayName, &birthDate, &genderStr, &item.CountryCode,
+			&item.Region, &relGoalStr, &item.FavoritedAt, &item.HasPhoto, &totalCount,
+		); err != nil {
+			return nil, fmt.Errorf("favorites: leer favorito: %w", err)
+		}
+
+		item.Age = profiles.AgeAt(birthDate, now)
+		item.Gender = profiles.Gender(genderStr)
+		if relGoalStr != nil {
+			g := profiles.RelationshipGoal(*relGoalStr)
+			item.RelationshipGoal = &g
+		}
+
+		total = totalCount
+		items = append(items, item)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("favorites: listar favoritos: %w", err)
+	}
+
+	totalPages := 0
+	if total > 0 {
+		totalPages = (total + pageSize - 1) / pageSize
+	}
+
+	return &ListResult{
+		Items:      items,
+		Total:      total,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: totalPages,
+	}, nil
+}
