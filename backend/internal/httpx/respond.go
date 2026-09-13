@@ -5,7 +5,9 @@ package httpx
 
 import (
 	"encoding/json"
+	"net"
 	"net/http"
+	"strings"
 )
 
 // ErrorResponse es el formato estándar de error de toda la API.
@@ -39,4 +41,28 @@ func DecodeJSON(r *http.Request, dst any) error {
 	dec := json.NewDecoder(r.Body)
 	dec.DisallowUnknownFields()
 	return dec.Decode(dst)
+}
+
+// ClientIP devuelve la IP del cliente, para logging y rate limiting.
+//
+// AVISO DE SEGURIDAD: X-Forwarded-For lo añade Caddy cuando la petición
+// pasa por el reverse proxy, pero el backend también publica su puerto
+// directamente en docker-compose.yml (para poder probarlo sin pasar por
+// Caddy en desarrollo). Cualquiera que llame al backend directamente
+// puede falsificar esa cabecera. En producción (Fase 14), el backend no
+// debería exponerse fuera de la red de Docker: solo Caddy debería
+// llegar a él, momento en el que confiar en X-Forwarded-For es seguro.
+func ClientIP(r *http.Request) string {
+	if fwd := r.Header.Get("X-Forwarded-For"); fwd != "" {
+		// Puede venir como "cliente, proxy1, proxy2"; el primero es el cliente real.
+		if i := strings.IndexByte(fwd, ','); i != -1 {
+			return strings.TrimSpace(fwd[:i])
+		}
+		return strings.TrimSpace(fwd)
+	}
+
+	if host, _, err := net.SplitHostPort(r.RemoteAddr); err == nil {
+		return host
+	}
+	return r.RemoteAddr
 }

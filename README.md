@@ -297,6 +297,50 @@ con las acciones de arriba. Si tu cuenta no es admin, verás un mensaje
 de permisos en vez del panel (el backend ya lo protege; el frontend solo
 refleja el `403`).
 
+## Seguridad y hardening (Fase 11)
+
+Añadido transversal a toda la API existente, sin cambiar ningún contrato:
+
+- **Rate limiting (Redis, ventana fija).** Dos niveles, por IP:
+  - Global sobre toda la API: `RATE_LIMIT_GLOBAL_MAX` peticiones cada
+    `RATE_LIMIT_GLOBAL_WINDOW_SECONDS` (300/300s por defecto).
+  - Estricto sobre los endpoints de auth más sensibles a fuerza bruta o
+    spam (`register`, `login`, `password/forgot`, `password/reset`,
+    `email/verify`, `email/resend`): `RATE_LIMIT_AUTH_MAX` cada
+    `RATE_LIMIT_AUTH_WINDOW_SECONDS` (20/900s por defecto). Al superarse,
+    `429 rate_limited`. Si Redis fallara, el límite se salta (fail-open):
+    es una capa de defensa, no debe poder tumbar la API entera.
+- **Cabeceras de seguridad** en toda respuesta: `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy: strict-origin-when-cross-origin`.
+- **Límite global de tamaño de petición** (`MAX_REQUEST_BODY_MB`, 10 MB por
+  defecto): backstop de memoria/DoS: cada endpoint sigue aplicando además
+  sus propios límites semánticos (2000 caracteres en un mensaje, 5 MB en
+  una foto...).
+- **Seguridad de imágenes reforzada.** El `Content-Type` que declara el
+  formulario de subida ya NO es de fiar (se falsifica con solo cambiar
+  una cabecera): ahora se inspeccionan los primeros bytes reales del
+  fichero (`http.DetectContentType`) y se guarda/sirve siempre ese tipo
+  detectado, nunca el declarado. Un desajuste se registra en logs pero
+  no bloquea por sí solo — lo que sí bloquea es que el contenido real no
+  sea JPEG/PNG/WebP.
+- **Suspensión efectiva de inmediato** (cerrada en la Fase 10, forma
+  parte del mismo endurecimiento): una cuenta suspendida pierde el
+  acceso aunque tenga una sesión ya abierta.
+- **Logs** incluyen ahora la IP de origen de cada petición.
+
+**Limitaciones conocidas, documentadas a propósito en vez de resueltas
+a medias:**
+- No hay protección CSRF explícita (tokens de formulario). La cookie de
+  sesión usa `SameSite=Lax`, que ya bloquea el caso más común (POST
+  cross-site), pero no es una solución completa. Añadir CSRF tokens
+  reales es una mejora futura razonable si se necesitara reforzar esto.
+- `docker-compose.yml` publica el puerto del backend directamente
+  (`8080`) para poder probarlo sin pasar por Caddy en desarrollo. Eso
+  significa que alguien podría saltarse Caddy y falsificar
+  `X-Forwarded-For` para intentar evadir el rate limiting por IP. En
+  producción (Fase 14) el backend no debería exponerse fuera de la red
+  de Docker: solo Caddy debería poder llegar a él.
+
 ## Tests
 
 Se añadirán en la Fase 12 (Tests y calidad).
@@ -335,6 +379,7 @@ Nunca se sube `.env` (con secretos reales) a Git.
 │   │   ├── blocking/                  # Bloqueo entre usuarios y reglas de visibilidad
 │   │   ├── reports/                   # Creación de reportes
 │   │   ├── admin/                     # Panel de administración (Fase 10)
+│   │   ├── ratelimit/                  # Rate limiting en Redis (Fase 11)
 │   │   └── storage/               # Abstracción de almacenamiento de ficheros (driver "local" en V1)
 │   └── migrations/            # Migraciones SQL versionadas
 └── frontend/                 # Next.js (App Router, TypeScript)

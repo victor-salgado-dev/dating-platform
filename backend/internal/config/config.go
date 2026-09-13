@@ -21,6 +21,7 @@ type Config struct {
 	Storage  StorageConfig
 	Email    EmailConfig
 	Auth     AuthConfig
+	Security SecurityConfig
 }
 
 type BackendConfig struct {
@@ -82,6 +83,27 @@ type AuthConfig struct {
 	CookieName             string
 }
 
+// SecurityConfig agrupa los parámetros de hardening de la Fase 11:
+// rate limiting (Redis) y el límite general de tamaño de petición.
+type SecurityConfig struct {
+	// Límite global, generoso, aplicado a TODAS las peticiones (defensa
+	// básica frente a abuso/DoS por fuerza bruta general).
+	GlobalRateLimit  int
+	GlobalRateWindow time.Duration
+
+	// Límite estricto aplicado solo a los endpoints sensibles de auth
+	// (register, login, password/forgot, password/reset, email/verify,
+	// email/resend), por IP.
+	AuthRateLimit  int
+	AuthRateWindow time.Duration
+
+	// Tamaño máximo de cualquier cuerpo de petición, en bytes. Es un
+	// backstop de memoria/DoS: los límites semánticos más estrictos
+	// (2000 caracteres en un mensaje, 5 MB en una foto...) los sigue
+	// aplicando cada módulo.
+	MaxRequestBodyBytes int64
+}
+
 // Load lee la configuración desde variables de entorno, aplicando valores
 // por defecto razonables para desarrollo. No debe inventar secretos: si
 // falta una variable sensible en producción, debe fallar de forma explícita
@@ -129,10 +151,18 @@ func Load() Config {
 			CookieSecure:         getEnv("APP_ENV", "development") == "production",
 			CookieName:           getEnv("SESSION_COOKIE_NAME", "session_id"),
 		},
+
+		Security: SecurityConfig{
+			GlobalRateLimit:     getEnvInt("RATE_LIMIT_GLOBAL_MAX", 300),
+			GlobalRateWindow:    time.Duration(getEnvInt("RATE_LIMIT_GLOBAL_WINDOW_SECONDS", 300)) * time.Second,
+			AuthRateLimit:       getEnvInt("RATE_LIMIT_AUTH_MAX", 20),
+			AuthRateWindow:      time.Duration(getEnvInt("RATE_LIMIT_AUTH_WINDOW_SECONDS", 900)) * time.Second,
+			MaxRequestBodyBytes: int64(getEnvInt("MAX_REQUEST_BODY_MB", 10)) * 1024 * 1024,
+		},
 	}
 }
 
-func getEnvHours(key string, fallback int) int {
+func getEnvInt(key string, fallback int) int {
 	v, ok := os.LookupEnv(key)
 	if !ok || v == "" {
 		return fallback
@@ -142,6 +172,10 @@ func getEnvHours(key string, fallback int) int {
 		return fallback
 	}
 	return n
+}
+
+func getEnvHours(key string, fallback int) int {
+	return getEnvInt(key, fallback)
 }
 
 func getEnv(key, fallback string) string {

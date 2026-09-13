@@ -1,10 +1,12 @@
 package profiles
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"log/slog"
+	"net/http"
 	"regexp"
 	"strings"
 	"time"
@@ -221,14 +223,38 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, patch Pro
 }
 
 // UploadPhoto valida y guarda una foto nueva para el perfil de userID.
-func (s *Service) UploadPhoto(ctx context.Context, userID uuid.UUID, contentType string, size int64, r io.Reader) (*Photo, error) {
-	ext, ok := allowedPhotoTypes[contentType]
-	if !ok {
-		return nil, invalidField("photo", "formato no soportado (usa JPEG, PNG o WebP)")
-	}
+//
+// Nunca se confía en el content-type que declara el cliente (es una
+// cabecera del formulario, se falsifica con nada): se inspeccionan los
+// primeros bytes del propio fichero para decidir su tipo real, y ESE
+// es el que se guarda y se sirve después.
+func (s *Service) UploadPhoto(ctx context.Context, userID uuid.UUID, declaredContentType string, size int64, r io.Reader) (*Photo, error) {
 	if size <= 0 || size > MaxPhotoSizeBytes {
 		return nil, invalidField("photo", fmt.Sprintf("el fichero debe pesar menos de %d MB", MaxPhotoSizeBytes/1024/1024))
 	}
+
+	peek := make([]byte, 512)
+	n, err := io.ReadFull(r, peek)
+	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+		return nil, fmt.Errorf("profiles: leer foto: %w", err)
+	}
+	peek = peek[:n]
+
+	detectedType := http.DetectContentType(peek)
+	ext, ok := allowedPhotoTypes[detectedType]
+	if !ok {
+		return nil, invalidField("photo", "el contenido del fichero no es una imagen JPEG, PNG o WebP válida")
+	}
+	if declaredContentType != "" && declaredContentType != detectedType {
+		// No es un error: solo una señal para logs. El content-type real
+		// (detectedType) es el único que se guarda y se sirve.
+		slog.Warn("content-type declarado no coincide con el detectado",
+			"declared", declaredContentType, "detected", detectedType)
+	}
+
+	// Reconstruye el stream completo: los bytes ya leídos para detectar
+	// el tipo + el resto, sin haber perdido nada.
+	fullReader := io.MultiReader(bytes.NewReader(peek), r)
 
 	profile, err := s.repo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -244,11 +270,11 @@ func (s *Service) UploadPhoto(ctx context.Context, userID uuid.UUID, contentType
 	}
 
 	key := fmt.Sprintf("profiles/%s/%s%s", profile.ID, uuid.NewString(), ext)
-	if err := s.storage.Save(ctx, key, r); err != nil {
+	if err := s.storage.Save(ctx, key, fullReader); err != nil {
 		return nil, fmt.Errorf("profiles: guardar fichero de foto: %w", err)
 	}
 
-	photo := &Photo{StorageKey: key, ContentType: contentType}
+	photo := &Photo{StorageKey: key, ContentType: detectedType}
 	if err := s.repo.AddPhoto(ctx, profile.ID, photo); err != nil {
 		// Evita dejar un fichero huérfano si falla el registro en BD.
 		if delErr := s.storage.Delete(ctx, key); delErr != nil {

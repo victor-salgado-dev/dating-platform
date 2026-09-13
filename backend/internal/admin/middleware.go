@@ -44,7 +44,11 @@ func RequireAdmin(authSvc *auth.Service, cookieName string) func(http.Handler) h
 				return
 			}
 
-			// Inyectar el ID de usuario en el contexto
+			// Sin esto, UserIDFromContext (usado por ListUsers/SuspendUser/
+			// ReactivateUser para saber quién es el admin que actúa) no
+			// encontraría nada: RequireAdmin valida la sesión por su cuenta
+			// en vez de delegar en RequireAuth, así que tiene que dejar el
+			// contexto en el mismo estado a mano, con la misma clave.
 			ctx := auth.ContextWithUserID(r.Context(), u.ID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})

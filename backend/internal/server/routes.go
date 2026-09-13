@@ -9,10 +9,12 @@ import (
 	"dating-platform/backend/internal/admin"
 	"dating-platform/backend/internal/auth"
 	"dating-platform/backend/internal/blocking"
+	"dating-platform/backend/internal/config"
 	"dating-platform/backend/internal/favorites"
 	"dating-platform/backend/internal/health"
 	"dating-platform/backend/internal/messaging"
 	"dating-platform/backend/internal/profiles"
+	"dating-platform/backend/internal/ratelimit"
 	"dating-platform/backend/internal/reports"
 	"dating-platform/backend/internal/search"
 )
@@ -36,6 +38,9 @@ type Dependencies struct {
 	BlockingHandler  *blocking.Handler
 	ReportsHandler   *reports.Handler
 	AdminHandler     *admin.Handler
+
+	RateLimiter *ratelimit.Limiter
+	Security    config.SecurityConfig
 }
 
 // NewRouter construye el árbol de rutas de la aplicación.
@@ -56,17 +61,21 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.HandleFunc("GET /api/v1/health", healthHandler.Readiness)
 
 	requireAuth := auth.RequireAuth(deps.AuthService, deps.SessionCookie)
+	authRateLimit := ratelimit.Middleware(deps.RateLimiter, "auth", deps.Security.AuthRateLimit, deps.Security.AuthRateWindow)
 
 	// --- Auth (Fase 3) -----------------------------------------------
-	mux.HandleFunc("POST /api/v1/auth/register", deps.AuthHandler.Register)
-	mux.HandleFunc("POST /api/v1/auth/login", deps.AuthHandler.Login)
+	// Rate limit estricto por IP: son los endpoints más golpeados por
+	// fuerza bruta (login), scraping de cuentas (forgot-password) y
+	// registro masivo de spam.
+	mux.Handle("POST /api/v1/auth/register", authRateLimit(http.HandlerFunc(deps.AuthHandler.Register)))
+	mux.Handle("POST /api/v1/auth/login", authRateLimit(http.HandlerFunc(deps.AuthHandler.Login)))
 	mux.HandleFunc("POST /api/v1/auth/logout", deps.AuthHandler.Logout)
-	mux.HandleFunc("POST /api/v1/auth/password/forgot", deps.AuthHandler.ForgotPassword)
-	mux.HandleFunc("POST /api/v1/auth/password/reset", deps.AuthHandler.ResetPassword)
-	mux.HandleFunc("POST /api/v1/auth/email/verify", deps.AuthHandler.VerifyEmail)
+	mux.Handle("POST /api/v1/auth/password/forgot", authRateLimit(http.HandlerFunc(deps.AuthHandler.ForgotPassword)))
+	mux.Handle("POST /api/v1/auth/password/reset", authRateLimit(http.HandlerFunc(deps.AuthHandler.ResetPassword)))
+	mux.Handle("POST /api/v1/auth/email/verify", authRateLimit(http.HandlerFunc(deps.AuthHandler.VerifyEmail)))
 
 	mux.Handle("GET /api/v1/auth/me", requireAuth(http.HandlerFunc(deps.AuthHandler.Me)))
-	mux.Handle("POST /api/v1/auth/email/resend", requireAuth(http.HandlerFunc(deps.AuthHandler.ResendVerification)))
+	mux.Handle("POST /api/v1/auth/email/resend", authRateLimit(requireAuth(http.HandlerFunc(deps.AuthHandler.ResendVerification))))
 	mux.Handle("DELETE /api/v1/auth/account", requireAuth(http.HandlerFunc(deps.AuthHandler.DeleteAccount)))
 
 	// --- Profiles (Fase 4) --------------------------------------------
@@ -131,9 +140,14 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/admin/reports", requireAdmin(http.HandlerFunc(deps.AdminHandler.ListReports)))
 	mux.Handle("POST /api/v1/admin/reports/{reportID}/resolve", requireAdmin(http.HandlerFunc(deps.AdminHandler.ResolveReport)))
 
+	globalRateLimit := ratelimit.Middleware(deps.RateLimiter, "global", deps.Security.GlobalRateLimit, deps.Security.GlobalRateWindow)
+
 	var handler http.Handler = mux
+	handler = globalRateLimit(handler)
 	handler = withRecover(handler)
 	handler = withLogging(handler)
+	handler = withSecurityHeaders(handler)
+	handler = withMaxBodySize(handler, deps.Security.MaxRequestBodyBytes)
 
 	return handler
 }

@@ -24,6 +24,7 @@ import (
 	"dating-platform/backend/internal/favorites"
 	"dating-platform/backend/internal/messaging"
 	"dating-platform/backend/internal/profiles"
+	"dating-platform/backend/internal/ratelimit"
 	"dating-platform/backend/internal/redisclient"
 	"dating-platform/backend/internal/reports"
 	"dating-platform/backend/internal/search"
@@ -111,6 +112,8 @@ func main() {
 	adminService := admin.NewService(usersRepo, reportsRepo)
 	adminHandler := admin.NewHandler(adminService)
 
+	rateLimiter := ratelimit.New(rdb)
+
 	router := server.NewRouter(server.Dependencies{
 		DB:               pool,
 		Redis:            rdb,
@@ -124,6 +127,8 @@ func main() {
 		BlockingHandler:  blockingHandler,
 		ReportsHandler:   reportsHandler,
 		AdminHandler:     adminHandler,
+		RateLimiter:      rateLimiter,
+		Security:         cfg.Security,
 	})
 
 	addr := cfg.Backend.Host + ":" + cfg.Backend.Port

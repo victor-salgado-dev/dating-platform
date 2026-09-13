@@ -14,11 +14,6 @@ type contextKey string
 
 const userIDContextKey contextKey = "auth_user_id"
 
-// ContextWithUserID añade el usuario autenticado al contexto de la petición.
-func ContextWithUserID(ctx context.Context, userID uuid.UUID) context.Context {
-	return context.WithValue(ctx, userIDContextKey, userID)
-}
-
 // RequireAuth exige una cookie de sesión válida. Si es válida, añade el
 // ID del usuario al contexto de la petición (ver UserIDFromContext) y
 // continúa; si no, responde 401 sin llegar al handler protegido.
@@ -48,6 +43,16 @@ func RequireAuth(svc *Service, cookieName string) func(http.Handler) http.Handle
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}
+}
+
+// ContextWithUserID añade el ID de usuario autenticado al contexto,
+// con la misma clave interna que usa RequireAuth. Se expone para que
+// otros middlewares de autorización (p. ej. admin.RequireAdmin, que no
+// pasa por RequireAuth sino que valida la sesión por su cuenta) puedan
+// dejar el contexto en el mismo estado, y así UserIDFromContext
+// funcione igual en ambos casos.
+func ContextWithUserID(ctx context.Context, userID uuid.UUID) context.Context {
+	return context.WithValue(ctx, userIDContextKey, userID)
 }
 
 // UserIDFromContext recupera el ID del usuario autenticado, colocado por
