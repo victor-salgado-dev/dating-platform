@@ -10,6 +10,8 @@ import (
 	"dating-platform/backend/internal/auth"
 	"dating-platform/backend/internal/blocking"
 	"dating-platform/backend/internal/config"
+	"dating-platform/backend/internal/consent"
+	"dating-platform/backend/internal/contact"
 	"dating-platform/backend/internal/favorites"
 	"dating-platform/backend/internal/health"
 	"dating-platform/backend/internal/messaging"
@@ -38,6 +40,8 @@ type Dependencies struct {
 	BlockingHandler  *blocking.Handler
 	ReportsHandler   *reports.Handler
 	AdminHandler     *admin.Handler
+	ConsentHandler   *consent.Handler
+	ContactHandler   *contact.Handler
 
 	RateLimiter *ratelimit.Limiter
 	Security    config.SecurityConfig
@@ -139,6 +143,16 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("POST /api/v1/admin/users/{userID}/reactivate", requireAdmin(http.HandlerFunc(deps.AdminHandler.ReactivateUser)))
 	mux.Handle("GET /api/v1/admin/reports", requireAdmin(http.HandlerFunc(deps.AdminHandler.ListReports)))
 	mux.Handle("POST /api/v1/admin/reports/{reportID}/resolve", requireAdmin(http.HandlerFunc(deps.AdminHandler.ResolveReport)))
+
+	// --- Legal y privacidad (Fase 13) ------------------------------------
+	// El historial de consentimientos es propio, con sesión normal.
+	mux.Handle("GET /api/v1/consents/me", requireAuth(http.HandlerFunc(deps.ConsentHandler.ListMine)))
+
+	// El formulario de contacto es deliberadamente público (alguien sin
+	// cuenta también tiene que poder escribir), así que NO pasa por
+	// requireAuth — pero sí por el mismo rate limit estricto que auth,
+	// para no convertirse en un vector de spam/abuso sin control.
+	mux.Handle("POST /api/v1/contact", authRateLimit(http.HandlerFunc(deps.ContactHandler.Send)))
 
 	globalRateLimit := ratelimit.Middleware(deps.RateLimiter, "global", deps.Security.GlobalRateLimit, deps.Security.GlobalRateWindow)
 

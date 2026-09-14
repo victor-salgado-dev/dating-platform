@@ -1,8 +1,8 @@
 // Comando api arranca el backend monolítico modular de la plataforma
 // de dating. Módulos activos: health, auth, profiles, search,
-// favorites, messaging, blocking, reports y admin. El resto de módulos
-// de dominio se irán añadiendo en fases futuras (seguridad, tests,
-// legal, producción).
+// favorites, messaging, blocking, reports, admin, consent y contact.
+// El resto de módulos de dominio se irán añadiendo en fases futuras
+// (producción).
 package main
 
 import (
@@ -19,6 +19,8 @@ import (
 	"dating-platform/backend/internal/auth"
 	"dating-platform/backend/internal/blocking"
 	"dating-platform/backend/internal/config"
+	"dating-platform/backend/internal/consent"
+	"dating-platform/backend/internal/contact"
 	"dating-platform/backend/internal/db"
 	"dating-platform/backend/internal/email"
 	"dating-platform/backend/internal/favorites"
@@ -68,16 +70,24 @@ func main() {
 	sessionStore := auth.NewRedisSessionStore(rdb, cfg.Auth.SessionTTL)
 	tokenStore := auth.NewRedisTokenStore(rdb)
 
+	consentRepo := consent.NewPostgresRepository(pool)
+	consentService := consent.NewService(consentRepo)
+	consentHandler := consent.NewHandler(consentService)
+
 	authService := auth.NewService(
 		usersRepo,
 		sessionStore,
 		tokenStore,
 		emailSender,
+		consentService,
 		cfg.Auth.SessionTTL,
 		cfg.Auth.EmailVerificationTTL,
 		cfg.Auth.PasswordResetTTL,
 	)
 	authHandler := auth.NewHandler(authService, cfg.Auth)
+
+	contactService := contact.NewService(emailSender, cfg.Email.ContactInbox)
+	contactHandler := contact.NewHandler(contactService)
 
 	fileStorage, err := storage.New(cfg.Storage.Driver, cfg.Storage.LocalPath)
 	if err != nil {
@@ -127,6 +137,8 @@ func main() {
 		BlockingHandler:  blockingHandler,
 		ReportsHandler:   reportsHandler,
 		AdminHandler:     adminHandler,
+		ConsentHandler:   consentHandler,
+		ContactHandler:   contactHandler,
 		RateLimiter:      rateLimiter,
 		Security:         cfg.Security,
 	})

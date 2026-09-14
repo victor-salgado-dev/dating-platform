@@ -70,6 +70,9 @@ type StorageConfig struct {
 type EmailConfig struct {
 	Driver string
 	From   string
+	// ContactInbox es la dirección a la que llegan los mensajes del
+	// formulario de contacto (Fase 13).
+	ContactInbox string
 }
 
 // AuthConfig agrupa la configuración del módulo de autenticación:
@@ -140,8 +143,9 @@ func Load() Config {
 		},
 
 		Email: EmailConfig{
-			Driver: getEnv("EMAIL_DRIVER", "noop"),
-			From:   getEnv("EMAIL_FROM", "no-reply@example.com"),
+			Driver:       getEnv("EMAIL_DRIVER", "noop"),
+			From:         getEnv("EMAIL_FROM", "no-reply@example.com"),
+			ContactInbox: getEnv("CONTACT_INBOX_EMAIL", "contact@example.com"),
 		},
 
 		Auth: AuthConfig{

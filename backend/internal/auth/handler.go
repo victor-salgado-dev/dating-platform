@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"dating-platform/backend/internal/config"
+	"dating-platform/backend/internal/consent"
 	"dating-platform/backend/internal/httpx"
 	"dating-platform/backend/internal/users"
 )
@@ -23,8 +24,9 @@ func NewHandler(svc *Service, cfg config.AuthConfig) *Handler {
 // --- DTOs de petición/respuesta -------------------------------------------
 
 type registerRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
+	Email         string `json:"email"`
+	Password      string `json:"password"`
+	AcceptedTerms bool   `json:"accepted_terms"`
 }
 
 type loginRequest struct {
@@ -76,7 +78,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	u, token, err := h.svc.Register(r.Context(), req.Email, req.Password)
+	u, token, err := h.svc.Register(r.Context(), req.Email, req.Password, req.AcceptedTerms)
 	if err != nil {
 		switch {
 		case errors.Is(err, ErrWeakPassword):
@@ -85,6 +87,8 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteError(w, http.StatusConflict, "email_taken", "Ese email ya está registrado.")
 		case errors.Is(err, ErrInvalidEmail):
 			httpx.WriteError(w, http.StatusBadRequest, "invalid_email", "El formato del email no es válido.")
+		case errors.Is(err, consent.ErrTermsNotAccepted):
+			httpx.WriteError(w, http.StatusBadRequest, "terms_not_accepted", "Debes aceptar los Términos y la Política de Privacidad.")
 		default:
 			httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo completar el registro.")
 		}

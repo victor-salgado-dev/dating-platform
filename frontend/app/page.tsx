@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import styles from './page.module.css';
 
 async function getBackendHealth() {
@@ -18,8 +19,11 @@ export default async function HomePage() {
   return (
     <main className={styles.main}>
       <h1>Dating Platform</h1>
-      <p>Fase 1: base del proyecto.</p>
-      <p>
+      <p>Plataforma internacional de dating/relaciones.</p>
+      <p className={styles.cta}>
+        <Link href="/register">Crear cuenta</Link> · <Link href="/login">Iniciar sesión</Link>
+      </p>
+      <p className={styles.status}>
         Estado del backend:{' '}
         <strong>{health.ok ? 'operativo' : 'no disponible'}</strong>
       </p>

@@ -29,8 +29,17 @@ export default function RootLayout({
           <Link href="/messages">Mensajes</Link>
           <Link href="/blocked">Bloqueados</Link>
           <Link href="/admin">Admin</Link>
+          <Link href="/account" className={styles.account}>
+            Cuenta
+          </Link>
         </nav>
         {children}
+        <footer className={styles.footer}>
+          <Link href="/legal/terms">Términos</Link>
+          <Link href="/legal/privacy">Privacidad</Link>
+          <Link href="/legal/impressum">Aviso legal</Link>
+          <Link href="/legal/contact">Contacto</Link>
+        </footer>
       </body>
     </html>
   );

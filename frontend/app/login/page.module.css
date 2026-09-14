@@ -1,0 +1,67 @@
+.main {
+  max-width: 380px;
+  margin: 3rem auto;
+  padding: 0 1.5rem;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.9rem;
+}
+
+.form input,
+.form select,
+.form textarea {
+  padding: 0.55rem 0.7rem;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  font: inherit;
+}
+
+.form button {
+  margin-top: 0.5rem;
+  padding: 0.6rem;
+  border-radius: 6px;
+  border: none;
+  background: #111;
+  color: white;
+  cursor: pointer;
+  font: inherit;
+}
+
+.form button:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.checkboxRow {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.85rem;
+}
+
+.checkboxRow input {
+  margin-top: 0.2rem;
+  width: auto;
+}
+
+.error {
+  color: #b00020;
+  font-size: 0.9rem;
+}
+
+.switch {
+  margin-top: 1.5rem;
+  font-size: 0.9rem;
+}

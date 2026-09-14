@@ -1,6 +1,7 @@
 .PHONY: up up-build down logs ps \
         migrate-new migrate-up migrate-down migrate-up-one migrate-down-one migrate-version migrate-force \
-        admin-promote
+        admin-promote \
+        test test-integration test-all smoke-test
 
 # Carga las variables de .env para poder usarlas en los comandos de migración.
 -include .env
@@ -81,3 +82,25 @@ migrate-force:
 admin-promote:
 	@if [ -z "$(email)" ]; then echo "ERROR: falta email. Uso: make admin-promote email=persona@example.com"; exit 1; fi
 	docker compose run --rm --entrypoint go backend run ./cmd/promote-admin --email=$(email)
+
+# ---------------------------------------------------------
+# Tests y calidad (Fase 12)
+# ---------------------------------------------------------
+
+## Tests unitarios: rápidos, sin red, se pueden ejecutar siempre.
+test:
+	docker compose run --rm --entrypoint go backend test ./...
+
+## Tests de integración: requieren Postgres y Redis levantados
+## (usan la misma base de datos de desarrollo; ver README).
+test-integration:
+	docker compose up -d postgres redis
+	docker compose run --rm --entrypoint go backend test -tags=integration ./...
+
+## Unitarios + integración en una sola llamada.
+test-all: test test-integration
+
+## Smoke test del stack Docker completo: arranca, migra y comprueba
+## los endpoints de salud. No sustituye a `test`/`test-integration`.
+smoke-test:
+	./scripts/smoke-test.sh

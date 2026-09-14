@@ -341,9 +341,119 @@ a medias:**
   producción (Fase 14) el backend no debería exponerse fuera de la red
   de Docker: solo Caddy debería poder llegar a él.
 
-## Tests
+## Tests (Fase 12)
 
-Se añadirán en la Fase 12 (Tests y calidad).
+Dos niveles, deliberadamente separados:
+
+### Unitarios — rápidos, sin red
+
+Lógica pura (validaciones, cálculo de edad, hashing, normalización de
+email, construcción/validación de parámetros de búsqueda, helpers
+HTTP). No tocan Postgres ni Redis, así que corren siempre, incluso sin
+`docker compose up`.
+
+```bash
+make test
+```
+
+### Integración — requieren Postgres y Redis reales
+
+Usan la build tag `integration` a propósito: `go test ./...` normal
+(sin esa tag) ni siquiera los compila, así que nunca fallan por
+sorpresa si alguien olvida levantar la infraestructura. Cubren:
+
+- **Autenticación** (`backend/internal/auth`): registro, login, logout,
+  que una sesión cerrada no siga siendo válida pero otras del mismo
+  usuario sí, reset de contraseña con consumo de un solo uso del token,
+  verificación de email.
+- **Búsqueda** (`backend/internal/search`): sobre todo, **la regla de
+  los datos faltantes contra PostgreSQL real** — un perfil que no
+  indicó un dato no aparece cuando la búsqueda exige ese dato, pero sí
+  aparece cuando no lo exige. También que nadie se encuentra a sí mismo.
+- **Rate limiting** (`backend/internal/ratelimit`): el límite se agota
+  a la cuenta esperada y cada key es independiente.
+- **Integración básica** (`backend/internal/server`): levanta el
+  router HTTP real (el mismo de `cmd/api`) y ejercita un flujo de
+  extremo a extremo — registrar dos cuentas, crear sus perfiles, y
+  comprobar que cada una encuentra a la otra en `/search/profiles` pero
+  nunca a sí misma — más los endpoints de salud.
+
+Usan la misma base de datos de desarrollo (vía `config.Load()`, igual
+que la app): no hay una base de datos de test separada en V1. Es
+aceptable para el flujo de desarrollo actual; si hiciera falta
+aislarlos (p. ej. en CI), lo natural sería una base de datos de test
+dedicada, no antes.
+
+```bash
+make test-integration   # levanta postgres/redis si hace falta
+make test-all           # unitarios + integración
+```
+
+### Smoke test del stack Docker
+
+No es un test de Go: comprueba que `docker compose up` deja el stack
+en un estado realmente usable (contenedores arriba, migraciones
+aplicables, endpoints de salud respondiendo) — el tipo de fallo que un
+test de Go no ve.
+
+```bash
+make smoke-test
+```
+
+## Legal y privacidad (Fase 13)
+
+### Consentimiento en el registro
+
+`POST /api/v1/auth/register` ahora exige `accepted_terms: true` en el
+cuerpo — si falta o es `false`, `400 terms_not_accepted`, **antes** de
+crear la cuenta. Al aceptar, se registran dos consentimientos
+separados (`terms` y `privacy_policy`, misma marca de tiempo): son
+documentos distintos y no se asume que aceptar uno implica el otro
+(sección 14). Cada fila guarda versión y fecha/hora exactas; nunca se
+sobrescribe un consentimiento ya dado, solo se añaden nuevos si
+volviera a hacer falta re-consentir una versión posterior.
+
+| Método | Ruta | Descripción |
+|--------|------|-------------|
+| GET | `/api/v1/consents/me` | Tu propio historial de consentimientos (transparencia) |
+
+### Formulario de contacto
+
+`POST /api/v1/contact` es la única ruta de escritura de toda la API
+que **no requiere sesión** (alguien sin cuenta también tiene que poder
+escribir). Por eso lleva el mismo rate limit estricto que login/registro,
+para no convertirse en un vector de spam. Cuerpo: `{"name", "email", "message"}`;
+se reenvía por email (abstracción `email.Sender`, driver `noop` en dev)
+a `CONTACT_INBOX_EMAIL`.
+
+### Páginas legales (frontend)
+
+`/legal/terms`, `/legal/privacy`, `/legal/impressum`, `/legal/contact`.
+**Son plantillas de contenido**, con placeholders (`[NOMBRE DE LA
+EMPRESA]`, `[DIRECCIÓN]`, etc.) y un aviso visible en cada página: no
+son asesoramiento legal y deben revisarse con un abogado antes de
+publicarse de verdad, adaptadas a la jurisdicción y la empresa reales.
+
+### Login, registro y cuenta (frontend)
+
+Hasta esta fase, todo el frontend asumía una sesión ya iniciada por
+`curl`. Como la casilla de consentimiento solo tiene sentido dentro de
+un formulario de registro real, esta fase añade las páginas que
+faltaban para completar el ciclo:
+
+- `/register` — email, contraseña y la casilla de aceptación (enlaza a
+  `/legal/terms` y `/legal/privacy`); el botón de enviar está
+  deshabilitado hasta marcarla.
+- `/login` — email y contraseña.
+- `/account` — email, estado de verificación, cerrar sesión, historial
+  de consentimientos, y **eliminar cuenta** (pide confirmar la
+  contraseña, con aviso de que es irreversible).
+
+**Nota de alcance:** estas páginas cierran el ciclo de cuenta/legal que
+pedía esta fase. No incluyen un formulario de creación/edición de
+perfil en el frontend (la Fase 4 solo pedía la API): sigue siendo
+razonable añadirlo más adelante, pero no lo pide ninguna fase todavía,
+así que no se ha construido por adelantado.
 
 ## Variables de entorno
 
@@ -380,6 +490,9 @@ Nunca se sube `.env` (con secretos reales) a Git.
 │   │   ├── reports/                   # Creación de reportes
 │   │   ├── admin/                     # Panel de administración (Fase 10)
 │   │   ├── ratelimit/                  # Rate limiting en Redis (Fase 11)
+│   │   ├── testutil/                    # Helpers para tests de integración (Fase 12)
+│   │   ├── consent/                     # Registro de aceptación de Términos/Privacidad (Fase 13)
+│   │   ├── contact/                      # Formulario de contacto público (Fase 13)
 │   │   └── storage/               # Abstracción de almacenamiento de ficheros (driver "local" en V1)
 │   └── migrations/            # Migraciones SQL versionadas
 └── frontend/                 # Next.js (App Router, TypeScript)
@@ -389,9 +502,16 @@ Nunca se sube `.env` (con secretos reales) a Git.
     │   ├── favorites/          # Lista de favoritos (Fase 7)
     │   ├── messages/           # Conversaciones y mensajes (Fase 8)
     │   ├── blocked/            # Perfiles bloqueados (Fase 9)
-    │   └── admin/              # Panel de administración (Fase 10)
+    │   ├── admin/              # Panel de administración (Fase 10)
+    │   ├── login/              # Inicio de sesión (Fase 13)
+    │   ├── register/           # Registro, con casilla de consentimiento (Fase 13)
+    │   ├── account/            # Cuenta: cerrar sesión, consentimientos, eliminar cuenta (Fase 13)
+    │   └── legal/              # Términos, Privacidad, Aviso legal, Contacto (Fase 13)
     ├── lib/                    # Helpers compartidos (cliente de API)
     └── messages/               # Esqueleto i18n (es/en), aún sin enrutar
+
+scripts/
+└── smoke-test.sh             # Comprobación de que el stack Docker arranca sano (Fase 12)
 ```
 
 ## Roadmap de fases

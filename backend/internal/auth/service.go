@@ -11,6 +11,7 @@ import (
 
 	"github.com/google/uuid"
 
+	"dating-platform/backend/internal/consent"
 	"dating-platform/backend/internal/email"
 	"dating-platform/backend/internal/users"
 )
@@ -28,10 +29,11 @@ type Service struct {
 	sessions SessionStore
 	tokens   TokenStore
 	sender   email.Sender
+	consents *consent.Service
 
-	sessionTTL   time.Duration
-	verifyTTL    time.Duration
-	resetTTL     time.Duration
+	sessionTTL time.Duration
+	verifyTTL  time.Duration
+	resetTTL   time.Duration
 }
 
 func NewService(
@@ -39,6 +41,7 @@ func NewService(
 	sessions SessionStore,
 	tokens TokenStore,
 	sender email.Sender,
+	consents *consent.Service,
 	sessionTTL, verifyTTL, resetTTL time.Duration,
 ) *Service {
 	return &Service{
@@ -46,23 +49,29 @@ func NewService(
 		sessions:   sessions,
 		tokens:     tokens,
 		sender:     sender,
+		consents:   consents,
 		sessionTTL: sessionTTL,
 		verifyTTL:  verifyTTL,
 		resetTTL:   resetTTL,
 	}
 }
 
-// Register crea una cuenta nueva, dispara el email de verificación
+// Register crea una cuenta nueva, registra la aceptación de Términos y
+// Política de Privacidad (sección 14: no se asume, tiene que venir
+// marcada explícitamente), dispara el email de verificación
 // (best-effort: un fallo de envío no impide el registro) y abre sesión
-// inmediatamente. Devuelve ErrWeakPassword, users.ErrDuplicateEmail, o
-// un error de validación de email envuelto.
-func (s *Service) Register(ctx context.Context, rawEmail, password string) (*users.User, string, error) {
+// inmediatamente. Devuelve consent.ErrTermsNotAccepted, ErrWeakPassword,
+// users.ErrDuplicateEmail, o un error de validación de email envuelto.
+func (s *Service) Register(ctx context.Context, rawEmail, password string, acceptedTerms bool) (*users.User, string, error) {
 	normEmail, err := normalizeEmail(rawEmail)
 	if err != nil {
 		return nil, "", err
 	}
 	if len(password) < MinPasswordLength {
 		return nil, "", ErrWeakPassword
+	}
+	if !acceptedTerms {
+		return nil, "", consent.ErrTermsNotAccepted
 	}
 
 	hash, err := HashPassword(password)
@@ -73,6 +82,17 @@ func (s *Service) Register(ctx context.Context, rawEmail, password string) (*use
 	u := &users.User{Email: normEmail, PasswordHash: hash}
 	if err := s.users.Create(ctx, u); err != nil {
 		return nil, "", err // p.ej. users.ErrDuplicateEmail
+	}
+
+	if err := s.consents.RecordRegistrationConsents(ctx, u.ID, acceptedTerms); err != nil {
+		// La cuenta ya existe en este punto (acceptedTerms es true, así
+		// que esto solo podría fallar por un problema real de base de
+		// datos, no de validación). No revertimos la creación: no hay
+		// una transacción cruzando ambos repositorios en V1. Se registra
+		// para poder detectarlo, y se corta el registro en vez de dejar
+		// pasar una cuenta sin consentimiento registrado.
+		slog.Error("no se pudo registrar el consentimiento en el alta", "user_id", u.ID, "error", err)
+		return nil, "", err
 	}
 
 	s.sendVerificationEmailBestEffort(ctx, u)
