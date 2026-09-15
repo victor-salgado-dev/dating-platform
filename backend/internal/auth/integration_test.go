@@ -103,7 +103,7 @@ func TestIntegration_RegisterRequiresAcceptedTerms(t *testing.T) {
 	ctx := context.Background()
 
 	if _, _, err := deps.svc.Register(ctx, testutil.UniqueEmail(), "contraseña-123456", false); err == nil {
-		t.Error("registrar sin aceptar los Términos debería fallar (consent.ErrTermsNotAccepted)")
+		t.Error("registrar sin aceptar los Términos debería fallar (auth.ErrTermsNotAccepted)")
 	}
 }
 

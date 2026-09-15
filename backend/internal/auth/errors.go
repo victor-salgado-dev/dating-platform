@@ -25,4 +25,8 @@ var (
 
 	// ErrInvalidEmail se devuelve cuando el email no tiene un formato válido.
 	ErrInvalidEmail = errors.New("auth: formato de email inválido")
+
+	// ErrTermsNotAccepted indica que el registro requiere aceptar explícitamente
+	// los Términos y la Política de Privacidad.
+	ErrTermsNotAccepted = errors.New("auth: debes aceptar los Términos y la Política de Privacidad")
 )

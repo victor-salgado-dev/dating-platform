@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"dating-platform/backend/internal/config"
-	"dating-platform/backend/internal/consent"
 	"dating-platform/backend/internal/httpx"
 	"dating-platform/backend/internal/users"
 )
@@ -87,7 +86,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteError(w, http.StatusConflict, "email_taken", "Ese email ya está registrado.")
 		case errors.Is(err, ErrInvalidEmail):
 			httpx.WriteError(w, http.StatusBadRequest, "invalid_email", "El formato del email no es válido.")
-		case errors.Is(err, consent.ErrTermsNotAccepted):
+		case errors.Is(err, ErrTermsNotAccepted):
 			httpx.WriteError(w, http.StatusBadRequest, "terms_not_accepted", "Debes aceptar los Términos y la Política de Privacidad.")
 		default:
 			httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo completar el registro.")

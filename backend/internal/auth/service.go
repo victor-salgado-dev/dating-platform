@@ -11,7 +11,6 @@ import (
 
 	"github.com/google/uuid"
 
-	"dating-platform/backend/internal/consent"
 	"dating-platform/backend/internal/email"
 	"dating-platform/backend/internal/users"
 )
@@ -21,15 +20,22 @@ import (
 // entradas obviamente inválidas antes de tocar la base de datos.
 var emailPattern = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 
+// ConsentRecorder registra los consentimientos asociados al alta de una
+// cuenta. La interfaz vive en auth para evitar depender del módulo concreto
+// que persiste los consentimientos.
+type ConsentRecorder interface {
+	RecordRegistrationConsents(ctx context.Context, userID uuid.UUID, accepted bool) error
+}
+
 // Service implementa los casos de uso de autenticación. Depende de
-// interfaces (users.Repository, SessionStore, TokenStore, email.Sender),
-// nunca de implementaciones concretas, para poder sustituirlas en tests.
+// interfaces (users.Repository, SessionStore, TokenStore, email.Sender y
+// ConsentRecorder), nunca de implementaciones concretas.
 type Service struct {
 	users    users.Repository
 	sessions SessionStore
 	tokens   TokenStore
 	sender   email.Sender
-	consents *consent.Service
+	consents ConsentRecorder
 
 	sessionTTL time.Duration
 	verifyTTL  time.Duration
@@ -41,7 +47,7 @@ func NewService(
 	sessions SessionStore,
 	tokens TokenStore,
 	sender email.Sender,
-	consents *consent.Service,
+	consents ConsentRecorder,
 	sessionTTL, verifyTTL, resetTTL time.Duration,
 ) *Service {
 	return &Service{
@@ -60,7 +66,7 @@ func NewService(
 // Política de Privacidad (sección 14: no se asume, tiene que venir
 // marcada explícitamente), dispara el email de verificación
 // (best-effort: un fallo de envío no impide el registro) y abre sesión
-// inmediatamente. Devuelve consent.ErrTermsNotAccepted, ErrWeakPassword,
+// inmediatamente. Devuelve ErrTermsNotAccepted, ErrWeakPassword,
 // users.ErrDuplicateEmail, o un error de validación de email envuelto.
 func (s *Service) Register(ctx context.Context, rawEmail, password string, acceptedTerms bool) (*users.User, string, error) {
 	normEmail, err := normalizeEmail(rawEmail)
@@ -71,7 +77,7 @@ func (s *Service) Register(ctx context.Context, rawEmail, password string, accep
 		return nil, "", ErrWeakPassword
 	}
 	if !acceptedTerms {
-		return nil, "", consent.ErrTermsNotAccepted
+		return nil, "", ErrTermsNotAccepted
 	}
 
 	hash, err := HashPassword(password)
