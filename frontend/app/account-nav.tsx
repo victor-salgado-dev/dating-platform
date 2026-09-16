@@ -2,13 +2,16 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 
 import { apiFetch } from '@/lib/api';
+import styles from './layout.module.css';
 
 export default function AccountNav() {
   const pathname = usePathname();
+  const router = useRouter();
   const [authenticated, setAuthenticated] = useState<boolean | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -36,11 +39,49 @@ export default function AccountNav() {
     return () => window.removeEventListener('auth-change', handleAuthChange);
   }, []);
 
+  async function handleLogout() {
+    try {
+      await apiFetch<void>('/auth/logout', { method: 'POST' });
+    } catch {
+    }
+    setAuthenticated(false);
+    setMenuOpen(false);
+    window.dispatchEvent(new Event('auth-change'));
+    router.push('/login');
+  }
+
   if (authenticated === null) return null;
 
-  return authenticated ? (
-    <Link href="/account">Cuenta</Link>
-  ) : (
-    <Link href="/login">Iniciar sesión</Link>
+  if (!authenticated) {
+    return (
+      <Link href="/login">Iniciar sesión</Link>
+    );
+  }
+
+  return (
+    <div className={styles.accountMenu}>
+      <button
+        type="button"
+        className={styles.accountButton}
+        onClick={() => setMenuOpen((open) => !open)}
+        aria-expanded={menuOpen}
+        aria-haspopup="menu"
+      >
+        Cuenta
+      </button>
+      {menuOpen && (
+        <div className={styles.accountDropdown} role="menu">
+          <Link href="/profile" role="menuitem" onClick={() => setMenuOpen(false)}>
+            Mi perfil
+          </Link>
+          <Link href="/settings" role="menuitem" onClick={() => setMenuOpen(false)}>
+            Ajustes
+          </Link>
+          <button type="button" role="menuitem" onClick={handleLogout}>
+            Cerrar sesión
+          </button>
+        </div>
+      )}
+    </div>
   );
 }

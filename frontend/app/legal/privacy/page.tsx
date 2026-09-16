@@ -24,7 +24,7 @@ export default function PrivacyPage() {
         <li><strong>Perfil:</strong> nombre visible, fecha de nacimiento, género, país/región, idiomas, objetivo de relación, información familiar, biografía, intereses, fotos.</li>
         <li><strong>Actividad:</strong> favoritos, mensajes enviados/recibidos, bloqueos, reportes.</li>
         <li><strong>Técnicos:</strong> dirección IP y registros de acceso, con fines de seguridad (rate limiting, detección de abuso).</li>
-        <li><strong>Consentimientos:</strong> qué versión de estos documentos aceptaste y cuándo (puedes consultarlo en tu <a href="/account">página de cuenta</a>).</li>
+        <li><strong>Consentimientos:</strong> qué versión de estos documentos aceptaste y cuándo (puedes consultarlo en tu <a href="/settings">página de ajustes</a>).</li>
       </ul>
       <p>
         Ningún dato de perfil se asume ni se inventa: si no lo indicas, se guarda como
@@ -70,7 +70,7 @@ export default function PrivacyPage() {
         Puedes ejercer tus derechos de acceso, rectificación, supresión, portabilidad y
         oposición escribiendo a [EMAIL DE CONTACTO] o desde la{' '}
         <a href="/legal/contact">página de contacto</a>. La eliminación de cuenta está
-        disponible en autoservicio desde <a href="/account">tu página de cuenta</a>.
+        disponible en autoservicio desde <a href="/settings">tu página de ajustes</a>.
       </p>
 
       <h2>7. Seguridad</h2>

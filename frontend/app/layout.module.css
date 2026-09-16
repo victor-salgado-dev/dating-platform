@@ -33,6 +33,50 @@
   gap: 1rem;
 }
 
+.accountMenu {
+  position: relative;
+}
+
+.accountButton {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.accountDropdown {
+  position: absolute;
+  top: calc(100% + 0.75rem);
+  right: 0;
+  z-index: 10;
+  display: flex;
+  min-width: 150px;
+  flex-direction: column;
+  padding: 0.35rem 0;
+  background: white;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+}
+
+.accountDropdown a,
+.accountDropdown button {
+  padding: 0.55rem 0.85rem;
+  border: 0;
+  background: transparent;
+  color: #222;
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.accountDropdown a:hover,
+.accountDropdown button:hover {
+  background: #f5f5f5;
+}
+
 .headerBottom {
   background-color: white;
   border-bottom: 1px solid #e0e0e0;

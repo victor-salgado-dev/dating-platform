@@ -165,7 +165,7 @@ export default function EditProfilePage() {
 
   return (
     <main className={styles.main}>
-      <Link href="/account">&larr; Volver a cuenta</Link>
+      <Link href="/profile">&larr; Volver a mi perfil</Link>
       <h1>{creating ? 'Crear perfil' : 'Modificar perfil'}</h1>
 
       <form onSubmit={handleSubmit} className={styles.form}>

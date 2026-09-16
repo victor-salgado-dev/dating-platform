@@ -63,7 +63,7 @@ export default function TermsPage() {
       <h2>6. Eliminación de cuenta</h2>
       <p>
         Puedes eliminar tu cuenta en cualquier momento desde{' '}
-        <a href="/account">tu página de cuenta</a>. Consulta la{' '}
+        <a href="/settings">tu página de ajustes</a>. Consulta la{' '}
         <a href="/legal/privacy">Política de Privacidad</a> para saber qué ocurre con tus
         datos tras la eliminación.
       </p>
