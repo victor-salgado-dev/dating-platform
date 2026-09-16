@@ -1,6 +1,6 @@
 // Comando api arranca el backend monolítico modular de la plataforma
 // de dating. Módulos activos: health, auth, profiles, search,
-// favorites, messaging, blocking, reports, admin, consent y contact.
+// favorites, likes, messaging, blocking, reports, admin, consent y contact.
 // El resto de módulos de dominio se irán añadiendo en fases futuras
 // (producción).
 package main
@@ -25,6 +25,7 @@ import (
 	"dating-platform/backend/internal/db"
 	"dating-platform/backend/internal/email"
 	"dating-platform/backend/internal/favorites"
+	"dating-platform/backend/internal/likes"
 	"dating-platform/backend/internal/messaging"
 	"dating-platform/backend/internal/profiles"
 	"dating-platform/backend/internal/ratelimit"
@@ -128,6 +129,10 @@ func main() {
 	favoritesService := favorites.NewService(favoritesRepo, profilesRepo)
 	favoritesHandler := favorites.NewHandler(favoritesService)
 
+	likesRepo := likes.NewPostgresRepository(pool)
+	likesService := likes.NewService(likesRepo, profilesRepo)
+	likesHandler := likes.NewHandler(likesService)
+
 	blockingRepo := blocking.NewPostgresRepository(pool)
 	blockingService := blocking.NewService(blockingRepo, profilesRepo)
 	blockingHandler := blocking.NewHandler(blockingService)
@@ -154,6 +159,7 @@ func main() {
 		ProfilesHandler:  profilesHandler,
 		SearchHandler:    searchHandler,
 		FavoritesHandler: favoritesHandler,
+		LikesHandler:     likesHandler,
 		MessagingHandler: messagingHandler,
 		BlockingHandler:  blockingHandler,
 		ReportsHandler:   reportsHandler,

@@ -1,0 +1,209 @@
+package likes
+
+import (
+	"errors"
+	"net/http"
+	"strconv"
+	"time"
+
+	"github.com/google/uuid"
+
+	"dating-platform/backend/internal/auth"
+	"dating-platform/backend/internal/httpx"
+	"dating-platform/backend/internal/profiles"
+)
+
+type Handler struct{ svc *Service }
+
+func NewHandler(svc *Service) *Handler { return &Handler{svc: svc} }
+
+type profileResponse struct {
+	ProfileID        string  `json:"profile_id"`
+	DisplayName      string  `json:"display_name"`
+	Age              int     `json:"age"`
+	Gender           string  `json:"gender"`
+	CountryCode      string  `json:"country_code"`
+	Region           *string `json:"region"`
+	RelationshipGoal *string `json:"relationship_goal"`
+	HasPhoto         bool    `json:"has_photo"`
+	LikedAt          string  `json:"liked_at"`
+}
+type listResponse struct {
+	Items      []profileResponse `json:"items"`
+	Page       int               `json:"page"`
+	PageSize   int               `json:"page_size"`
+	Total      int               `json:"total"`
+	TotalPages int               `json:"total_pages"`
+}
+type matchResponse struct {
+	ProfileID      string  `json:"profile_id"`
+	DisplayName    string  `json:"display_name"`
+	Age            int     `json:"age"`
+	Gender         string  `json:"gender"`
+	CountryCode    string  `json:"country_code"`
+	Region         *string `json:"region"`
+	HasPhoto       bool    `json:"has_photo"`
+	MatchedAt      string  `json:"matched_at"`
+	ConversationID *string `json:"conversation_id,omitempty"`
+}
+type matchesResponse struct {
+	Items      []matchResponse `json:"items"`
+	Page       int             `json:"page"`
+	PageSize   int             `json:"page_size"`
+	Total      int             `json:"total"`
+	TotalPages int             `json:"total_pages"`
+}
+
+type statusResponse struct {
+	Liked   bool `json:"liked"`
+	Matched bool `json:"matched"`
+}
+
+func (h *Handler) Add(w http.ResponseWriter, r *http.Request) {
+	userID, profileID, ok := h.authAndProfileID(w, r)
+	if !ok {
+		return
+	}
+	matched, err := h.svc.Add(r.Context(), userID, profileID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	_ = matched
+	w.WriteHeader(http.StatusNoContent)
+}
+func (h *Handler) Remove(w http.ResponseWriter, r *http.Request) {
+	userID, profileID, ok := h.authAndProfileID(w, r)
+	if !ok {
+		return
+	}
+	if err := h.svc.Remove(r.Context(), userID, profileID); err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
+	userID, profileID, ok := h.authAndProfileID(w, r)
+	if !ok {
+		return
+	}
+	liked, matched, err := h.svc.Status(r.Context(), userID, profileID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, statusResponse{Liked: liked, Matched: matched})
+}
+func (h *Handler) ListSent(w http.ResponseWriter, r *http.Request)     { h.list(w, r, true) }
+func (h *Handler) ListReceived(w http.ResponseWriter, r *http.Request) { h.list(w, r, false) }
+func (h *Handler) list(w http.ResponseWriter, r *http.Request, sent bool) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, 401, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+	page, pageSize, ok := parsePaging(w, r)
+	if !ok {
+		return
+	}
+	var result *ListResult
+	var err error
+	if sent {
+		result, err = h.svc.ListSent(r.Context(), userID, page, pageSize)
+	} else {
+		result, err = h.svc.ListReceived(r.Context(), userID, page, pageSize)
+	}
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, toListResponse(result))
+}
+func (h *Handler) ListMatches(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, 401, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+	page, pageSize, ok := parsePaging(w, r)
+	if !ok {
+		return
+	}
+	result, err := h.svc.ListMatches(r.Context(), userID, page, pageSize)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	items := make([]matchResponse, 0, len(result.Items))
+	for _, it := range result.Items {
+		var conversationID *string
+		if it.ConversationID != nil {
+			v := it.ConversationID.String()
+			conversationID = &v
+		}
+		items = append(items, matchResponse{ProfileID: it.ProfileID.String(), DisplayName: it.DisplayName, Age: it.Age, Gender: string(it.Gender), CountryCode: it.CountryCode, Region: it.Region, HasPhoto: it.HasPhoto, MatchedAt: it.MatchedAt.Format(time.RFC3339), ConversationID: conversationID})
+	}
+	httpx.WriteJSON(w, http.StatusOK, matchesResponse{Items: items, Page: result.Page, PageSize: result.PageSize, Total: result.Total, TotalPages: result.TotalPages})
+}
+func (h *Handler) MatchStatus(w http.ResponseWriter, r *http.Request) {
+	userID, profileID, ok := h.authAndProfileID(w, r)
+	if !ok {
+		return
+	}
+	_, matched, err := h.svc.Status(r.Context(), userID, profileID)
+	if err != nil {
+		writeError(w, err)
+		return
+	}
+	httpx.WriteJSON(w, http.StatusOK, map[string]bool{"matched": matched})
+}
+func (h *Handler) authAndProfileID(w http.ResponseWriter, r *http.Request) (uuid.UUID, uuid.UUID, bool) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, 401, "unauthenticated", "Inicia sesión para continuar.")
+		return uuid.Nil, uuid.Nil, false
+	}
+	id, err := uuid.Parse(r.PathValue("profileID"))
+	if err != nil {
+		httpx.WriteError(w, 400, "invalid_id", "ID de perfil inválido.")
+		return uuid.Nil, uuid.Nil, false
+	}
+	return userID, id, true
+}
+func parsePaging(w http.ResponseWriter, r *http.Request) (int, int, bool) {
+	page, size := 1, DefaultPageSize
+	for key, target := range map[string]*int{"page": &page, "page_size": &size} {
+		if value := r.URL.Query().Get(key); value != "" {
+			n, err := strconv.Atoi(value)
+			if err != nil || n < 1 {
+				httpx.WriteError(w, 400, "invalid_param", key+" debe ser un entero >= 1.")
+				return 0, 0, false
+			}
+			*target = n
+		}
+	}
+	return page, size, true
+}
+func toListResponse(result *ListResult) listResponse {
+	items := make([]profileResponse, 0, len(result.Items))
+	for _, it := range result.Items {
+		var goal *string
+		if it.RelationshipGoal != nil {
+			v := string(*it.RelationshipGoal)
+			goal = &v
+		}
+		items = append(items, profileResponse{ProfileID: it.ProfileID.String(), DisplayName: it.DisplayName, Age: it.Age, Gender: string(it.Gender), CountryCode: it.CountryCode, Region: it.Region, RelationshipGoal: goal, HasPhoto: it.HasPhoto, LikedAt: it.LikedAt.Format(time.RFC3339)})
+	}
+	return listResponse{Items: items, Page: result.Page, PageSize: result.PageSize, Total: result.Total, TotalPages: result.TotalPages}
+}
+func writeError(w http.ResponseWriter, err error) {
+	switch {
+	case errors.Is(err, ErrCannotLikeSelf):
+		httpx.WriteError(w, 400, "cannot_like_self", "No puedes dar like a tu propio perfil.")
+	case errors.Is(err, profiles.ErrNotFound):
+		httpx.WriteError(w, 404, "profile_not_found", "Perfil no encontrado.")
+	default:
+		httpx.WriteError(w, 500, "internal_error", "No se pudo completar la operación.")
+	}
+}

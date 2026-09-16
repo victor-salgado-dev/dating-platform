@@ -14,6 +14,7 @@ import (
 	"dating-platform/backend/internal/contact"
 	"dating-platform/backend/internal/favorites"
 	"dating-platform/backend/internal/health"
+	"dating-platform/backend/internal/likes"
 	"dating-platform/backend/internal/messaging"
 	"dating-platform/backend/internal/profiles"
 	"dating-platform/backend/internal/ratelimit"
@@ -36,6 +37,7 @@ type Dependencies struct {
 	ProfilesHandler  *profiles.Handler
 	SearchHandler    *search.Handler
 	FavoritesHandler *favorites.Handler
+	LikesHandler     *likes.Handler
 	MessagingHandler *messaging.Handler
 	BlockingHandler  *blocking.Handler
 	ReportsHandler   *reports.Handler
@@ -112,6 +114,15 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("POST /api/v1/favorites/{profileID}", requireAuth(http.HandlerFunc(deps.FavoritesHandler.Add)))
 	mux.Handle("DELETE /api/v1/favorites/{profileID}", requireAuth(http.HandlerFunc(deps.FavoritesHandler.Remove)))
 	mux.Handle("GET /api/v1/favorites/{profileID}", requireAuth(http.HandlerFunc(deps.FavoritesHandler.Status)))
+
+	// --- Likes y matches (Fase 15) --------------------------------------
+	mux.Handle("POST /api/v1/likes/{profileID}", requireAuth(http.HandlerFunc(deps.LikesHandler.Add)))
+	mux.Handle("DELETE /api/v1/likes/{profileID}", requireAuth(http.HandlerFunc(deps.LikesHandler.Remove)))
+	mux.Handle("GET /api/v1/likes/{profileID}", requireAuth(http.HandlerFunc(deps.LikesHandler.Status)))
+	mux.Handle("GET /api/v1/likes/sent", requireAuth(http.HandlerFunc(deps.LikesHandler.ListSent)))
+	mux.Handle("GET /api/v1/likes/received", requireAuth(http.HandlerFunc(deps.LikesHandler.ListReceived)))
+	mux.Handle("GET /api/v1/matches", requireAuth(http.HandlerFunc(deps.LikesHandler.ListMatches)))
+	mux.Handle("GET /api/v1/matches/{profileID}", requireAuth(http.HandlerFunc(deps.LikesHandler.MatchStatus)))
 
 	// --- Mensajería (Fase 8) ---------------------------------------------
 	// "to/{profileID}" inicia o continúa la conversación con esa persona

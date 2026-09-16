@@ -105,8 +105,9 @@ make migrate-force VERSION=3
 ```
 
 El esquema actual incluye extensión `pgcrypto`, usuarios con estados y soft
-delete, perfiles 1:1, fotos, índices de búsqueda, favoritos, conversaciones y
-mensajes, bloqueos, reportes, roles `user/admin` y consentimientos.
+delete, perfiles 1:1, fotos, índices de búsqueda, favoritos, likes, matches,
+conversaciones y mensajes, bloqueos, reportes, roles `user/admin` y
+consentimientos.
 
 No se deben editar migraciones ya aplicadas: los cambios nuevos deben ir en
 otra pareja `.up.sql`/`.down.sql`.
@@ -181,20 +182,25 @@ paginadas. Admite `gender`, `min_age`, `max_age`, `country`, `language`,
 Los filtros que exigen un dato excluyen perfiles que lo tienen en `NULL`; sin
 filtro, esos perfiles siguen siendo visibles.
 
-### Favoritos, mensajes, bloqueos y reportes
+### Favoritos, likes, matches, mensajes, bloqueos y reportes
 
 | Área | Rutas |
 | --- | --- |
 | Favoritos | `GET /api/v1/favorites`, `POST|DELETE /api/v1/favorites/{profileID}`, `GET /api/v1/favorites/{profileID}` |
+| Likes | `POST|DELETE /api/v1/likes/{profileID}`, `GET /api/v1/likes/{profileID}`, `GET /api/v1/likes/sent`, `GET /api/v1/likes/received` |
+| Matches | `GET /api/v1/matches`, `GET /api/v1/matches/{profileID}` |
 | Mensajes | `POST /api/v1/messages/to/{profileID}`, `GET /api/v1/messages/conversations`, `GET|POST /api/v1/messages/conversations/{conversationID}/messages` |
 | Bloqueos | `GET /api/v1/blocks`, `POST|DELETE /api/v1/blocks/{profileID}`, `GET /api/v1/blocks/{profileID}` |
 | Reportes | `POST /api/v1/reports/{profileID}` |
 
-Favoritos, bloqueos y sus operaciones de estado son idempotentes. Los mensajes
+Favoritos, likes, bloqueos y sus operaciones de estado son idempotentes. Dos
+likes mutuos crean un match dentro de la misma transacción; quitar cualquiera
+de los likes elimina el match. Las listas ocultan perfiles suspendidos,
+eliminados o bloqueados, pero bloquear no borra el historial. Los mensajes
 son 1:1 y tienen un máximo de 2000 caracteres. Al listar una conversación se
 marcan como leídos los mensajes recibidos. Un bloqueo es mutuo a efectos de
-búsqueda, favoritos, perfiles, conversaciones y nuevos mensajes, pero no
-borra los datos históricos.
+búsqueda, favoritos, likes, matches, perfiles, conversaciones y nuevos
+mensajes, pero no borra los datos históricos.
 
 Los reportes aceptan `spam`, `fake_profile`, `harassment`,
 `inappropriate_content`, `underage` u `other`, con una descripción opcional de
@@ -236,6 +242,8 @@ Caddy y el mismo origen.
 | `/profile` | Visualización del perfil propio. |
 | `/profile/edit` | Creación, edición y gestión de fotos del perfil propio. |
 | `/favorites` | Lista de favoritos. |
+| `/likes` | Likes enviados y recibidos, paginados. |
+| `/matches` | Matches paginados y enlace a conversaciones existentes. |
 | `/messages` | Lista de conversaciones. |
 | `/messages/[id]` | Hilo de conversación y respuesta. |
 | `/blocked` | Lista y desbloqueo de perfiles. |

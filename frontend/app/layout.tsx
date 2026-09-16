@@ -26,6 +26,8 @@ export default function RootLayout({
           <nav className={styles.topNav}>
             <Link href="/">Inicio</Link>
             <Link href="/messages">Mensajes</Link>
+            <Link href="/matches">Matches</Link>
+            <Link href="/likes">Likes</Link>
             <Link href="/activity">Actividad</Link>
           </nav>
 
@@ -36,7 +38,7 @@ export default function RootLayout({
 
         {/* Barra secundaria de filtros (Blanca) */}
         <nav className={styles.headerBottom}>
-          <Link href="/discover">Matches</Link>
+          <Link href="/discover">Descubrir</Link>
           <Link href="/favorites">Favoritos</Link>
           <Link href="/" className={styles.activeTab}>⭐ Populares</Link>
           <Link href="/online">En línea</Link>

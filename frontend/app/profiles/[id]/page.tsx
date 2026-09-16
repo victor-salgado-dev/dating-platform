@@ -14,6 +14,10 @@ export default function ProfilePage() {
   const [photos, setPhotos] = useState<ProfilePhoto[]>([]);
   const [favorited, setFavorited] = useState<boolean | null>(null);
   const [favoriteBusy, setFavoriteBusy] = useState(false);
+  const [liked, setLiked] = useState<boolean | null>(null);
+  const [matched, setMatched] = useState(false);
+  const [likeBusy, setLikeBusy] = useState(false);
+  const [showMatchNotice, setShowMatchNotice] = useState(false);
   const [messageDraft, setMessageDraft] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const [messageError, setMessageError] = useState<string | null>(null);
@@ -51,6 +55,13 @@ export default function ProfilePage() {
           setFavorited(null);
         }
         try {
+          const status = await apiFetch<{ liked: boolean; matched: boolean }>(`/likes/${params.id}`);
+          setLiked(status.liked);
+          setMatched(status.matched);
+        } catch {
+          setLiked(null);
+        }
+        try {
           const status = await apiFetch<{ blocked: boolean }>(`/blocks/${params.id}`);
           setBlocked(status.blocked);
         } catch {
@@ -82,6 +93,27 @@ export default function ProfilePage() {
       setFavorited(!next); // revertir si la llamada falla
     } finally {
       setFavoriteBusy(false);
+    }
+  }
+
+  async function toggleLike() {
+    if (!params?.id || liked === null || likeBusy) return;
+
+    setLikeBusy(true);
+    const next = !liked;
+    try {
+      await apiFetch<void>(`/likes/${params.id}`, { method: next ? 'POST' : 'DELETE' });
+      setLiked(next);
+      if (next) {
+        const status = await apiFetch<{ matched: boolean }>(`/matches/${params.id}`);
+        setMatched(status.matched);
+        if (status.matched && !matched) setShowMatchNotice(true);
+      } else {
+        setMatched(false);
+      }
+    } catch {
+    } finally {
+      setLikeBusy(false);
     }
   }
 
@@ -180,6 +212,24 @@ export default function ProfilePage() {
             >
               {favorited ? '★ En favoritos' : '☆ Añadir a favoritos'}
             </button>
+          )}
+
+          {liked !== null && (
+            <button
+              type="button"
+              onClick={toggleLike}
+              disabled={likeBusy}
+              className={liked ? styles.likeActive : styles.likeButton}
+            >
+              {liked ? '♥ Te gusta' : '♡ Me gusta'}
+            </button>
+          )}
+
+          {showMatchNotice && (
+            <div className={styles.matchNotice} role="status">
+              ¡Es un match! También le gustas a {profile.display_name}.
+              <button type="button" onClick={() => setShowMatchNotice(false)}>Cerrar</button>
+            </div>
           )}
 
           <form onSubmit={handleSendMessage} className={styles.messageForm}>
