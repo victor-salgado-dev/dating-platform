@@ -26,7 +26,12 @@ var (
 	// ErrInvalidEmail se devuelve cuando el email no tiene un formato válido.
 	ErrInvalidEmail = errors.New("auth: formato de email inválido")
 
-	// ErrTermsNotAccepted indica que el registro requiere aceptar explícitamente
-	// los Términos y la Política de Privacidad.
+	// ErrTermsNotAccepted se devuelve al registrarse sin marcar la
+	// aceptación explícita de Términos y Política de Privacidad. Vive
+	// aquí (no en el paquete consent) para que auth solo dependa de una
+	// interfaz mínima (ConsentRecorder, en service.go) y no del paquete
+	// consent en sí: consent.Service ya depende de auth (para
+	// auth.UserIDFromContext en su handler HTTP), así que auth
+	// dependiendo también de consent cerraría un ciclo de imports.
 	ErrTermsNotAccepted = errors.New("auth: debes aceptar los Términos y la Política de Privacidad")
 )

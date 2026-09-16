@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -38,7 +39,9 @@ import (
 func main() {
 	cfg := config.Load()
 
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{
+		Level: parseLogLevel(cfg.LogLevel),
+	}))
 	slog.SetDefault(logger)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -61,7 +64,13 @@ func main() {
 	// --- Wiring de módulos de dominio ---------------------------------
 	usersRepo := users.NewPostgresRepository(pool)
 
-	emailSender, err := email.NewSender(cfg.Email.Driver)
+	emailSender, err := email.NewSender(cfg.Email.Driver, email.SMTPConfig{
+		Host:     cfg.Email.SMTPHost,
+		Port:     cfg.Email.SMTPPort,
+		Username: cfg.Email.SMTPUsername,
+		Password: cfg.Email.SMTPPassword,
+		From:     cfg.Email.From,
+	})
 	if err != nil {
 		slog.Error("configuración de email inválida", "error", err)
 		os.Exit(1)
@@ -89,7 +98,19 @@ func main() {
 	contactService := contact.NewService(emailSender, cfg.Email.ContactInbox)
 	contactHandler := contact.NewHandler(contactService)
 
-	fileStorage, err := storage.New(cfg.Storage.Driver, cfg.Storage.LocalPath)
+	fileStorage, err := storage.New(ctx, storage.Config{
+		Driver:    cfg.Storage.Driver,
+		LocalPath: cfg.Storage.LocalPath,
+		S3: storage.S3Config{
+			Endpoint:       cfg.Storage.S3Endpoint,
+			Region:         cfg.Storage.S3Region,
+			Bucket:         cfg.Storage.S3Bucket,
+			AccessKey:      cfg.Storage.S3AccessKey,
+			SecretKey:      cfg.Storage.S3SecretKey,
+			UseSSL:         cfg.Storage.S3UseSSL,
+			ForcePathStyle: cfg.Storage.S3ForcePathStyle,
+		},
+	})
 	if err != nil {
 		slog.Error("configuración de storage inválida", "error", err)
 		os.Exit(1)
@@ -169,4 +190,20 @@ func main() {
 	}
 
 	slog.Info("servidor detenido correctamente")
+}
+
+// parseLogLevel traduce LOG_LEVEL a slog.Level. Un valor desconocido o
+// vacío cae en "info" (el valor por defecto de config.Load), nunca en
+// un error de arranque: el nivel de log no debería poder tumbar la app.
+func parseLogLevel(level string) slog.Level {
+	switch strings.ToLower(level) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error":
+		return slog.LevelError
+	default:
+		return slog.LevelInfo
+	}
 }

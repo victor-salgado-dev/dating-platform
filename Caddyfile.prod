@@ -1,0 +1,26 @@
+# Caddyfile de PRODUCCIÓN. A diferencia del Caddyfile de desarrollo
+# (":80"), aquí el sitio es un dominio real: Caddy obtiene y renueva un
+# certificado HTTPS de Let's Encrypt automáticamente, y redirige
+# HTTP -> HTTPS sin configuración adicional. {$DOMAIN} se sustituye por
+# la variable de entorno del mismo nombre (ver .env.production.example).
+
+{$DOMAIN} {
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+
+	handle /healthz {
+		reverse_proxy backend:8080
+	}
+
+	handle {
+		reverse_proxy frontend:3000
+	}
+
+	encode gzip
+
+	log {
+		output stdout
+		format json
+	}
+}

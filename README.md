@@ -455,23 +455,121 @@ perfil en el frontend (la Fase 4 solo pedía la API): sigue siendo
 razonable añadirlo más adelante, pero no lo pide ninguna fase todavía,
 así que no se ha construido por adelantado.
 
+## Producción (Fase 14)
+
+Última fase del roadmap original. Todo lo anterior seguía funcionando
+igual en desarrollo (`docker compose up`); esto es exclusivamente
+infraestructura nueva para desplegar de verdad.
+
+### Qué cambia respecto a desarrollo
+
+| | Desarrollo | Producción |
+|---|---|---|
+| Backend/frontend | `Dockerfile.dev`, código montado, `go run`/`next dev` | `Dockerfile`, build compilado, sin código fuente en la imagen |
+| Puertos | postgres/redis/backend publicados en el host, para poder probarlos sueltos | **solo Caddy** publica 80/443; el resto solo habla por la red interna de Docker |
+| Caddy | `:80`, sin TLS | dominio real, HTTPS automático (Let's Encrypt) vía `Caddyfile.prod` |
+| Storage | `STORAGE_DRIVER=local` (disco del contenedor) | `STORAGE_DRIVER=s3` (cualquier proveedor compatible con S3) |
+| Email | `EMAIL_DRIVER=noop` (logs) | `EMAIL_DRIVER=smtp` (envío real) |
+| Logs | `LOG_LEVEL=debug` | `LOG_LEVEL=info` (configurable; antes de esta fase la variable existía pero no se aplicaba de verdad al logger — quedó corregido aquí) |
+
+### Desplegar
+
+Pensado para el caso más simple y barato: **una sola VM con Docker**
+(coincide con la prioridad de coste bajo de la sección 1). Nada de esto
+impide migrar después a un orquestador más sofisticado si hiciera
+falta, pero no se construye por adelantado.
+
+```bash
+# En el servidor, con Docker y el plugin compose instalados:
+git clone <tu-repo> && cd dating-platform
+
+cp .env.production.example .env
+# Rellena TODOS los [CAMBIAR]: dominio, contraseñas, SMTP, bucket S3...
+
+# Apunta el DNS de tu dominio (registro A) a la IP del servidor ANTES
+# de arrancar Caddy, o la emisión del certificado HTTPS fallará.
+
+# (Opcional pero recomendable) comprobar cómo se combina el override
+# antes de construir nada:
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml config
+
+make prod-build
+make prod-up
+
+# Migraciones (igual que en desarrollo, contra la base de datos real):
+docker compose run --rm migrate -path=/migrations \
+  -database "postgres://USUARIO:PASSWORD@postgres:5432/BASE_DE_DATOS?sslmode=disable" up
+
+# Primer admin (igual que en desarrollo):
+make admin-promote email=tu-email@tu-dominio.com
+```
+
+Caddy obtiene y renueva el certificado HTTPS solo; no hace falta
+certbot ni configuración de TLS manual.
+
+### Backups
+
+```bash
+make backup                          # -> ./backups/dating_platform_<fecha>.sql.gz
+make restore file=backups/xxx.sql.gz # pide confirmación explícita
+```
+
+`pg_dump`/`psql` corren dentro del contenedor de `postgres` (misma
+versión que la base de datos real): no hace falta instalar herramientas
+de PostgreSQL en el servidor. No hay una tarea programada (cron)
+incluida — en la mayoría de VMs basta un `cron` del sistema operativo
+llamando a `make backup`; automatizarlo dentro de la propia app sería
+sobrearquitectura para V1.
+
+### Almacenamiento S3-compatible
+
+`STORAGE_DRIVER=s3` (además de `local`, que sigue siendo el de
+desarrollo). Funciona con cualquier proveedor compatible con la API de
+S3 — AWS S3, MinIO, DigitalOcean Spaces, Backblaze B2... — vía
+[`minio-go`](https://github.com/minio/minio-go), un cliente ligero, no
+solo para MinIO pese al nombre. El bucket debe existir de antemano: el
+backend comprueba que es accesible al arrancar y falla pronto (antes de
+aceptar tráfico) si no. Ver variables `STORAGE_S3_*` en
+`.env.production.example`.
+
+### Email real (SMTP)
+
+`EMAIL_DRIVER=smtp` usa `net/smtp` de la librería estándar de Go (sin
+dependencias nuevas): compatible con cualquier proveedor transaccional
+que hable SMTP con STARTTLS en el puerto 587 (SendGrid, Mailgun,
+Postmark, Amazon SES...). Ver variables `SMTP_*`.
+
+### Health checks
+
+Las imágenes de producción (`backend/Dockerfile`, `frontend/Dockerfile`)
+incluyen `HEALTHCHECK` propio (antes solo lo tenían postgres/redis):
+Docker puede saber si el backend o el frontend dejaron de responder,
+no solo si el proceso sigue vivo.
+
 ## Variables de entorno
 
-Ver [`.env.example`](./.env.example) para la lista completa y comentada.
-Nunca se sube `.env` (con secretos reales) a Git.
+Ver [`.env.example`](./.env.example) (desarrollo) y
+[`.env.production.example`](./.env.production.example) (producción,
+Fase 14) para la lista completa y comentada. Nunca se sube `.env` (con
+secretos reales) a Git.
 
 ## Estructura del proyecto
 
 ```
 .
-├── docker-compose.yml       # Orquestación de todos los servicios
-├── Caddyfile                 # Reverse proxy: /api/* -> backend, resto -> frontend
-├── Makefile                  # Comandos de arranque y migraciones
+├── docker-compose.yml       # Orquestación (desarrollo)
+├── docker-compose.prod.yml   # Override de producción (Fase 14)
+├── Caddyfile                 # Reverse proxy de desarrollo (:80, sin TLS)
+├── Caddyfile.prod              # Reverse proxy de producción (dominio real, HTTPS automático)
+├── Makefile                  # Comandos de arranque, migraciones, tests, producción, backups
 ├── .env.example
+├── .env.production.example    # Plantilla de variables de producción (Fase 14)
 ├── backend/                  # Monolito modular en Go
 │   ├── cmd/
 │   │   ├── api/                # Punto de entrada del servidor
 │   │   └── promote-admin/       # CLI para promocionar una cuenta a admin
+│   ├── Dockerfile.dev           # Imagen de desarrollo (go run, código montado)
+│   ├── Dockerfile                # Imagen de producción (build compilado, Fase 14)
 │   ├── internal/
 │   │   ├── config/             # Lectura de variables de entorno
 │   │   ├── db/                  # Pool de conexión a PostgreSQL
@@ -481,7 +579,7 @@ Nunca se sube `.env` (con secretos reales) a Git.
 │   │   ├── health/              # Endpoints de liveness/readiness
 │   │   ├── users/               # Dominio de cuenta: modelo + repositorio
 │   │   ├── auth/                 # Registro, login, sesiones, tokens, email de verificación/reset
-│   │   ├── email/                # Abstracción de envío de email (driver "noop" en V1)
+│   │   ├── email/                # Abstracción de email (driver "noop" en dev, "smtp" en producción)
 │   │   ├── profiles/              # Perfil propio: datos estructurados + fotos
 │   │   ├── search/                 # Búsqueda de perfiles con filtros estructurados
 │   │   ├── favorites/               # Favoritos: añadir, eliminar, listar
@@ -493,9 +591,11 @@ Nunca se sube `.env` (con secretos reales) a Git.
 │   │   ├── testutil/                    # Helpers para tests de integración (Fase 12)
 │   │   ├── consent/                     # Registro de aceptación de Términos/Privacidad (Fase 13)
 │   │   ├── contact/                      # Formulario de contacto público (Fase 13)
-│   │   └── storage/               # Abstracción de almacenamiento de ficheros (driver "local" en V1)
+│   │   └── storage/               # Abstracción de storage (driver "local" en dev, "s3" en producción)
 │   └── migrations/            # Migraciones SQL versionadas
 └── frontend/                 # Next.js (App Router, TypeScript)
+    ├── Dockerfile.dev           # Imagen de desarrollo (next dev, código montado)
+    ├── Dockerfile                # Imagen de producción (build standalone, Fase 14)
     ├── app/
     │   ├── discover/           # Resultados de búsqueda (Fase 6)
     │   ├── profiles/[id]/      # Página de perfil público (Fase 6)
@@ -511,7 +611,9 @@ Nunca se sube `.env` (con secretos reales) a Git.
     └── messages/               # Esqueleto i18n (es/en), aún sin enrutar
 
 scripts/
-└── smoke-test.sh             # Comprobación de que el stack Docker arranca sano (Fase 12)
+├── smoke-test.sh             # Comprobación de que el stack Docker arranca sano (Fase 12)
+├── backup.sh                  # Backup de PostgreSQL (Fase 14)
+└── restore.sh                 # Restauración de un backup (Fase 14)
 ```
 
 ## Roadmap de fases

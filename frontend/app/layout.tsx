@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+// @ts-expect-error Next.js bundles global CSS imports without TypeScript declarations.
 import './globals.css';
 import styles from './layout.module.css';
 

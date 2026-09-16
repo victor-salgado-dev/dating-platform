@@ -1,0 +1,57 @@
+# Override de PRODUCCIÓN. Se usa JUNTO al docker-compose.yml base:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+#
+# (o `make prod-up`, ver Makefile). Requiere Docker Compose >= 2.24
+# (por el tag YAML `!reset`, usado abajo para anular puertos/volúmenes
+# del fichero base en vez de acumularlos).
+#
+# Cambios respecto al desarrollo:
+# - backend/frontend usan las imágenes de producción (Dockerfile, no
+#   Dockerfile.dev): binario/build ya compilados, sin código fuente
+#   montado como volumen.
+# - postgres, redis y backend YA NO publican su puerto al host: en
+#   desarrollo se exponían para poder probarlos directamente (ver el
+#   aviso de seguridad de la Fase 11 sobre X-Forwarded-For). En
+#   producción, todo el tráfico externo entra únicamente por Caddy.
+# - Caddy usa Caddyfile.prod (dominio real, HTTPS automático vía
+#   Let's Encrypt) y publica 80/443 en vez del 80 "a secas" de dev.
+
+services:
+  postgres:
+    ports: !reset []
+    restart: always
+
+  redis:
+    ports: !reset []
+    restart: always
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    volumes: !reset []
+    ports: !reset []
+    restart: always
+    environment:
+      APP_ENV: production
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    volumes: !reset []
+    ports: !reset []
+    restart: always
+    environment:
+      NODE_ENV: production
+
+  caddy:
+    restart: always
+    volumes: !override
+      - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    ports: !override
+      - "80:80"
+      - "443:443"

@@ -20,16 +20,19 @@ import (
 // entradas obviamente inválidas antes de tocar la base de datos.
 var emailPattern = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 
-// ConsentRecorder registra los consentimientos asociados al alta de una
-// cuenta. La interfaz vive en auth para evitar depender del módulo concreto
-// que persiste los consentimientos.
+// ConsentRecorder es la interfaz mínima que auth necesita del módulo
+// consent: persistir que se aceptaron los documentos legales al
+// registrarse. auth valida el booleano accepted por su cuenta (ver
+// Register) y solo delega en esta interfaz el efecto de guardarlo;
+// consent.Service la satisface sin que ninguno de los dos paquetes
+// importe al otro más que en este único punto.
 type ConsentRecorder interface {
 	RecordRegistrationConsents(ctx context.Context, userID uuid.UUID, accepted bool) error
 }
 
 // Service implementa los casos de uso de autenticación. Depende de
-// interfaces (users.Repository, SessionStore, TokenStore, email.Sender y
-// ConsentRecorder), nunca de implementaciones concretas.
+// interfaces (users.Repository, SessionStore, TokenStore, email.Sender),
+// nunca de implementaciones concretas, para poder sustituirlas en tests.
 type Service struct {
 	users    users.Repository
 	sessions SessionStore

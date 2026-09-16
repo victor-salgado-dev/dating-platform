@@ -1,7 +1,8 @@
 .PHONY: up up-build down logs ps \
         migrate-new migrate-up migrate-down migrate-up-one migrate-down-one migrate-version migrate-force \
         admin-promote \
-        test test-integration test-all smoke-test
+        test test-integration test-all smoke-test \
+        prod-build prod-up prod-down prod-logs backup restore
 
 # Carga las variables de .env para poder usarlas en los comandos de migración.
 -include .env
@@ -104,3 +105,36 @@ test-all: test test-integration
 ## los endpoints de salud. No sustituye a `test`/`test-integration`.
 smoke-test:
 	./scripts/smoke-test.sh
+
+# ---------------------------------------------------------
+# Producción (Fase 14)
+#
+# Requiere un .env de producción (ver .env.production.example) y
+# Docker Compose >= 2.24 (por el uso de !override/!reset en
+# docker-compose.prod.yml).
+# ---------------------------------------------------------
+
+## Construye las imágenes de producción (backend/Dockerfile, frontend/Dockerfile).
+prod-build:
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml build
+
+## Arranca el stack de producción (Caddy con HTTPS real en 80/443).
+prod-up:
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+
+## Detiene el stack de producción.
+prod-down:
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+
+## Logs del stack de producción.
+prod-logs:
+	docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f
+
+## Backup de PostgreSQL a ./backups (pg_dump dentro del contenedor).
+backup:
+	./scripts/backup.sh
+
+## Restaura un backup. Uso: make restore file=backups/xxx.sql.gz
+restore:
+	@if [ -z "$(file)" ]; then echo "ERROR: falta file. Uso: make restore file=backups/xxx.sql.gz"; exit 1; fi
+	./scripts/restore.sh $(file)

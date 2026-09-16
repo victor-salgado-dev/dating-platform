@@ -58,21 +58,37 @@ func (r RedisConfig) Addr() string {
 }
 
 // StorageConfig es la configuración de la abstracción de almacenamiento
-// de imágenes. En V1 solo se usa el driver "local"; en producción se
-// podrá cambiar a un driver S3-compatible sin tocar la lógica de negocio.
+// de imágenes. driver=local (V1/desarrollo) o driver=s3 (producción,
+// Fase 14: cualquier proveedor compatible con S3 — AWS S3, MinIO,
+// DigitalOcean Spaces, Backblaze B2...). Los campos S3* se ignoran
+// completamente si driver=local.
 type StorageConfig struct {
 	Driver    string
 	LocalPath string
+
+	S3Endpoint       string
+	S3Region         string
+	S3Bucket         string
+	S3AccessKey      string
+	S3SecretKey      string
+	S3UseSSL         bool
+	S3ForcePathStyle bool
 }
 
 // EmailConfig es la configuración de la abstracción de envío de email.
-// El driver "noop" (usado hasta ahora) no envía nada, solo registra en logs.
+// El driver "noop" (desarrollo) registra en logs en vez de enviar; el
+// driver "smtp" (producción, Fase 14) envía de verdad.
 type EmailConfig struct {
 	Driver string
 	From   string
 	// ContactInbox es la dirección a la que llegan los mensajes del
 	// formulario de contacto (Fase 13).
 	ContactInbox string
+
+	SMTPHost     string
+	SMTPPort     string
+	SMTPUsername string
+	SMTPPassword string
 }
 
 // AuthConfig agrupa la configuración del módulo de autenticación:
@@ -140,12 +156,25 @@ func Load() Config {
 		Storage: StorageConfig{
 			Driver:    getEnv("STORAGE_DRIVER", "local"),
 			LocalPath: getEnv("STORAGE_LOCAL_PATH", "/data/uploads"),
+
+			S3Endpoint:       getEnv("STORAGE_S3_ENDPOINT", ""),
+			S3Region:         getEnv("STORAGE_S3_REGION", "us-east-1"),
+			S3Bucket:         getEnv("STORAGE_S3_BUCKET", ""),
+			S3AccessKey:      getEnv("STORAGE_S3_ACCESS_KEY", ""),
+			S3SecretKey:      getEnv("STORAGE_S3_SECRET_KEY", ""),
+			S3UseSSL:         getEnvBool("STORAGE_S3_USE_SSL", true),
+			S3ForcePathStyle: getEnvBool("STORAGE_S3_FORCE_PATH_STYLE", false),
 		},
 
 		Email: EmailConfig{
 			Driver:       getEnv("EMAIL_DRIVER", "noop"),
 			From:         getEnv("EMAIL_FROM", "no-reply@example.com"),
 			ContactInbox: getEnv("CONTACT_INBOX_EMAIL", "contact@example.com"),
+
+			SMTPHost:     getEnv("SMTP_HOST", ""),
+			SMTPPort:     getEnv("SMTP_PORT", "587"),
+			SMTPUsername: getEnv("SMTP_USERNAME", ""),
+			SMTPPassword: getEnv("SMTP_PASSWORD", ""),
 		},
 
 		Auth: AuthConfig{
@@ -176,6 +205,18 @@ func getEnvInt(key string, fallback int) int {
 		return fallback
 	}
 	return n
+}
+
+func getEnvBool(key string, fallback bool) bool {
+	v, ok := os.LookupEnv(key)
+	if !ok || v == "" {
+		return fallback
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return fallback
+	}
+	return b
 }
 
 func getEnvHours(key string, fallback int) int {
