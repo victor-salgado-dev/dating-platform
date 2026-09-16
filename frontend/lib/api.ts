@@ -152,6 +152,26 @@ export type MatchesResponse = {
   total_pages: number;
 };
 
+export type ActivityItem = {
+  event_type: 'like_received' | 'match_created' | 'favorite_received';
+  profile_id: string;
+  display_name: string;
+  age: number;
+  gender: string;
+  country_code: string;
+  region: string | null;
+  has_photo: boolean;
+  created_at: string;
+};
+
+export type ActivityResponse = {
+  items: ActivityItem[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+};
+
 export type ConversationParticipant = {
   profile_id: string;
   display_name: string;

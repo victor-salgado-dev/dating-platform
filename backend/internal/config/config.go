@@ -95,11 +95,11 @@ type EmailConfig struct {
 // duración de sesiones y de los tokens de un solo uso (verificación de
 // email, reseteo de contraseña), y si las cookies deben marcarse Secure.
 type AuthConfig struct {
-	SessionTTL             time.Duration
-	EmailVerificationTTL   time.Duration
-	PasswordResetTTL       time.Duration
-	CookieSecure           bool
-	CookieName             string
+	SessionTTL           time.Duration
+	EmailVerificationTTL time.Duration
+	PasswordResetTTL     time.Duration
+	CookieSecure         bool
+	CookieName           string
 }
 
 // SecurityConfig agrupa los parámetros de hardening de la Fase 11:

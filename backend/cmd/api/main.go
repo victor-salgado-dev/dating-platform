@@ -16,6 +16,7 @@ import (
 	"syscall"
 	"time"
 
+	"dating-platform/backend/internal/activity"
 	"dating-platform/backend/internal/admin"
 	"dating-platform/backend/internal/auth"
 	"dating-platform/backend/internal/blocking"
@@ -129,6 +130,10 @@ func main() {
 	favoritesService := favorites.NewService(favoritesRepo, profilesRepo)
 	favoritesHandler := favorites.NewHandler(favoritesService)
 
+	activityRepo := activity.NewPostgresRepository(pool)
+	activityService := activity.NewService(activityRepo, profilesRepo)
+	activityHandler := activity.NewHandler(activityService)
+
 	likesRepo := likes.NewPostgresRepository(pool)
 	likesService := likes.NewService(likesRepo, profilesRepo)
 	likesHandler := likes.NewHandler(likesService)
@@ -159,6 +164,7 @@ func main() {
 		ProfilesHandler:  profilesHandler,
 		SearchHandler:    searchHandler,
 		FavoritesHandler: favoritesHandler,
+		ActivityHandler:  activityHandler,
 		LikesHandler:     likesHandler,
 		MessagingHandler: messagingHandler,
 		BlockingHandler:  blockingHandler,

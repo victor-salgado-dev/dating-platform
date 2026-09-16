@@ -63,15 +63,15 @@ type Report struct {
 // administración (Fase 10), enriquecida con el nombre a mostrar de
 // quién reporta y de quién es reportado cuando existe su perfil.
 type ListItem struct {
-	ID            uuid.UUID
-	ReporterID    uuid.UUID
-	ReporterName  *string
-	ReportedID    uuid.UUID
-	ReportedName  *string
-	Reason        Reason
-	Description   *string
-	Status        Status
-	CreatedAt     time.Time
+	ID           uuid.UUID
+	ReporterID   uuid.UUID
+	ReporterName *string
+	ReportedID   uuid.UUID
+	ReportedName *string
+	Reason       Reason
+	Description  *string
+	Status       Status
+	CreatedAt    time.Time
 }
 
 type ListResult struct {

@@ -196,11 +196,11 @@ func (r *PostgresRepository) ListConversations(ctx context.Context, userID uuid.
 
 	for rows.Next() {
 		var (
-			item           ConversationSummary
-			genderStr      string
-			birthDate      time.Time
-			lastSenderID   uuid.UUID
-			totalCount     int
+			item         ConversationSummary
+			genderStr    string
+			birthDate    time.Time
+			lastSenderID uuid.UUID
+			totalCount   int
 		)
 
 		if err := rows.Scan(

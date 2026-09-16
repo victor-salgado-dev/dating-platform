@@ -32,9 +32,9 @@ const (
 
 // Consent es un consentimiento ya registrado.
 type Consent struct {
-	ID               uuid.UUID
-	UserID           uuid.UUID
-	DocumentType     DocumentType
-	DocumentVersion  string
-	AcceptedAt       time.Time
+	ID              uuid.UUID
+	UserID          uuid.UUID
+	DocumentType    DocumentType
+	DocumentVersion string
+	AcceptedAt      time.Time
 }

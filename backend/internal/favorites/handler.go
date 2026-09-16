@@ -85,6 +85,14 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
+	h.list(w, r, false)
+}
+
+func (h *Handler) ListReceived(w http.ResponseWriter, r *http.Request) {
+	h.list(w, r, true)
+}
+
+func (h *Handler) list(w http.ResponseWriter, r *http.Request, received bool) {
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
 		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
@@ -111,7 +119,13 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 		pageSize = n
 	}
 
-	result, err := h.svc.List(r.Context(), userID, page, pageSize)
+	var result *ListResult
+	var err error
+	if received {
+		result, err = h.svc.ListReceived(r.Context(), userID, page, pageSize)
+	} else {
+		result, err = h.svc.List(r.Context(), userID, page, pageSize)
+	}
 	if err != nil {
 		writeFavoritesError(w, err)
 		return

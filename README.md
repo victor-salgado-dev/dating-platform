@@ -186,9 +186,10 @@ filtro, esos perfiles siguen siendo visibles.
 
 | Área | Rutas |
 | --- | --- |
-| Favoritos | `GET /api/v1/favorites`, `POST|DELETE /api/v1/favorites/{profileID}`, `GET /api/v1/favorites/{profileID}` |
+| Favoritos | `GET /api/v1/favorites`, `GET /api/v1/favorites/received`, `POST|DELETE /api/v1/favorites/{profileID}`, `GET /api/v1/favorites/{profileID}` |
 | Likes | `POST|DELETE /api/v1/likes/{profileID}`, `GET /api/v1/likes/{profileID}`, `GET /api/v1/likes/sent`, `GET /api/v1/likes/received` |
 | Matches | `GET /api/v1/matches`, `GET /api/v1/matches/{profileID}` |
+| Actividad | `GET /api/v1/activity` |
 | Mensajes | `POST /api/v1/messages/to/{profileID}`, `GET /api/v1/messages/conversations`, `GET|POST /api/v1/messages/conversations/{conversationID}/messages` |
 | Bloqueos | `GET /api/v1/blocks`, `POST|DELETE /api/v1/blocks/{profileID}`, `GET /api/v1/blocks/{profileID}` |
 | Reportes | `POST /api/v1/reports/{profileID}` |
@@ -244,6 +245,7 @@ Caddy y el mismo origen.
 | `/favorites` | Lista de favoritos. |
 | `/likes` | Likes enviados y recibidos, paginados. |
 | `/matches` | Matches paginados y enlace a conversaciones existentes. |
+| `/activity` | Feed paginado de likes, matches y favoritos recibidos. |
 | `/messages` | Lista de conversaciones. |
 | `/messages/[id]` | Hilo de conversación y respuesta. |
 | `/blocked` | Lista y desbloqueo de perfiles. |

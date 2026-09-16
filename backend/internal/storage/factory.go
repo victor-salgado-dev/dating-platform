@@ -29,4 +29,3 @@ func New(ctx context.Context, cfg Config) (Storage, error) {
 		return nil, fmt.Errorf("storage: driver desconocido %q", cfg.Driver)
 	}
 }
-

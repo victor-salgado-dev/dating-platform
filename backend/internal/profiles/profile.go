@@ -25,11 +25,11 @@ const (
 type RelationshipGoal string
 
 const (
-	RelationshipCasual    RelationshipGoal = "casual"
-	RelationshipLongTerm  RelationshipGoal = "long_term"
+	RelationshipCasual     RelationshipGoal = "casual"
+	RelationshipLongTerm   RelationshipGoal = "long_term"
 	RelationshipFriendship RelationshipGoal = "friendship"
-	RelationshipMarriage  RelationshipGoal = "marriage"
-	RelationshipNotSure   RelationshipGoal = "not_sure"
+	RelationshipMarriage   RelationshipGoal = "marriage"
+	RelationshipNotSure    RelationshipGoal = "not_sure"
 )
 
 // Profile es la entidad de dominio de perfil.
@@ -47,13 +47,13 @@ type Profile struct {
 	Gender      Gender
 	CountryCode string
 
-	Region            *string
-	Languages         []string
-	RelationshipGoal  *RelationshipGoal
-	HasChildren       *bool
-	WantsChildren     *bool
-	Bio               *string
-	Interests         []string
+	Region           *string
+	Languages        []string
+	RelationshipGoal *RelationshipGoal
+	HasChildren      *bool
+	WantsChildren    *bool
+	Bio              *string
+	Interests        []string
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

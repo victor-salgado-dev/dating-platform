@@ -54,3 +54,20 @@ func (s *Service) List(ctx context.Context, userID uuid.UUID, page, pageSize int
 	}
 	return s.repo.List(ctx, userID, page, pageSize)
 }
+
+func (s *Service) ListReceived(ctx context.Context, userID uuid.UUID, page, pageSize int) (*ListResult, error) {
+	profile, err := s.profiles.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = DefaultPageSize
+	}
+	if pageSize > MaxPageSize {
+		pageSize = MaxPageSize
+	}
+	return s.repo.ListReceived(ctx, profile.ID, page, pageSize)
+}

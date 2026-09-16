@@ -17,4 +17,5 @@ type Repository interface {
 	Remove(ctx context.Context, userID, profileID uuid.UUID) error
 	IsFavorited(ctx context.Context, userID, profileID uuid.UUID) (bool, error)
 	List(ctx context.Context, userID uuid.UUID, page, pageSize int) (*ListResult, error)
+	ListReceived(ctx context.Context, profileID uuid.UUID, page, pageSize int) (*ListResult, error)
 }

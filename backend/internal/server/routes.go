@@ -6,6 +6,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/redis/go-redis/v9"
 
+	"dating-platform/backend/internal/activity"
 	"dating-platform/backend/internal/admin"
 	"dating-platform/backend/internal/auth"
 	"dating-platform/backend/internal/blocking"
@@ -37,6 +38,7 @@ type Dependencies struct {
 	ProfilesHandler  *profiles.Handler
 	SearchHandler    *search.Handler
 	FavoritesHandler *favorites.Handler
+	ActivityHandler  *activity.Handler
 	LikesHandler     *likes.Handler
 	MessagingHandler *messaging.Handler
 	BlockingHandler  *blocking.Handler
@@ -111,6 +113,7 @@ func NewRouter(deps Dependencies) http.Handler {
 
 	// --- Favoritos (Fase 7) ---------------------------------------------
 	mux.Handle("GET /api/v1/favorites", requireAuth(http.HandlerFunc(deps.FavoritesHandler.List)))
+	mux.Handle("GET /api/v1/favorites/received", requireAuth(http.HandlerFunc(deps.FavoritesHandler.ListReceived)))
 	mux.Handle("POST /api/v1/favorites/{profileID}", requireAuth(http.HandlerFunc(deps.FavoritesHandler.Add)))
 	mux.Handle("DELETE /api/v1/favorites/{profileID}", requireAuth(http.HandlerFunc(deps.FavoritesHandler.Remove)))
 	mux.Handle("GET /api/v1/favorites/{profileID}", requireAuth(http.HandlerFunc(deps.FavoritesHandler.Status)))
@@ -123,6 +126,9 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/likes/received", requireAuth(http.HandlerFunc(deps.LikesHandler.ListReceived)))
 	mux.Handle("GET /api/v1/matches", requireAuth(http.HandlerFunc(deps.LikesHandler.ListMatches)))
 	mux.Handle("GET /api/v1/matches/{profileID}", requireAuth(http.HandlerFunc(deps.LikesHandler.MatchStatus)))
+
+	// --- Actividad (Fase 16) --------------------------------------------
+	mux.Handle("GET /api/v1/activity", requireAuth(http.HandlerFunc(deps.ActivityHandler.List)))
 
 	// --- Mensajería (Fase 8) ---------------------------------------------
 	// "to/{profileID}" inicia o continúa la conversación con esa persona
