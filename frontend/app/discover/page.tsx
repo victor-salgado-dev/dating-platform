@@ -1,69 +1,56 @@
-'use client';
-
-import React, { useEffect, useState } from 'react';
-import Link from 'next/link';
-
-import { apiFetch, ApiError, SearchResponse } from '@/lib/api';
-import styles from './page.module.css';
-
-interface PhotoItem {
-  id: string;
-  url: string;
-  position: number;
-}
-
-// Componente que carga la foto real de cada usuario
-function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) {
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiFetch<PhotoItem[]>(`/profiles/${profileId}/photos`)
-      .then((photos) => {
-        if (photos && photos.length > 0) {
-          const firstPhoto = photos[0];
-          setPhotoUrl(firstPhoto.url ?? `/api/v1/profiles/${profileId}/photos/${firstPhoto.id}/file`);
-        }
-      })
-      .catch(() => setPhotoUrl(null));
-  }, [profileId]);
-
-  if (!photoUrl) {
-    return <div className={styles.photoPlaceholder}>Sin Foto</div>;
-  }
-
-  return <img src={photoUrl} alt={name} className={styles.photoImg} />;
-}
-
-export default function DiscoverPage() {
+function DiscoverContent() {
+  const searchParams = useSearchParams();
+  const searchString = searchParams.toString(); // Lo pasamos a string para evitar re-renders innecesarios
+  
   const [data, setData] = useState<SearchResponse | null>(null);
   const [page, setPage] = useState(1);
+  const [lastSearch, setLastSearch] = useState(searchString);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Si los filtros cambian, reseteamos a la página 1 de forma segura (sin doble petición)
+  if (searchString !== lastSearch) {
+    setLastSearch(searchString);
+    setPage(1);
+  }
+
   useEffect(() => {
+    let isMounted = true;
     setLoading(true);
     setError(null);
 
-    // 24 perfiles por página
-    apiFetch<SearchResponse>(`/search/profiles?page=${page}&page_size=24`)
-      .then(setData)
+    const params = new URLSearchParams(searchString);
+    params.set('page', page.toString());
+    params.set('page_size', '24');
+
+    apiFetch<SearchResponse>(`/search/profiles?${params.toString()}`)
+      .then((res) => {
+        if (isMounted) setData(res);
+      })
       .catch((err: unknown) => {
+        if (!isMounted) return;
         if (err instanceof ApiError && err.status === 401) {
           setError('Inicia sesión para ver perfiles.');
+        } else if (err instanceof ApiError && err.status === 429) {
+          setError('Demasiadas peticiones. Espera un minuto e inténtalo de nuevo.');
         } else {
           setError('No se pudieron cargar los resultados.');
         }
       })
-      .finally(() => setLoading(false));
-  }, [page]);
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false; // Cleanup para que el modo estricto de React no duplique el set state
+    };
+  }, [page, searchString]);
 
   const profiles = data?.items ?? [];
   const totalPages = data?.total_pages ?? 1;
 
   return (
-    <main className={styles.main}>
-      <h1 className={styles.title}>Descubrir</h1>
-
+    <>
       {loading && <p style={{ textAlign: 'center', padding: '2rem' }}>Cargando perfiles…</p>}
 
       {error && <div className={styles.errorBanner}>{error}</div>}
@@ -72,7 +59,10 @@ export default function DiscoverPage() {
         <>
           {profiles.length === 0 ? (
             <div className={styles.emptyState}>
-              <p>No hay resultados disponibles.</p>
+              <p>No hay resultados que coincidan con tu búsqueda.</p>
+              <Link href="/search" style={{ color: 'var(--primary)', textDecoration: 'underline', marginTop: '1rem', display: 'inline-block' }}>
+                Cambiar filtros
+              </Link>
             </div>
           ) : (
             <ul className={styles.grid}>
@@ -130,6 +120,6 @@ export default function DiscoverPage() {
           )}
         </>
       )}
-    </main>
+    </>
   );
 }

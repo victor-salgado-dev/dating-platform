@@ -257,6 +257,10 @@ Caddy y el mismo origen.
 | `/legal/privacy` | Política de privacidad. |
 | `/legal/impressum` | Aviso legal. |
 | `/legal/contact` | Página de contacto. |
+| `/` | Página inicial con perfiles populares/paginados. |
+| `/search` | Formulario de búsqueda avanzada con filtros (género, rango de edad, objetivo de relación, país). |
+| `/discover` | Resultados de búsqueda paginados; procesa filtros dinámicos vía query params (`?gender=&min_age=...`). |
+| `/profiles/[id]` | Perfil público, fotos, favorito, bloqueo, reporte y primer mensaje. |
 
 Las páginas legales son plantillas con placeholders y deben revisarse con
 asesoramiento legal antes de una publicación real. Los archivos de
@@ -265,6 +269,9 @@ no hay routing i18n activo todavía.
 
 La navegación contiene enlaces a `/activity`, `/online` y `/new`, pero esas
 páginas todavía no tienen implementación propia.
+
+
+
 
 ## Seguridad
 
@@ -281,6 +288,19 @@ protección CSRF explícita con tokens; `SameSite=Lax` cubre el caso común, per
 no sustituye una solución CSRF completa. En desarrollo el backend está
 publicado directamente en el host, por lo que `X-Forwarded-For` puede ser
 falseado; en producción el tráfico externo debe entrar solo por Caddy.
+
+
+### Rate Limiting en desarrollo local
+
+El rate limiting por IP puede verse activado involuntariamente en el entorno de desarrollo debido al comportamiento de React Strict Mode (ejecución doble de efectos) y el Hot Reloading de Next.js, provocando errores HTTP `429 (Too Many Requests)`.
+
+Para mitigar esto en local:
+- Se pueden relajar temporalmente los límites en `.env` elevando los umbrales configurados.
+- Si una IP local resulta bloqueada, basta con limpiar la memoria de Redis reiniciando el servicio:
+
+```bash
+docker compose restart redis
+
 
 ## Tests y calidad
 

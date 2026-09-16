@@ -34,6 +34,7 @@ function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) 
 }
 
 export default function FavoritesPage() {
+  const [tab, setTab] = useState<'sent' | 'received'>('sent');
   const [data, setData] = useState<FavoritesResponse | null>(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -43,7 +44,7 @@ export default function FavoritesPage() {
     setLoading(true);
     setError(null);
 
-    apiFetch<FavoritesResponse>(`/favorites?page=${page}`)
+    apiFetch<FavoritesResponse>(`/favorites/${tab}?page=${page}`)
       .then(setData)
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 401) {
@@ -53,7 +54,12 @@ export default function FavoritesPage() {
         }
       })
       .finally(() => setLoading(false));
-  }, [page]);
+  }, [tab, page]);
+
+  function changeTab(nextTab: 'sent' | 'received') {
+    setTab(nextTab);
+    setPage(1);
+  }
 
   const favorites = data?.items ?? [];
   const totalPages = data?.total_pages ?? 1;
@@ -61,6 +67,23 @@ export default function FavoritesPage() {
   return (
     <main className={styles.main}>
       <h1 className={styles.title}>Mis Favoritos</h1>
+
+      <div className={styles.tabs} role="tablist">
+        <button
+          type="button"
+          className={tab === 'sent' ? styles.activeTab : styles.tab}
+          onClick={() => changeTab('sent')}
+        >
+          Mis Favoritos
+        </button>
+        <button
+          type="button"
+          className={tab === 'received' ? styles.activeTab : styles.tab}
+          onClick={() => changeTab('received')}
+        >
+          Me Marcaron
+        </button>
+      </div>
 
       {loading && <p style={{ textAlign: 'center', padding: '2rem' }}>Cargando favoritos…</p>}
 
@@ -70,9 +93,15 @@ export default function FavoritesPage() {
         <>
           {favorites.length === 0 ? (
             <div className={styles.emptyState}>
-              <p className={styles.emptyStateTitle}>Todavía no has añadido ningún favorito.</p>
+              <p className={styles.emptyStateTitle}>
+                {tab === 'sent'
+                  ? 'Todavía no has añadido ningún favorito.'
+                  : 'Todavía nadie te ha marcado como favorito.'}
+              </p>
               <p className={styles.emptyStateSubtitle}>
-                Explora perfiles en el inicio y pulsa la estrella ★ para guardarlos aquí.
+                {tab === 'sent'
+                  ? 'Explora perfiles en el inicio y pulsa la estrella ★ para guardarlos aquí.'
+                  : 'Cuando alguien te marque como favorito, aparecerá aquí.'}
               </p>
             </div>
           ) : (

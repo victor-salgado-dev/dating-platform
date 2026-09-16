@@ -39,6 +39,7 @@ export default function RootLayout({
         {/* Barra secundaria de filtros (Blanca) */}
         <nav className={styles.headerBottom}>
           <Link href="/discover">Descubrir</Link>
+          <Link href="/search">🔍 Búsqueda Avanzada</Link> 
           <Link href="/favorites">Favoritos</Link>
           <Link href="/" className={styles.activeTab}>⭐ Populares</Link>
           <Link href="/online">En línea</Link>

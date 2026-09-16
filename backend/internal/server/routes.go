@@ -113,6 +113,8 @@ func NewRouter(deps Dependencies) http.Handler {
 
 	// --- Favoritos (Fase 7) ---------------------------------------------
 	mux.Handle("GET /api/v1/favorites", requireAuth(http.HandlerFunc(deps.FavoritesHandler.List)))
+	// Alias explícito para clientes que distinguen favoritos enviados y recibidos.
+	mux.Handle("GET /api/v1/favorites/sent", requireAuth(http.HandlerFunc(deps.FavoritesHandler.List)))
 	mux.Handle("GET /api/v1/favorites/received", requireAuth(http.HandlerFunc(deps.FavoritesHandler.ListReceived)))
 	mux.Handle("POST /api/v1/favorites/{profileID}", requireAuth(http.HandlerFunc(deps.FavoritesHandler.Add)))
 	mux.Handle("DELETE /api/v1/favorites/{profileID}", requireAuth(http.HandlerFunc(deps.FavoritesHandler.Remove)))
