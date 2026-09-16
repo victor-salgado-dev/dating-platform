@@ -53,6 +53,7 @@ export default function AccountPage() {
     }
     setMe(null);
     setLoggedOut(true);
+    window.dispatchEvent(new Event('auth-change'));
   }
 
   async function handleDelete(e: FormEvent) {
@@ -110,6 +111,10 @@ export default function AccountPage() {
         <dt>Miembro desde</dt>
         <dd>{new Date(me.created_at).toLocaleDateString()}</dd>
       </dl>
+
+      <p>
+        <Link href="/profile/edit" className={styles.profileLink}>Modificar perfil</Link>
+      </p>
 
       <button type="button" onClick={handleLogout} className={styles.logoutButton}>
         Cerrar sesión

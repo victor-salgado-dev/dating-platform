@@ -28,6 +28,15 @@
   cursor: pointer;
 }
 
+.profileLink {
+  display: inline-block;
+  padding: 0.55rem 0.9rem;
+  border-radius: 6px;
+  background: #111;
+  color: white;
+  text-decoration: none;
+}
+
 .section {
   margin-top: 2.5rem;
 }

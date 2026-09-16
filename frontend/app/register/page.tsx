@@ -25,7 +25,7 @@ export default function RegisterPage() {
         method: 'POST',
         body: JSON.stringify({ email, password, accepted_terms: acceptedTerms }),
       });
-      router.push('/discover');
+      router.push('/profile/edit');
     } catch (err) {
       if (err instanceof ApiError && err.code === 'email_taken') {
         setError('Ese email ya está registrado.');

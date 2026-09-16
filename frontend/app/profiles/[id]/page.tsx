@@ -201,6 +201,15 @@ export default function ProfilePage() {
             {[profile.region, profile.country_code].filter(Boolean).join(', ')}
           </p>
 
+          <dl className={styles.details}>
+            <dt>Género</dt>
+            <dd>{profile.gender}</dd>
+            <dt>¿Tiene hijos?</dt>
+            <dd>{profile.has_children === null ? 'No indicado' : profile.has_children ? 'Sí' : 'No'}</dd>
+            <dt>¿Quiere tener hijos?</dt>
+            <dd>{profile.wants_children === null ? 'No indicado' : profile.wants_children ? 'Sí' : 'No'}</dd>
+          </dl>
+
           {photos.length > 0 && (
             <div className={styles.photos}>
               {photos.map((photo) => (

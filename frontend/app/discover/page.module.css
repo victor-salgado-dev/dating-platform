@@ -1,60 +1,180 @@
 .main {
-  max-width: 720px;
-  margin: 2rem auto;
+  width: 100%;
+  max-width: 1600px;
+  margin: 1.5rem auto;
   padding: 0 1.5rem;
+  box-sizing: border-box;
 }
 
-.error {
-  color: #b00020;
+.title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 1.5rem;
 }
 
+/* Grilla fluida */
 .grid {
-  list-style: none;
-  padding: 0;
-  margin: 1.5rem 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  align-items: stretch;
+  padding: 0;
+  margin: 0;
+  list-style: none;
 }
 
+/* Tarjeta */
 .card {
-  border: 1px solid #ddd;
+  background: white;
   border-radius: 8px;
   overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
 }
 
 .cardLink {
-  display: block;
-  padding: 1rem;
-  color: inherit;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
   text-decoration: none;
+  color: inherit;
 }
 
-.cardLink:hover {
-  background: rgba(0, 0, 0, 0.03);
+/* Contenedor de la foto (proporción 3:4) */
+.imageContainer {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  background-color: #f3f4f6;
 }
 
-.cardName {
-  font-weight: 600;
+.photoImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
-.cardLocation {
-  color: #666;
+.photoPlaceholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #e5e7eb;
+  color: #9ca3af;
   font-size: 0.9rem;
+}
+
+/* Info del usuario */
+.cardInfo {
+  padding: 10px 14px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.age {
+  font-weight: normal;
+  color: #6b7280;
+}
+
+.details {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 2px 0 0 0;
 }
 
 .cardGoal {
   margin-top: 0.5rem;
   display: inline-block;
+  align-self: flex-start;
   font-size: 0.75rem;
-  padding: 0.15rem 0.5rem;
+  padding: 0.2rem 0.6rem;
   border-radius: 999px;
-  background: #eee;
+  background: #f3f4f6;
+  color: #4b5563;
+  font-weight: 500;
 }
 
+/* Estados */
+.emptyState {
+  text-align: center;
+  padding: 3rem;
+  color: #6b7280;
+  background: #ffffff;
+  border-radius: 8px;
+}
+
+.errorBanner {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  padding: 12px;
+  border-radius: 6px;
+  text-align: center;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+}
+
+/* Paginación */
 .pagination {
   display: flex;
+  justify-content: center;
   align-items: center;
   gap: 1rem;
-  justify-content: center;
+  margin: 3rem 0;
+}
+
+.pageButton {
+  padding: 0.6rem 1.2rem;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  color: #374151;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.pageButton:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.pageButton:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.pageInfo {
+  font-weight: 600;
+  color: #4b5563;
+  font-size: 0.9rem;
+}
+
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
 }

@@ -1,10 +1,38 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import { apiFetch, ApiError, SearchResponse } from '@/lib/api';
 import styles from './page.module.css';
+
+interface PhotoItem {
+  id: string;
+  url: string;
+  position: number;
+}
+
+// Componente que carga la foto real de cada usuario
+function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) {
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiFetch<PhotoItem[]>(`/profiles/${profileId}/photos`)
+      .then((photos) => {
+        if (photos && photos.length > 0) {
+          const firstPhoto = photos[0];
+          setPhotoUrl(firstPhoto.url ?? `/api/v1/profiles/${profileId}/photos/${firstPhoto.id}/file`);
+        }
+      })
+      .catch(() => setPhotoUrl(null));
+  }, [profileId]);
+
+  if (!photoUrl) {
+    return <div className={styles.photoPlaceholder}>Sin Foto</div>;
+  }
+
+  return <img src={photoUrl} alt={name} className={styles.photoImg} />;
+}
 
 export default function DiscoverPage() {
   const [data, setData] = useState<SearchResponse | null>(null);
@@ -16,7 +44,8 @@ export default function DiscoverPage() {
     setLoading(true);
     setError(null);
 
-    apiFetch<SearchResponse>(`/search/profiles?page=${page}`)
+    // 24 perfiles por página
+    apiFetch<SearchResponse>(`/search/profiles?page=${page}&page_size=24`)
       .then(setData)
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 401) {
@@ -28,56 +57,77 @@ export default function DiscoverPage() {
       .finally(() => setLoading(false));
   }, [page]);
 
+  const profiles = data?.items ?? [];
+  const totalPages = data?.total_pages ?? 1;
+
   return (
     <main className={styles.main}>
-      <h1>Descubrir</h1>
+      <h1 className={styles.title}>Descubrir</h1>
 
-      {loading && <p>Cargando…</p>}
-      {error && <p className={styles.error}>{error}</p>}
+      {loading && <p style={{ textAlign: 'center', padding: '2rem' }}>Cargando perfiles…</p>}
 
-      {data && (
+      {error && <div className={styles.errorBanner}>{error}</div>}
+
+      {!loading && !error && (
         <>
-          {data.items.length === 0 ? (
-            <p>No hay resultados con estos criterios.</p>
+          {profiles.length === 0 ? (
+            <div className={styles.emptyState}>
+              <p>No hay resultados disponibles.</p>
+            </div>
           ) : (
             <ul className={styles.grid}>
-              {data.items.map((item) => (
+              {profiles.map((item) => (
                 <li key={item.profile_id} className={styles.card}>
                   <Link href={`/profiles/${item.profile_id}`} className={styles.cardLink}>
-                    <div className={styles.cardName}>
-                      {item.display_name}, {item.age}
+                    <div className={styles.imageContainer}>
+                      {item.has_photo ? (
+                        <ProfilePhoto profileId={item.profile_id} name={item.display_name} />
+                      ) : (
+                        <div className={styles.photoPlaceholder}>Sin Foto</div>
+                      )}
                     </div>
-                    <div className={styles.cardLocation}>
-                      {[item.region, item.country_code].filter(Boolean).join(', ')}
+
+                    <div className={styles.cardInfo}>
+                      <h3 className={styles.name}>
+                        {item.display_name}
+                        <span className={styles.age}> · {item.age}</span>
+                      </h3>
+                      <p className={styles.details}>
+                        {[item.region, item.country_code].filter(Boolean).join(', ')}
+                      </p>
+                      {item.relationship_goal && (
+                        <span className={styles.cardGoal}>{item.relationship_goal}</span>
+                      )}
                     </div>
-                    {item.relationship_goal && (
-                      <div className={styles.cardGoal}>{item.relationship_goal}</div>
-                    )}
                   </Link>
                 </li>
               ))}
             </ul>
           )}
 
-          <div className={styles.pagination}>
-            <button
-              type="button"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-            >
-              Anterior
-            </button>
-            <span>
-              Página {data.page} de {Math.max(data.total_pages, 1)} ({data.total} perfiles)
-            </span>
-            <button
-              type="button"
-              disabled={page >= data.total_pages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Siguiente
-            </button>
-          </div>
+          {totalPages > 1 && (
+            <div className={styles.pagination}>
+              <button
+                type="button"
+                className={styles.pageButton}
+                disabled={page <= 1}
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+              >
+                ← Anterior
+              </button>
+              <span className={styles.pageInfo}>
+                Página {data?.page} de {totalPages} ({data?.total} perfiles)
+              </span>
+              <button
+                type="button"
+                className={styles.pageButton}
+                disabled={page >= totalPages}
+                onClick={() => setPage((p) => p + 1)}
+              >
+                Siguiente →
+              </button>
+            </div>
+          )}
         </>
       )}
     </main>

@@ -72,7 +72,7 @@ export default function LoginPage() {
       </form>
 
       <p className={styles.switch}>
-        ¿No tienes cuenta? <Link href="/register">Regístrate</Link>
+        ¿No tienes cuenta? <Link href="/register">Crear cuenta</Link>
       </p>
     </main>
   );

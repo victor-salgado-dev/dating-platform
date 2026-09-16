@@ -1,19 +1,150 @@
+/* Contenedor principal: fluido, con padding lateral elegante */
 .main {
+  width: 100%;
+  max-width: 1600px; /* Ocupa prácticamente toda la pantalla con margen de seguridad */
+  margin: 1.5rem auto;
+  padding: 0 1.5rem;
+  box-sizing: border-box;
+}
+
+/* Grilla fluida que calcula las columnas óptimas según el ancho de la pantalla */
+.grid {
+  display: grid;
+  /* En móviles tarjetas de min 160px, en escritorio hasta 240px */
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  grid-auto-flow: dense; /* Rellena los huecos automáticamente */
+  gap: 16px;
+  align-items: stretch;
+}
+
+/* Tarjeta estándar */
+.card {
+  background: white;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-  max-width: 640px;
-  margin: 4rem auto;
-  padding: 0 1.5rem;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
-.cta {
-  margin: 1rem 0;
-  font-size: 1.05rem;
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
 }
 
-.status {
-  margin-top: 2rem;
-  color: #666;
+/* Tarjeta Destacada (Ocupa 2 columnas y 2 filas) */
+.cardPremium {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+/* Contenedor de la foto con proporción vertical de retrato (3:4) */
+.imageContainer {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  overflow: hidden;
+  background-color: #f3f4f6;
+}
+
+/* En la tarjeta grande, la imagen llena todo el espacio disponible */
+.cardPremium .imageContainer {
+  height: 100%;
+  aspect-ratio: auto;
+}
+
+/* La imagen nunca se deforma: recorta por los bordes proporcionalmente */
+.photoImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.photoPlaceholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #e5e7eb;
+  color: #9ca3af;
+  font-size: 0.9rem;
+}
+
+/* Información del perfil */
+.cardInfo {
+  padding: 10px 14px;
+  background: #ffffff;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1f2937;
+  margin: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.details {
+  font-size: 0.8rem;
+  color: #6b7280;
+  margin: 2px 0 0 0;
+}
+
+/* --- ZONAS DE PUBLICIDAD --- */
+
+/* Anuncio patrocinado (ocupa 2 columnas) */
+.adSquare {
+  grid-column: span 2;
+  background-color: #f9fafb;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+  min-height: 200px;
+  color: #64748b;
   font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  text-align: center;
+}
+
+/* Banner horizontal que cruza de lado a lado */
+.adBanner {
+  grid-column: 1 / -1;
+  background-color: #f9fafb;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 8px;
+  height: 90px;
+  margin: 1rem 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #64748b;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* En pantallas móviles (menos de 640px) el anuncio doble y grande pasa a ancho normal */
+@media (max-width: 640px) {
+  .grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+  .cardPremium,
+  .adSquare {
+    grid-column: span 2;
+  }
 }
