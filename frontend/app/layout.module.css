@@ -4,7 +4,9 @@
   display: flex;
   align-items: center;
   padding: 0 1.5rem;
-  height: 60px;
+  height: 65px; /* Un poco más alto para respirar */
+  position: relative;
+  z-index: 20; /* Necesario para que el avatar monte sobre la barra de abajo */
 }
 
 .brand {
@@ -22,8 +24,15 @@
   font-weight: 500;
 }
 
+.topNav a {
+  padding: 0.5rem 0;
+  border-bottom: 2px solid transparent;
+  transition: all 0.2s ease;
+}
+
 .topNav a:hover {
-  opacity: 0.8;
+  border-bottom: 2px solid white;
+  opacity: 0.9;
 }
 
 .account {
@@ -35,6 +44,8 @@
 
 .accountMenu {
   position: relative;
+  display: flex;
+  align-items: center;
 }
 
 .accountButton {
@@ -44,37 +55,75 @@
   color: inherit;
   font: inherit;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+/* El círculo con progreso */
+.avatarWrapper {
+  position: relative;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  /* conic-gradient se inyecta dinámicamente desde React */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: -35px; /* Aquí está la magia: asoma 35px hacia abajo */
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s ease;
+  z-index: 30;
+}
+
+.avatarWrapper:hover {
+  transform: scale(1.05);
+}
+
+.avatarInner {
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  background-color: white;
+  border: 3px solid white;
+  object-fit: cover;
 }
 
 .accountDropdown {
   position: absolute;
-  top: calc(100% + 0.75rem);
+  top: calc(100% + 1.5rem);
   right: 0;
-  z-index: 10;
+  z-index: 40;
   display: flex;
-  min-width: 150px;
+  min-width: 180px;
   flex-direction: column;
-  padding: 0.35rem 0;
+  padding: 0.5rem 0;
   background: white;
+  border-radius: 8px;
   border: 1px solid #e0e0e0;
-  box-shadow: 0 4px 12px rgb(0 0 0 / 15%);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+  overflow: hidden;
 }
 
 .accountDropdown a,
 .accountDropdown button {
-  padding: 0.55rem 0.85rem;
+  padding: 0.75rem 1.25rem;
   border: 0;
   background: transparent;
-  color: #222;
+  color: #333;
   font: inherit;
+  font-weight: 500;
   text-align: left;
   text-decoration: none;
   cursor: pointer;
+  transition: background 0.2s;
 }
 
 .accountDropdown a:hover,
 .accountDropdown button:hover {
-  background: #f5f5f5;
+  background: #f0fdf4;
+  color: var(--brand-primary);
 }
 
 .headerBottom {
@@ -82,24 +131,33 @@
   border-bottom: 1px solid #e0e0e0;
   display: flex;
   align-items: center;
-  justify-content: center; /* Centrado como en la captura */
-  gap: 2rem;
-  height: 50px;
-  font-size: 0.9rem;
-  font-weight: 500;
+  justify-content: center; 
+  gap: 2.5rem;
+  height: 55px;
+  font-size: 0.95rem;
+  font-weight: 600;
   color: var(--text-muted);
+  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+  position: relative;
+  z-index: 10;
+}
+
+.headerBottom a {
+  display: flex;
+  align-items: center;
+  height: 100%;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s ease;
 }
 
 .headerBottom a:hover {
   color: var(--brand-primary);
+  border-bottom: 3px solid #ffccd5;
 }
 
 .activeTab {
-  color: var(--brand-primary);
-  border-bottom: 2px solid var(--brand-primary);
-  height: 100%;
-  display: flex;
-  align-items: center;
+  color: var(--brand-primary) !important;
+  border-bottom: 3px solid var(--brand-primary) !important;
 }
 
 .footer {

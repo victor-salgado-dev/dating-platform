@@ -17,7 +17,7 @@ export default function RootLayout({
   return (
     <html lang="es">
       <body>
-        {/* Barra superior (Roja) */}
+        {/* Barra superior (Roja) - SECCIONES PRINCIPALES */}
         <header className={styles.headerTop}>
           <Link href="/" className={styles.brand}>
             🤍 Dating Platform
@@ -25,10 +25,11 @@ export default function RootLayout({
 
           <nav className={styles.topNav}>
             <Link href="/">Inicio</Link>
-            <Link href="/messages">Mensajes</Link>
-            <Link href="/matches">Matches</Link>
-            <Link href="/likes">Likes</Link>
+            <Link href="/discover">Descubrir</Link>
             <Link href="/activity">Actividad</Link>
+            <Link href="/likes">Likes</Link>
+            <Link href="/matches">Matches</Link>
+            <Link href="/messages">Mensajes</Link>
           </nav>
 
           <div className={styles.account}>
@@ -36,14 +37,13 @@ export default function RootLayout({
           </div>
         </header>
 
-        {/* Barra secundaria de filtros (Blanca) */}
+        {/* Barra secundaria (Blanca) - FILTROS Y VISTAS */}
         <nav className={styles.headerBottom}>
-          <Link href="/discover">Descubrir</Link>
-          <Link href="/search">🔍 Búsqueda Avanzada</Link> 
-          <Link href="/favorites">Favoritos</Link>
           <Link href="/" className={styles.activeTab}>⭐ Populares</Link>
-          <Link href="/online">En línea</Link>
-          <Link href="/new">Nuevos miembros</Link>
+          <Link href="/online">🟢 En línea</Link>
+          <Link href="/new">✨ Nuevos miembros</Link>
+          <Link href="/favorites">💖 Favoritos</Link>
+          <Link href="/search">🔍 Búsqueda Avanzada</Link> 
         </nav>
 
         {children}

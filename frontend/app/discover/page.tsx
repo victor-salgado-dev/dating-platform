@@ -1,6 +1,45 @@
+'use client';
+
+import React, { useEffect, useState, Suspense } from 'react';
+import Link from 'next/link';
+import { useSearchParams } from 'next/navigation';
+
+import { apiFetch, ApiError, SearchResponse } from '@/lib/api';
+// Si tuvieras los estilos en la raíz, cámbialo a '../page.module.css'. 
+// Asumimos que discover tiene su propio page.module.css o usa el mismo.
+import styles from './page.module.css';
+
+interface PhotoItem {
+  id: string;
+  url: string;
+  position: number;
+}
+
+function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) {
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    apiFetch<PhotoItem[]>(`/profiles/${profileId}/photos`)
+      .then((photos) => {
+        if (photos && photos.length > 0) {
+          const firstPhoto = photos[0];
+          setPhotoUrl(firstPhoto.url ?? `/api/v1/profiles/${profileId}/photos/${firstPhoto.id}/file`);
+        }
+      })
+      .catch(() => setPhotoUrl(null));
+  }, [profileId]);
+
+  if (!photoUrl) {
+    return <div className={styles.photoPlaceholder}>Sin Foto</div>;
+  }
+
+  return <img src={photoUrl} alt={name} className={styles.photoImg} />;
+}
+
+// Componente interno que maneja la lógica de los parámetros de búsqueda
 function DiscoverContent() {
   const searchParams = useSearchParams();
-  const searchString = searchParams.toString(); // Lo pasamos a string para evitar re-renders innecesarios
+  const searchString = searchParams.toString();
   
   const [data, setData] = useState<SearchResponse | null>(null);
   const [page, setPage] = useState(1);
@@ -8,7 +47,6 @@ function DiscoverContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Si los filtros cambian, reseteamos a la página 1 de forma segura (sin doble petición)
   if (searchString !== lastSearch) {
     setLastSearch(searchString);
     setPage(1);
@@ -42,7 +80,7 @@ function DiscoverContent() {
       });
 
     return () => {
-      isMounted = false; // Cleanup para que el modo estricto de React no duplique el set state
+      isMounted = false;
     };
   }, [page, searchString]);
 
@@ -51,24 +89,24 @@ function DiscoverContent() {
 
   return (
     <>
-      {loading && <p style={{ textAlign: 'center', padding: '2rem' }}>Cargando perfiles…</p>}
+      {loading && <p style={{ textAlign: 'center', padding: '2rem', fontSize: '1.2rem', color: '#666' }}>Cargando perfiles…</p>}
 
-      {error && <div className={styles.errorBanner}>{error}</div>}
+      {error && <div className={styles.errorBanner} style={{ padding: '1rem', background: '#fee2e2', color: '#991b1b', borderRadius: '8px', textAlign: 'center', margin: '1rem 0' }}>{error}</div>}
 
       {!loading && !error && (
         <>
           {profiles.length === 0 ? (
-            <div className={styles.emptyState}>
-              <p>No hay resultados que coincidan con tu búsqueda.</p>
-              <Link href="/search" style={{ color: 'var(--primary)', textDecoration: 'underline', marginTop: '1rem', display: 'inline-block' }}>
+            <div className={styles.emptyState} style={{ textAlign: 'center', padding: '4rem 1rem', color: '#666' }}>
+              <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>No hay resultados que coincidan con tu búsqueda.</p>
+              <Link href="/search" style={{ color: 'var(--brand-primary)', textDecoration: 'none', fontWeight: 'bold', padding: '0.5rem 1rem', border: '1px solid var(--brand-primary)', borderRadius: '4px' }}>
                 Cambiar filtros
               </Link>
             </div>
           ) : (
-            <ul className={styles.grid}>
+            <ul className={styles.grid} style={{ padding: 0, listStyle: 'none' }}>
               {profiles.map((item) => (
                 <li key={item.profile_id} className={styles.card}>
-                  <Link href={`/profiles/${item.profile_id}`} className={styles.cardLink}>
+                  <Link href={`/profiles/${item.profile_id}`} style={{ textDecoration: 'none', color: 'inherit', display: 'flex', flexDirection: 'column', height: '100%' }}>
                     <div className={styles.imageContainer}>
                       {item.has_photo ? (
                         <ProfilePhoto profileId={item.profile_id} name={item.display_name} />
@@ -80,13 +118,15 @@ function DiscoverContent() {
                     <div className={styles.cardInfo}>
                       <h3 className={styles.name}>
                         {item.display_name}
-                        <span className={styles.age}> · {item.age}</span>
+                        <span style={{ fontWeight: 'normal', color: '#9ca3af' }}> · {item.age}</span>
                       </h3>
                       <p className={styles.details}>
                         {[item.region, item.country_code].filter(Boolean).join(', ')}
                       </p>
                       {item.relationship_goal && (
-                        <span className={styles.cardGoal}>{item.relationship_goal}</span>
+                        <span style={{ display: 'inline-block', marginTop: '8px', fontSize: '0.8rem', background: '#f3f4f6', padding: '2px 8px', borderRadius: '12px', color: '#4b5563' }}>
+                          {item.relationship_goal}
+                        </span>
                       )}
                     </div>
                   </Link>
@@ -96,23 +136,23 @@ function DiscoverContent() {
           )}
 
           {totalPages > 1 && (
-            <div className={styles.pagination}>
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', margin: '3rem 0' }}>
               <button
                 type="button"
-                className={styles.pageButton}
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
+                style={{ padding: '0.75rem 1.5rem', cursor: page <= 1 ? 'not-allowed' : 'pointer', borderRadius: '8px', border: '1px solid #ccc', background: '#fff', fontWeight: 'bold' }}
               >
                 ← Anterior
               </button>
-              <span className={styles.pageInfo}>
-                Página {data?.page} de {totalPages} ({data?.total} perfiles)
+              <span style={{ fontWeight: 600, color: '#444' }}>
+                Página {data?.page} de {totalPages}
               </span>
               <button
                 type="button"
-                className={styles.pageButton}
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
+                style={{ padding: '0.75rem 1.5rem', cursor: page >= totalPages ? 'not-allowed' : 'pointer', borderRadius: '8px', border: '1px solid #ccc', background: '#fff', fontWeight: 'bold' }}
               >
                 Siguiente →
               </button>
@@ -121,5 +161,26 @@ function DiscoverContent() {
         </>
       )}
     </>
+  );
+}
+
+// ESTE ES EL EXPORT DEFAULT QUE NEXT.JS NECESITA
+export default function DiscoverPage() {
+  return (
+    <main className={styles.main}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+        <h1 style={{ fontSize: '1.8rem', margin: 0, color: '#111827' }}>Descubrir</h1>
+        <Link 
+          href="/search" 
+          style={{ textDecoration: 'none', background: 'var(--brand-primary)', color: 'white', padding: '0.6rem 1.2rem', borderRadius: '8px', fontWeight: 'bold', boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}
+        >
+          🔍 Filtros de Búsqueda
+        </Link>
+      </div>
+
+      <Suspense fallback={<p style={{ textAlign: 'center' }}>Cargando...</p>}>
+        <DiscoverContent />
+      </Suspense>
+    </main>
   );
 }
