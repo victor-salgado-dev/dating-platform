@@ -59,6 +59,33 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 		Page:             q.Get("page"),
 		PageSize:         q.Get("page_size"),
 		Sort:             q.Get("sort"),
+
+		// --- Nuevos filtros recibidos por Query Params ---
+		MinHeight:             q.Get("min_height"),
+		MaxHeight:             q.Get("max_height"),
+		MinWeight:             q.Get("min_weight"),
+		MaxWeight:             q.Get("max_weight"),
+		BodyType:              q.Get("body_type"),
+		Ethnicity:             q.Get("ethnicity"),
+		AppearanceRating:      q.Get("appearance_rating"),
+		HairColor:             q.Get("hair_color"),
+		EyeColor:              q.Get("eye_color"),
+		BodyArt:               splitMulti(q["body_art"]),
+		SmokingHabit:          q.Get("smoking_habit"),
+		DrinkingHabit:         q.Get("drinking_habit"),
+		RelocationWillingness: splitMulti(q["relocation_willingness"]),
+		MaritalStatus:         q.Get("marital_status"),
+		MaxChildren:           q.Get("max_children"),
+		Occupation:            q.Get("occupation"),
+		EmploymentStatus:      q.Get("employment_status"),
+		IncomeLevel:           q.Get("income_level"),
+		LivingSituation:       q.Get("living_situation"),
+		Nationality:           q.Get("nationality"),
+		EducationLevel:        q.Get("education_level"),
+		EnglishAbility:        q.Get("english_ability"),
+		Religion:              q.Get("religion"),
+		ReligiousValues:       q.Get("religious_values"),
+		StarSign:              q.Get("star_sign"),
 	}
 
 	result, err := h.svc.Search(r.Context(), userID, raw)
@@ -105,8 +132,6 @@ func toSearchResponse(res *Result) searchResponse {
 	}
 }
 
-// splitMulti aplana valores de query string repetidos (?gender=a&gender=b)
-// y/o separados por comas (?gender=a,b) en una sola lista limpia.
 func splitMulti(values []string) []string {
 	var out []string
 	for _, v := range values {

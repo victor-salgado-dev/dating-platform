@@ -38,20 +38,14 @@ var allowedRelationshipGoals = map[RelationshipGoal]bool{
 	RelationshipMarriage: true, RelationshipNotSure: true,
 }
 
-// IsValidGender indica si g es uno de los valores de género permitidos.
-// Expuesta para que otros módulos (p. ej. search, al validar filtros)
-// no dupliquen esta lista.
 func IsValidGender(g Gender) bool {
 	return allowedGenders[g]
 }
 
-// IsValidRelationshipGoal indica si g es un objetivo de relación permitido.
 func IsValidRelationshipGoal(g RelationshipGoal) bool {
 	return allowedRelationshipGoals[g]
 }
 
-// allowedPhotoTypes mapea content-types de imagen aceptados a su extensión
-// de fichero. Cualquier otro tipo se rechaza antes de tocar storage.
 var allowedPhotoTypes = map[string]string{
 	"image/jpeg": ".jpg",
 	"image/png":  ".png",
@@ -67,10 +61,37 @@ type CreateProfileInput struct {
 	Region           *string
 	Languages        []string
 	RelationshipGoal *RelationshipGoal
-	HasChildren      *bool
-	WantsChildren    *bool
+	HasChildren      *string
+	WantsChildren    *string
 	Bio              *string
 	Interests        []string
+
+	// --- Nuevos campos ---
+	Height                *int
+	Weight                *int
+	BodyType              *string
+	Ethnicity             *string
+	AppearanceRating      *string
+	HairColor             *string
+	EyeColor              *string
+	BodyArt               []string
+	SmokingHabit          *string
+	DrinkingHabit         *string
+	RelocationWillingness []string
+	MaritalStatus         *string
+	ChildrenCount         *int
+	YoungestChildAge      *int
+	OldestChildAge        *int
+	Occupation            *string
+	EmploymentStatus      *string
+	IncomeLevel           *string
+	LivingSituation       *string
+	Nationality           *string
+	EducationLevel        *string
+	EnglishAbility        *string
+	Religion              *string
+	ReligiousValues       *string
+	StarSign              *string
 }
 
 type Service struct {
@@ -86,15 +107,10 @@ func (s *Service) GetMyProfile(ctx context.Context, userID uuid.UUID) (*Profile,
 	return s.repo.GetByUserID(ctx, userID)
 }
 
-// GetPublicProfile devuelve el perfil de otra persona para verlo (Fase 6).
-// Devuelve ErrNotFound si no existe, si su cuenta no está activa, o si
-// hay un bloqueo entre viewerUserID y esa cuenta (Fase 9).
 func (s *Service) GetPublicProfile(ctx context.Context, viewerUserID, profileID uuid.UUID) (*Profile, error) {
 	return s.repo.GetPublicByID(ctx, profileID, viewerUserID)
 }
 
-// ListPublicPhotos lista las fotos de un perfil ajeno, comprobando
-// primero que sea visible públicamente para viewerUserID.
 func (s *Service) ListPublicPhotos(ctx context.Context, viewerUserID, profileID uuid.UUID) ([]Photo, error) {
 	if _, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID); err != nil {
 		return nil, err
@@ -102,10 +118,6 @@ func (s *Service) ListPublicPhotos(ctx context.Context, viewerUserID, profileID 
 	return s.repo.ListPhotos(ctx, profileID)
 }
 
-// OpenPublicPhoto abre el contenido de una foto de un perfil ajeno,
-// comprobando primero que el perfil sea visible públicamente para
-// viewerUserID. El llamador es responsable de cerrar el io.ReadCloser
-// devuelto.
 func (s *Service) OpenPublicPhoto(ctx context.Context, viewerUserID, profileID, photoID uuid.UUID) (io.ReadCloser, *Photo, error) {
 	if _, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID); err != nil {
 		return nil, nil, err
@@ -151,6 +163,12 @@ func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, in Create
 		return nil, err
 	}
 
+	var nationality *string
+	if in.Nationality != nil {
+		n := strings.ToUpper(strings.TrimSpace(*in.Nationality))
+		nationality = &n
+	}
+
 	p := &Profile{
 		UserID:           userID,
 		DisplayName:      strings.TrimSpace(in.DisplayName),
@@ -164,6 +182,33 @@ func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, in Create
 		WantsChildren:    in.WantsChildren,
 		Bio:              in.Bio,
 		Interests:        in.Interests,
+
+		// Asignación de los nuevos campos
+		Height:                in.Height,
+		Weight:                in.Weight,
+		BodyType:              in.BodyType,
+		Ethnicity:             in.Ethnicity,
+		AppearanceRating:      in.AppearanceRating,
+		HairColor:             in.HairColor,
+		EyeColor:              in.EyeColor,
+		BodyArt:               in.BodyArt,
+		SmokingHabit:          in.SmokingHabit,
+		DrinkingHabit:         in.DrinkingHabit,
+		RelocationWillingness: in.RelocationWillingness,
+		MaritalStatus:         in.MaritalStatus,
+		ChildrenCount:         in.ChildrenCount,
+		YoungestChildAge:      in.YoungestChildAge,
+		OldestChildAge:        in.OldestChildAge,
+		Occupation:            in.Occupation,
+		EmploymentStatus:      in.EmploymentStatus,
+		IncomeLevel:           in.IncomeLevel,
+		LivingSituation:       in.LivingSituation,
+		Nationality:           nationality,
+		EducationLevel:        in.EducationLevel,
+		EnglishAbility:        in.EnglishAbility,
+		Religion:              in.Religion,
+		ReligiousValues:       in.ReligiousValues,
+		StarSign:              in.StarSign,
 	}
 
 	if err := s.repo.Create(ctx, p); err != nil {
@@ -198,6 +243,10 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, patch Pro
 		}
 		patch.CountryCode = &cc
 	}
+	if patch.Nationality != nil {
+		nat := strings.ToUpper(strings.TrimSpace(*patch.Nationality))
+		patch.Nationality = &nat
+	}
 	if patch.RelationshipGoalSet {
 		if err := validateOptionalRelationshipGoal(patch.RelationshipGoal); err != nil {
 			return nil, err
@@ -222,12 +271,6 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, patch Pro
 	return s.repo.Update(ctx, userID, patch)
 }
 
-// UploadPhoto valida y guarda una foto nueva para el perfil de userID.
-//
-// Nunca se confía en el content-type que declara el cliente (es una
-// cabecera del formulario, se falsifica con nada): se inspeccionan los
-// primeros bytes del propio fichero para decidir su tipo real, y ESE
-// es el que se guarda y se sirve después.
 func (s *Service) UploadPhoto(ctx context.Context, userID uuid.UUID, declaredContentType string, size int64, r io.Reader) (*Photo, error) {
 	if size <= 0 || size > MaxPhotoSizeBytes {
 		return nil, invalidField("photo", fmt.Sprintf("el fichero debe pesar menos de %d MB", MaxPhotoSizeBytes/1024/1024))
@@ -246,14 +289,10 @@ func (s *Service) UploadPhoto(ctx context.Context, userID uuid.UUID, declaredCon
 		return nil, invalidField("photo", "el contenido del fichero no es una imagen JPEG, PNG o WebP válida")
 	}
 	if declaredContentType != "" && declaredContentType != detectedType {
-		// No es un error: solo una señal para logs. El content-type real
-		// (detectedType) es el único que se guarda y se sirve.
 		slog.Warn("content-type declarado no coincide con el detectado",
 			"declared", declaredContentType, "detected", detectedType)
 	}
 
-	// Reconstruye el stream completo: los bytes ya leídos para detectar
-	// el tipo + el resto, sin haber perdido nada.
 	fullReader := io.MultiReader(bytes.NewReader(peek), r)
 
 	profile, err := s.repo.GetByUserID(ctx, userID)
@@ -276,7 +315,6 @@ func (s *Service) UploadPhoto(ctx context.Context, userID uuid.UUID, declaredCon
 
 	photo := &Photo{StorageKey: key, ContentType: detectedType}
 	if err := s.repo.AddPhoto(ctx, profile.ID, photo); err != nil {
-		// Evita dejar un fichero huérfano si falla el registro en BD.
 		if delErr := s.storage.Delete(ctx, key); delErr != nil {
 			slog.Error("no se pudo limpiar el fichero huérfano tras un fallo", "key", key, "error", delErr)
 		}
@@ -294,8 +332,6 @@ func (s *Service) ListPhotos(ctx context.Context, userID uuid.UUID) ([]Photo, er
 	return s.repo.ListPhotos(ctx, profile.ID)
 }
 
-// OpenPhoto devuelve el contenido de una foto propia para servirla. El
-// llamador es responsable de cerrar el io.ReadCloser devuelto.
 func (s *Service) OpenPhoto(ctx context.Context, userID, photoID uuid.UUID) (io.ReadCloser, *Photo, error) {
 	profile, err := s.repo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -331,14 +367,13 @@ func (s *Service) DeletePhoto(ctx context.Context, userID, photoID uuid.UUID) er
 	}
 
 	if err := s.storage.Delete(ctx, ph.StorageKey); err != nil {
-		// El registro ya se borró: no revertimos, solo lo dejamos en logs.
 		slog.Error("no se pudo borrar el fichero de la foto", "key", ph.StorageKey, "error", err)
 	}
 
 	return nil
 }
 
-// --- Validaciones -------------------------------------------------------
+// --- Validaciones auxiliares ---
 
 func validateDisplayName(v string) error {
 	trimmed := strings.TrimSpace(v)

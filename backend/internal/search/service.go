@@ -10,10 +10,7 @@ import (
 	"dating-platform/backend/internal/profiles"
 )
 
-// RawQuery son los parámetros de búsqueda tal como llegan de la query
-// string HTTP, todavía sin validar ni convertir a tipos de dominio.
-// Mantener esta capa separada permite testear la validación (Service)
-// sin depender de net/http.
+// RawQuery son los parámetros de búsqueda tal como llegan de la query string
 type RawQuery struct {
 	Genders          []string
 	MinAge           string
@@ -27,6 +24,33 @@ type RawQuery struct {
 	Page             string
 	PageSize         string
 	Sort             string
+
+	// --- Nuevos campos ---
+	MinHeight             string
+	MaxHeight             string
+	MinWeight             string
+	MaxWeight             string
+	BodyType              string
+	Ethnicity             string
+	AppearanceRating      string
+	HairColor             string
+	EyeColor              string
+	BodyArt               []string
+	SmokingHabit          string
+	DrinkingHabit         string
+	RelocationWillingness []string
+	MaritalStatus         string
+	MaxChildren           string
+	Occupation            string
+	EmploymentStatus      string
+	IncomeLevel           string
+	LivingSituation       string
+	Nationality           string
+	EducationLevel        string
+	EnglishAbility        string
+	Religion              string
+	ReligiousValues       string
+	StarSign              string
 }
 
 type Service struct {
@@ -97,20 +121,17 @@ func buildParams(excludeUserID uuid.UUID, raw RawQuery) (Params, error) {
 		f.RelationshipGoal = &g
 	}
 
-	if raw.HasChildren != "" {
-		b, err := parseBool("has_children", raw.HasChildren)
-		if err != nil {
-			return Params{}, err
+	// Strings simples opcionales
+	nonEmptyPtr := func(val string) *string {
+		trimmed := strings.TrimSpace(val)
+		if trimmed == "" {
+			return nil
 		}
-		f.HasChildren = &b
+		return &trimmed
 	}
-	if raw.WantsChildren != "" {
-		b, err := parseBool("wants_children", raw.WantsChildren)
-		if err != nil {
-			return Params{}, err
-		}
-		f.WantsChildren = &b
-	}
+
+	f.HasChildren = nonEmptyPtr(raw.HasChildren)
+	f.WantsChildren = nonEmptyPtr(raw.WantsChildren)
 
 	for _, i := range raw.Interests {
 		i = strings.TrimSpace(i)
@@ -119,6 +140,76 @@ func buildParams(excludeUserID uuid.UUID, raw RawQuery) (Params, error) {
 		}
 	}
 
+	// --- Validación de números (Alturas, Pesos, Hijos) ---
+	parseInt := func(field, raw string, min, max int) (*int, error) {
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" {
+			return nil, nil
+		}
+		n, err := strconv.Atoi(trimmed)
+		if err != nil {
+			return nil, invalidParam(field, "debe ser un número entero")
+		}
+		if n < min || n > max {
+			return nil, invalidParam(field, "valor fuera de rango permitido")
+		}
+		return &n, nil
+	}
+
+	var err error
+	if f.MinHeight, err = parseInt("min_height", raw.MinHeight, 50, 300); err != nil { return Params{}, err }
+	if f.MaxHeight, err = parseInt("max_height", raw.MaxHeight, 50, 300); err != nil { return Params{}, err }
+	if f.MinHeight != nil && f.MaxHeight != nil && *f.MinHeight > *f.MaxHeight {
+		return Params{}, invalidParam("min_height", "no puede ser mayor que max_height")
+	}
+
+	if f.MinWeight, err = parseInt("min_weight", raw.MinWeight, 20, 400); err != nil { return Params{}, err }
+	if f.MaxWeight, err = parseInt("max_weight", raw.MaxWeight, 20, 400); err != nil { return Params{}, err }
+	if f.MinWeight != nil && f.MaxWeight != nil && *f.MinWeight > *f.MaxWeight {
+		return Params{}, invalidParam("min_weight", "no puede ser mayor que max_weight")
+	}
+
+	if f.MaxChildren, err = parseInt("max_children", raw.MaxChildren, 0, 30); err != nil { return Params{}, err }
+
+	// --- Mapeo de opciones de texto simples ---
+	f.BodyType = nonEmptyPtr(raw.BodyType)
+	f.Ethnicity = nonEmptyPtr(raw.Ethnicity)
+	f.AppearanceRating = nonEmptyPtr(raw.AppearanceRating)
+	f.HairColor = nonEmptyPtr(raw.HairColor)
+	f.EyeColor = nonEmptyPtr(raw.EyeColor)
+	f.SmokingHabit = nonEmptyPtr(raw.SmokingHabit)
+	f.DrinkingHabit = nonEmptyPtr(raw.DrinkingHabit)
+	f.MaritalStatus = nonEmptyPtr(raw.MaritalStatus)
+	f.Occupation = nonEmptyPtr(raw.Occupation)
+	f.EmploymentStatus = nonEmptyPtr(raw.EmploymentStatus)
+	f.IncomeLevel = nonEmptyPtr(raw.IncomeLevel)
+	f.LivingSituation = nonEmptyPtr(raw.LivingSituation)
+
+	if raw.Nationality != "" {
+		nat := strings.ToUpper(strings.TrimSpace(raw.Nationality))
+		f.Nationality = &nat
+	}
+	f.EducationLevel = nonEmptyPtr(raw.EducationLevel)
+	f.EnglishAbility = nonEmptyPtr(raw.EnglishAbility)
+	f.Religion = nonEmptyPtr(raw.Religion)
+	f.ReligiousValues = nonEmptyPtr(raw.ReligiousValues)
+	f.StarSign = nonEmptyPtr(raw.StarSign)
+
+	// --- Mapeo de listas múltiples (Arrays) ---
+	cleanSlice := func(items []string) []string {
+		var out []string
+		for _, it := range items {
+			trimmed := strings.TrimSpace(it)
+			if trimmed != "" {
+				out = append(out, trimmed)
+			}
+		}
+		return out
+	}
+	f.BodyArt = cleanSlice(raw.BodyArt)
+	f.RelocationWillingness = cleanSlice(raw.RelocationWillingness)
+
+	// Ordenación y Paginación
 	sort := Sort(raw.Sort)
 	switch sort {
 	case "":
@@ -168,12 +259,4 @@ func parseAge(field, raw string) (int, error) {
 		return 0, invalidParam(field, "debe estar entre 18 y 120")
 	}
 	return n, nil
-}
-
-func parseBool(field, raw string) (bool, error) {
-	b, err := strconv.ParseBool(raw)
-	if err != nil {
-		return false, invalidParam(field, "debe ser true o false")
-	}
-	return b, nil
 }

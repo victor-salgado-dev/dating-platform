@@ -31,15 +31,95 @@ type ProfilePatch struct {
 	RelationshipGoalSet bool
 	RelationshipGoal    *RelationshipGoal
 
+	// Cambiado de *bool a *string para soportar más opciones
 	HasChildrenSet bool
-	HasChildren    *bool
+	HasChildren    *string
 
+	// Cambiado de *bool a *string
 	WantsChildrenSet bool
-	WantsChildren    *bool
+	WantsChildren    *string
 
 	BioSet bool
 	Bio    *string
 
 	InterestsSet bool
 	Interests    []string
+
+	// --- Físico y Apariencia ---
+	HeightSet bool
+	Height    *int
+
+	WeightSet bool
+	Weight    *int
+
+	BodyTypeSet bool
+	BodyType    *string
+
+	EthnicitySet bool
+	Ethnicity    *string
+
+	AppearanceRatingSet bool
+	AppearanceRating    *string
+
+	HairColorSet bool
+	HairColor    *string
+
+	EyeColorSet bool
+	EyeColor    *string
+
+	BodyArtSet bool
+	BodyArt    []string
+
+	// --- Estilo de Vida y Familia ---
+	SmokingHabitSet bool
+	SmokingHabit    *string
+
+	DrinkingHabitSet bool
+	DrinkingHabit    *string
+
+	RelocationWillingnessSet bool
+	RelocationWillingness    []string
+
+	MaritalStatusSet bool
+	MaritalStatus    *string
+
+	ChildrenCountSet bool
+	ChildrenCount    *int
+
+	YoungestChildAgeSet bool
+	YoungestChildAge    *int
+
+	OldestChildAgeSet bool
+	OldestChildAge    *int
+
+	OccupationSet bool
+	Occupation    *string
+
+	EmploymentStatusSet bool
+	EmploymentStatus    *string
+
+	IncomeLevelSet bool
+	IncomeLevel    *string
+
+	LivingSituationSet bool
+	LivingSituation    *string
+
+	// --- Fondo, Cultura y Valores ---
+	NationalitySet bool
+	Nationality    *string
+
+	EducationLevelSet bool
+	EducationLevel    *string
+
+	EnglishAbilitySet bool
+	EnglishAbility    *string
+
+	ReligionSet bool
+	Religion    *string
+
+	ReligiousValuesSet bool
+	ReligiousValues    *string
+
+	StarSignSet bool
+	StarSign    *string
 }

@@ -48,16 +48,12 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		add("p.gender = ANY($%d)", genders)
 	}
 
-	// Los filtros de edad se traducen a un rango de birth_date con la
-	// MISMA lógica de "cumplir años" que Profile.Age() (profiles.AgeAt),
-	// para que el filtro y el campo "age" devuelto sean siempre coherentes.
+	// Filtros de edad
 	if f.MinAge != nil {
-		// Nacido en esta fecha o antes => ya tiene al menos MinAge años.
 		bound := now.AddDate(-*f.MinAge, 0, 0)
 		add("p.birth_date <= $%d", bound)
 	}
 	if f.MaxAge != nil {
-		// Nacido en esta fecha o después => todavía no supera MaxAge años.
 		bound := now.AddDate(-(*f.MaxAge + 1), 0, 1)
 		add("p.birth_date >= $%d", bound)
 	}
@@ -66,10 +62,6 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		add("p.country_code = $%d", *f.CountryCode)
 	}
 
-	// languages/interests son arrays NULLABLE: el operador && con una
-	// columna NULL evalúa a NULL (no TRUE), así que estas cláusulas ya
-	// excluyen automáticamente los perfiles sin ese dato, cumpliendo la
-	// regla de los datos faltantes sin necesidad de un IS NOT NULL aparte.
 	if len(f.Languages) > 0 {
 		add("p.languages && $%d", f.Languages)
 	}
@@ -77,17 +69,97 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		add("p.interests && $%d", f.Interests)
 	}
 
-	// relationship_goal/has_children/wants_children son NULLABLE con
-	// comparación de igualdad: NULL = valor también evalúa a NULL, así
-	// que estas cláusulas excluyen igualmente los perfiles sin ese dato.
 	if f.RelationshipGoal != nil {
 		add("p.relationship_goal = $%d", string(*f.RelationshipGoal))
 	}
+
+	// Cambiado de booleano a string
 	if f.HasChildren != nil {
 		add("p.has_children = $%d", *f.HasChildren)
 	}
 	if f.WantsChildren != nil {
 		add("p.wants_children = $%d", *f.WantsChildren)
+	}
+
+	// --- NUEVOS FILTROS: Físico y Apariencia ---
+	if f.MinHeight != nil {
+		add("p.height >= $%d", *f.MinHeight)
+	}
+	if f.MaxHeight != nil {
+		add("p.height <= $%d", *f.MaxHeight)
+	}
+	if f.MinWeight != nil {
+		add("p.weight >= $%d", *f.MinWeight)
+	}
+	if f.MaxWeight != nil {
+		add("p.weight <= $%d", *f.MaxWeight)
+	}
+	if f.BodyType != nil {
+		add("p.body_type = $%d", *f.BodyType)
+	}
+	if f.Ethnicity != nil {
+		add("p.ethnicity = $%d", *f.Ethnicity)
+	}
+	if f.AppearanceRating != nil {
+		add("p.appearance_rating = $%d", *f.AppearanceRating)
+	}
+	if f.HairColor != nil {
+		add("p.hair_color = $%d", *f.HairColor)
+	}
+	if f.EyeColor != nil {
+		add("p.eye_color = $%d", *f.EyeColor)
+	}
+	if len(f.BodyArt) > 0 {
+		add("p.body_art && $%d", f.BodyArt)
+	}
+
+	// --- NUEVOS FILTROS: Estilo de Vida y Familia ---
+	if f.SmokingHabit != nil {
+		add("p.smoking_habit = $%d", *f.SmokingHabit)
+	}
+	if f.DrinkingHabit != nil {
+		add("p.drinking_habit = $%d", *f.DrinkingHabit)
+	}
+	if len(f.RelocationWillingness) > 0 {
+		add("p.relocation_willingness && $%d", f.RelocationWillingness)
+	}
+	if f.MaritalStatus != nil {
+		add("p.marital_status = $%d", *f.MaritalStatus)
+	}
+	if f.MaxChildren != nil {
+		add("p.children_count <= $%d", *f.MaxChildren)
+	}
+	if f.Occupation != nil {
+		add("p.occupation = $%d", *f.Occupation)
+	}
+	if f.EmploymentStatus != nil {
+		add("p.employment_status = $%d", *f.EmploymentStatus)
+	}
+	if f.IncomeLevel != nil {
+		add("p.income_level = $%d", *f.IncomeLevel)
+	}
+	if f.LivingSituation != nil {
+		add("p.living_situation = $%d", *f.LivingSituation)
+	}
+
+	// --- NUEVOS FILTROS: Fondo, Cultura y Valores ---
+	if f.Nationality != nil {
+		add("p.nationality = $%d", *f.Nationality)
+	}
+	if f.EducationLevel != nil {
+		add("p.education_level = $%d", *f.EducationLevel)
+	}
+	if f.EnglishAbility != nil {
+		add("p.english_ability = $%d", *f.EnglishAbility)
+	}
+	if f.Religion != nil {
+		add("p.religion = $%d", *f.Religion)
+	}
+	if f.ReligiousValues != nil {
+		add("p.religious_values = $%d", *f.ReligiousValues)
+	}
+	if f.StarSign != nil {
+		add("p.star_sign = $%d", *f.StarSign)
 	}
 
 	orderBy := orderByClause(params.Sort)

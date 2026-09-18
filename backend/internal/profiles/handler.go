@@ -35,12 +35,40 @@ type profileResponse struct {
 	Region           *string  `json:"region"`
 	Languages        []string `json:"languages"`
 	RelationshipGoal *string  `json:"relationship_goal"`
-	HasChildren      *bool    `json:"has_children"`
-	WantsChildren    *bool    `json:"wants_children"`
+	HasChildren      *string  `json:"has_children"`
+	WantsChildren    *string  `json:"wants_children"`
 	Bio              *string  `json:"bio"`
 	Interests        []string `json:"interests"`
-	CreatedAt        string   `json:"created_at"`
-	UpdatedAt        string   `json:"updated_at"`
+
+	// --- Nuevos campos ---
+	Height                *int     `json:"height"`
+	Weight                *int     `json:"weight"`
+	BodyType              *string  `json:"body_type"`
+	Ethnicity             *string  `json:"ethnicity"`
+	AppearanceRating      *string  `json:"appearance_rating"`
+	HairColor             *string  `json:"hair_color"`
+	EyeColor              *string  `json:"eye_color"`
+	BodyArt               []string `json:"body_art"`
+	SmokingHabit          *string  `json:"smoking_habit"`
+	DrinkingHabit         *string  `json:"drinking_habit"`
+	RelocationWillingness []string `json:"relocation_willingness"`
+	MaritalStatus         *string  `json:"marital_status"`
+	ChildrenCount         *int     `json:"children_count"`
+	YoungestChildAge      *int     `json:"youngest_child_age"`
+	OldestChildAge        *int     `json:"oldest_child_age"`
+	Occupation            *string  `json:"occupation"`
+	EmploymentStatus      *string  `json:"employment_status"`
+	IncomeLevel           *string  `json:"income_level"`
+	LivingSituation       *string  `json:"living_situation"`
+	Nationality           *string  `json:"nationality"`
+	EducationLevel        *string  `json:"education_level"`
+	EnglishAbility        *string  `json:"english_ability"`
+	Religion              *string  `json:"religion"`
+	ReligiousValues       *string  `json:"religious_values"`
+	StarSign              *string  `json:"star_sign"`
+
+	CreatedAt string `json:"created_at"`
+	UpdatedAt string `json:"updated_at"`
 }
 
 func toProfileResponse(p *Profile) profileResponse {
@@ -62,8 +90,36 @@ func toProfileResponse(p *Profile) profileResponse {
 		WantsChildren:    p.WantsChildren,
 		Bio:              p.Bio,
 		Interests:        p.Interests,
-		CreatedAt:        p.CreatedAt.Format(time.RFC3339),
-		UpdatedAt:        p.UpdatedAt.Format(time.RFC3339),
+
+		// Mapeo de campos nuevos
+		Height:                p.Height,
+		Weight:                p.Weight,
+		BodyType:              p.BodyType,
+		Ethnicity:             p.Ethnicity,
+		AppearanceRating:      p.AppearanceRating,
+		HairColor:             p.HairColor,
+		EyeColor:              p.EyeColor,
+		BodyArt:               p.BodyArt,
+		SmokingHabit:          p.SmokingHabit,
+		DrinkingHabit:         p.DrinkingHabit,
+		RelocationWillingness: p.RelocationWillingness,
+		MaritalStatus:         p.MaritalStatus,
+		ChildrenCount:         p.ChildrenCount,
+		YoungestChildAge:      p.YoungestChildAge,
+		OldestChildAge:        p.OldestChildAge,
+		Occupation:            p.Occupation,
+		EmploymentStatus:      p.EmploymentStatus,
+		IncomeLevel:           p.IncomeLevel,
+		LivingSituation:       p.LivingSituation,
+		Nationality:           p.Nationality,
+		EducationLevel:        p.EducationLevel,
+		EnglishAbility:        p.EnglishAbility,
+		Religion:              p.Religion,
+		ReligiousValues:       p.ReligiousValues,
+		StarSign:              p.StarSign,
+
+		CreatedAt: p.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: p.UpdatedAt.Format(time.RFC3339),
 	}
 }
 
@@ -100,10 +156,36 @@ type createProfileRequest struct {
 	Region           *string  `json:"region"`
 	Languages        []string `json:"languages"`
 	RelationshipGoal *string  `json:"relationship_goal"`
-	HasChildren      *bool    `json:"has_children"`
-	WantsChildren    *bool    `json:"wants_children"`
+	HasChildren      *string  `json:"has_children"`
+	WantsChildren    *string  `json:"wants_children"`
 	Bio              *string  `json:"bio"`
 	Interests        []string `json:"interests"`
+
+	Height                *int     `json:"height"`
+	Weight                *int     `json:"weight"`
+	BodyType              *string  `json:"body_type"`
+	Ethnicity             *string  `json:"ethnicity"`
+	AppearanceRating      *string  `json:"appearance_rating"`
+	HairColor             *string  `json:"hair_color"`
+	EyeColor              *string  `json:"eye_color"`
+	BodyArt               []string `json:"body_art"`
+	SmokingHabit          *string  `json:"smoking_habit"`
+	DrinkingHabit         *string  `json:"drinking_habit"`
+	RelocationWillingness []string `json:"relocation_willingness"`
+	MaritalStatus         *string  `json:"marital_status"`
+	ChildrenCount         *int     `json:"children_count"`
+	YoungestChildAge      *int     `json:"youngest_child_age"`
+	OldestChildAge        *int     `json:"oldest_child_age"`
+	Occupation            *string  `json:"occupation"`
+	EmploymentStatus      *string  `json:"employment_status"`
+	IncomeLevel           *string  `json:"income_level"`
+	LivingSituation       *string  `json:"living_situation"`
+	Nationality           *string  `json:"nationality"`
+	EducationLevel        *string  `json:"education_level"`
+	EnglishAbility        *string  `json:"english_ability"`
+	Religion              *string  `json:"religion"`
+	ReligiousValues       *string  `json:"religious_values"`
+	StarSign              *string  `json:"star_sign"`
 }
 
 // --- Handlers: perfil -------------------------------------------------
@@ -165,6 +247,32 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		WantsChildren:    req.WantsChildren,
 		Bio:              req.Bio,
 		Interests:        req.Interests,
+
+		Height:                req.Height,
+		Weight:                req.Weight,
+		BodyType:              req.BodyType,
+		Ethnicity:             req.Ethnicity,
+		AppearanceRating:      req.AppearanceRating,
+		HairColor:             req.HairColor,
+		EyeColor:              req.EyeColor,
+		BodyArt:               req.BodyArt,
+		SmokingHabit:          req.SmokingHabit,
+		DrinkingHabit:         req.DrinkingHabit,
+		RelocationWillingness: req.RelocationWillingness,
+		MaritalStatus:         req.MaritalStatus,
+		ChildrenCount:         req.ChildrenCount,
+		YoungestChildAge:      req.YoungestChildAge,
+		OldestChildAge:        req.OldestChildAge,
+		Occupation:            req.Occupation,
+		EmploymentStatus:      req.EmploymentStatus,
+		IncomeLevel:           req.IncomeLevel,
+		LivingSituation:       req.LivingSituation,
+		Nationality:           req.Nationality,
+		EducationLevel:        req.EducationLevel,
+		EnglishAbility:        req.EnglishAbility,
+		Religion:              req.Religion,
+		ReligiousValues:       req.ReligiousValues,
+		StarSign:              req.StarSign,
 	})
 	if err != nil {
 		writeProfileError(w, err)
@@ -202,12 +310,51 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, toProfileResponse(p))
 }
 
-// buildProfilePatch traduce el JSON de la petición a un ProfilePatch,
-// distinguiendo "clave ausente" (no tocar) de "clave con valor null"
-// (borrar, pasa a desconocido) tal como exige la regla de datos
-// faltantes para los campos opcionales.
+// buildProfilePatch traduce el JSON de la petición a un ProfilePatch
 func buildProfilePatch(raw map[string]json.RawMessage) (ProfilePatch, error) {
 	var patch ProfilePatch
+
+	parseString := func(key string, target **string, flag *bool) error {
+		if v, ok := raw[key]; ok {
+			*flag = true
+			if !isJSONNull(v) {
+				var s string
+				if err := json.Unmarshal(v, &s); err != nil {
+					return invalidField(key, "debe ser texto o null")
+				}
+				*target = &s
+			}
+		}
+		return nil
+	}
+
+	parseInt := func(key string, target **int, flag *bool) error {
+		if v, ok := raw[key]; ok {
+			*flag = true
+			if !isJSONNull(v) {
+				var i int
+				if err := json.Unmarshal(v, &i); err != nil {
+					return invalidField(key, "debe ser un entero o null")
+				}
+				*target = &i
+			}
+		}
+		return nil
+	}
+
+	parseSlice := func(key string, target *[]string, flag *bool) error {
+		if v, ok := raw[key]; ok {
+			*flag = true
+			if !isJSONNull(v) {
+				var sl []string
+				if err := json.Unmarshal(v, &sl); err != nil {
+					return invalidField(key, "debe ser una lista de textos o null")
+				}
+				*target = sl
+			}
+		}
+		return nil
+	}
 
 	if v, ok := raw["display_name"]; ok {
 		var s string
@@ -246,28 +393,6 @@ func buildProfilePatch(raw map[string]json.RawMessage) (ProfilePatch, error) {
 		patch.CountryCode = &s
 	}
 
-	if v, ok := raw["region"]; ok {
-		patch.RegionSet = true
-		if !isJSONNull(v) {
-			var s string
-			if err := json.Unmarshal(v, &s); err != nil {
-				return patch, invalidField("region", "debe ser texto o null")
-			}
-			patch.Region = &s
-		}
-	}
-
-	if v, ok := raw["languages"]; ok {
-		patch.LanguagesSet = true
-		if !isJSONNull(v) {
-			var s []string
-			if err := json.Unmarshal(v, &s); err != nil {
-				return patch, invalidField("languages", "debe ser una lista de textos o null")
-			}
-			patch.Languages = s
-		}
-	}
-
 	if v, ok := raw["relationship_goal"]; ok {
 		patch.RelationshipGoalSet = true
 		if !isJSONNull(v) {
@@ -280,49 +405,42 @@ func buildProfilePatch(raw map[string]json.RawMessage) (ProfilePatch, error) {
 		}
 	}
 
-	if v, ok := raw["has_children"]; ok {
-		patch.HasChildrenSet = true
-		if !isJSONNull(v) {
-			var b bool
-			if err := json.Unmarshal(v, &b); err != nil {
-				return patch, invalidField("has_children", "debe ser booleano o null")
-			}
-			patch.HasChildren = &b
-		}
-	}
+	// Parsing de los campos opcionales mediante helpers
+	if err := parseString("region", &patch.Region, &patch.RegionSet); err != nil { return patch, err }
+	if err := parseSlice("languages", &patch.Languages, &patch.LanguagesSet); err != nil { return patch, err }
+	if err := parseString("has_children", &patch.HasChildren, &patch.HasChildrenSet); err != nil { return patch, err }
+	if err := parseString("wants_children", &patch.WantsChildren, &patch.WantsChildrenSet); err != nil { return patch, err }
+	if err := parseString("bio", &patch.Bio, &patch.BioSet); err != nil { return patch, err }
+	if err := parseSlice("interests", &patch.Interests, &patch.InterestsSet); err != nil { return patch, err }
 
-	if v, ok := raw["wants_children"]; ok {
-		patch.WantsChildrenSet = true
-		if !isJSONNull(v) {
-			var b bool
-			if err := json.Unmarshal(v, &b); err != nil {
-				return patch, invalidField("wants_children", "debe ser booleano o null")
-			}
-			patch.WantsChildren = &b
-		}
-	}
+	// Nuevos campos
+	if err := parseInt("height", &patch.Height, &patch.HeightSet); err != nil { return patch, err }
+	if err := parseInt("weight", &patch.Weight, &patch.WeightSet); err != nil { return patch, err }
+	if err := parseString("body_type", &patch.BodyType, &patch.BodyTypeSet); err != nil { return patch, err }
+	if err := parseString("ethnicity", &patch.Ethnicity, &patch.EthnicitySet); err != nil { return patch, err }
+	if err := parseString("appearance_rating", &patch.AppearanceRating, &patch.AppearanceRatingSet); err != nil { return patch, err }
+	if err := parseString("hair_color", &patch.HairColor, &patch.HairColorSet); err != nil { return patch, err }
+	if err := parseString("eye_color", &patch.EyeColor, &patch.EyeColorSet); err != nil { return patch, err }
+	if err := parseSlice("body_art", &patch.BodyArt, &patch.BodyArtSet); err != nil { return patch, err }
 
-	if v, ok := raw["bio"]; ok {
-		patch.BioSet = true
-		if !isJSONNull(v) {
-			var s string
-			if err := json.Unmarshal(v, &s); err != nil {
-				return patch, invalidField("bio", "debe ser texto o null")
-			}
-			patch.Bio = &s
-		}
-	}
+	if err := parseString("smoking_habit", &patch.SmokingHabit, &patch.SmokingHabitSet); err != nil { return patch, err }
+	if err := parseString("drinking_habit", &patch.DrinkingHabit, &patch.DrinkingHabitSet); err != nil { return patch, err }
+	if err := parseSlice("relocation_willingness", &patch.RelocationWillingness, &patch.RelocationWillingnessSet); err != nil { return patch, err }
+	if err := parseString("marital_status", &patch.MaritalStatus, &patch.MaritalStatusSet); err != nil { return patch, err }
+	if err := parseInt("children_count", &patch.ChildrenCount, &patch.ChildrenCountSet); err != nil { return patch, err }
+	if err := parseInt("youngest_child_age", &patch.YoungestChildAge, &patch.YoungestChildAgeSet); err != nil { return patch, err }
+	if err := parseInt("oldest_child_age", &patch.OldestChildAge, &patch.OldestChildAgeSet); err != nil { return patch, err }
+	if err := parseString("occupation", &patch.Occupation, &patch.OccupationSet); err != nil { return patch, err }
+	if err := parseString("employment_status", &patch.EmploymentStatus, &patch.EmploymentStatusSet); err != nil { return patch, err }
+	if err := parseString("income_level", &patch.IncomeLevel, &patch.IncomeLevelSet); err != nil { return patch, err }
+	if err := parseString("living_situation", &patch.LivingSituation, &patch.LivingSituationSet); err != nil { return patch, err }
 
-	if v, ok := raw["interests"]; ok {
-		patch.InterestsSet = true
-		if !isJSONNull(v) {
-			var s []string
-			if err := json.Unmarshal(v, &s); err != nil {
-				return patch, invalidField("interests", "debe ser una lista de textos o null")
-			}
-			patch.Interests = s
-		}
-	}
+	if err := parseString("nationality", &patch.Nationality, &patch.NationalitySet); err != nil { return patch, err }
+	if err := parseString("education_level", &patch.EducationLevel, &patch.EducationLevelSet); err != nil { return patch, err }
+	if err := parseString("english_ability", &patch.EnglishAbility, &patch.EnglishAbilitySet); err != nil { return patch, err }
+	if err := parseString("religion", &patch.Religion, &patch.ReligionSet); err != nil { return patch, err }
+	if err := parseString("religious_values", &patch.ReligiousValues, &patch.ReligiousValuesSet); err != nil { return patch, err }
+	if err := parseString("star_sign", &patch.StarSign, &patch.StarSignSet); err != nil { return patch, err }
 
 	return patch, nil
 }
@@ -331,7 +449,7 @@ func isJSONNull(raw json.RawMessage) bool {
 	return string(raw) == "null"
 }
 
-// --- Handlers: fotos ----------------------------------------------------
+// --- Fotos y perfiles públicos se mantienen idénticos ---
 
 func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())
@@ -340,9 +458,9 @@ func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, MaxPhotoSizeBytes+1<<20) // margen para el multipart
+	r.Body = http.MaxBytesReader(w, r.Body, MaxPhotoSizeBytes+1<<20)
 	if err := r.ParseMultipartForm(2 << 20); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_body", "No se pudo leer el fichero enviado (¿supera el límite de tamaño?).")
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_body", "No se pudo leer el fichero enviado.")
 		return
 	}
 
@@ -430,15 +548,6 @@ func (h *Handler) DeletePhoto(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusNoContent)
 }
-
-// --- Handlers: perfiles públicos (Fase 6) --------------------------------
-//
-// A diferencia de los handlers /me, estos actúan sobre el perfil de OTRA
-// persona identificado por {profileID} en la ruta. La privacidad básica
-// de esta fase consiste en que Service.GetPublicProfile (y las llamadas
-// que dependen de ella) solo devuelven perfiles de cuentas activas: ver
-// el perfil de alguien suspendido o que se ha dado de baja da el mismo
-// 404 genérico que un ID inexistente, para no filtrar esa información.
 
 func (h *Handler) GetPublic(w http.ResponseWriter, r *http.Request) {
 	viewerID, ok := auth.UserIDFromContext(r.Context())

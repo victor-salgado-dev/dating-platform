@@ -50,10 +50,43 @@ type Profile struct {
 	Region           *string
 	Languages        []string
 	RelationshipGoal *RelationshipGoal
-	HasChildren      *bool
-	WantsChildren    *bool
+	
+	// Han pasado a string para soportar opciones extra (ej: "not_sure", "prefer_not_to_say")
+	HasChildren      *string
+	WantsChildren    *string
 	Bio              *string
 	Interests        []string
+
+	// --- NUEVOS CAMPOS (Físico y Apariencia) ---
+	Height           *int
+	Weight           *int
+	BodyType         *string
+	Ethnicity        *string
+	AppearanceRating *string
+	HairColor        *string
+	EyeColor         *string
+	BodyArt          []string
+
+	// --- NUEVOS CAMPOS (Estilo de Vida y Familia) ---
+	SmokingHabit          *string
+	DrinkingHabit         *string
+	RelocationWillingness []string
+	MaritalStatus         *string
+	ChildrenCount         *int
+	YoungestChildAge      *int
+	OldestChildAge        *int
+	Occupation            *string
+	EmploymentStatus      *string
+	IncomeLevel           *string
+	LivingSituation       *string
+
+	// --- NUEVOS CAMPOS (Fondo, Cultura y Valores) ---
+	Nationality      *string
+	EducationLevel   *string
+	EnglishAbility   *string
+	Religion         *string
+	ReligiousValues  *string
+	StarSign         *string
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

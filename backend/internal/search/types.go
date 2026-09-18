@@ -41,9 +41,42 @@ type Filters struct {
 	CountryCode      *string
 	Languages        []string
 	RelationshipGoal *profiles.RelationshipGoal
-	HasChildren      *bool
-	WantsChildren    *bool
+
+	// Cambiados de *bool a *string
+	HasChildren      *string
+	WantsChildren    *string
 	Interests        []string
+
+	// --- Físico y Apariencia ---
+	MinHeight        *int
+	MaxHeight        *int
+	MinWeight        *int
+	MaxWeight        *int
+	BodyType         *string
+	Ethnicity        *string
+	AppearanceRating *string
+	HairColor        *string
+	EyeColor         *string
+	BodyArt          []string
+
+	// --- Estilo de Vida y Familia ---
+	SmokingHabit          *string
+	DrinkingHabit         *string
+	RelocationWillingness []string
+	MaritalStatus         *string
+	MaxChildren           *int
+	Occupation            *string
+	EmploymentStatus      *string
+	IncomeLevel           *string
+	LivingSituation       *string
+
+	// --- Fondo, Cultura y Valores ---
+	Nationality     *string
+	EducationLevel  *string
+	EnglishAbility  *string
+	Religion        *string
+	ReligiousValues *string
+	StarSign        *string
 }
 
 // Params agrupa los filtros con la paginación/ordenación y quién busca
