@@ -1,57 +1,117 @@
 /* Contenedor principal */
 .main {
   width: 100%;
-  max-width: 1600px; 
+  max-width: 1600px;
   margin: 2rem auto;
-  padding: 0 2rem;
+  padding: 0 clamp(1.25rem, 3vw, 3rem);
   box-sizing: border-box;
 }
 
-/* Grilla con perfiles más grandes (min 240px) */
+/* Grilla con perfiles */
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  grid-auto-flow: dense; 
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  grid-auto-flow: dense;
   gap: 20px;
   align-items: stretch;
 }
 
-/* Tarjeta estándar modernizada */
+/* Tarjeta estándar */
 .card {
-  background: white;
-  border-radius: 12px;
+  background: var(--surface);
+  border-radius: var(--radius-card);
   overflow: hidden;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
-  border: 1px solid #f0f0f0;
+  border: 1px solid var(--line);
   display: flex;
   flex-direction: column;
-  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  transition: border-color 0.2s ease, transform 0.2s ease;
   position: relative;
 }
 
 .card:hover {
-  transform: translateY(-5px);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.12);
-  border-color: #ffccd5;
+  transform: translateY(-4px);
+  border-color: var(--brand-primary);
 }
 
-/* Tarjeta Destacada: Ocupa 2 columnas de ancho pero 1 de alto */
+/* ---------- Te han dado like / favorito: borde + insignia ---------- */
+.receivedLike {
+  box-shadow: 0 0 0 3px var(--received-like);
+}
+.receivedFav {
+  box-shadow: 0 0 0 3px var(--received-fav);
+}
+.receivedBoth {
+  background-image: linear-gradient(var(--surface), var(--surface)),
+    linear-gradient(135deg, var(--received-like), var(--received-fav));
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  border: 3px solid transparent;
+  box-shadow: none;
+}
+.receivedBadges {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  gap: 5px;
+  z-index: 2;
+}
+.receivedBadges span {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  color: white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.18);
+}
+.badgeLike {
+  background: var(--received-like);
+}
+.badgeFav {
+  background: var(--received-fav);
+}
+
+/* Tarjeta destacada: foto ancha en vertical + texto al lado (no fuerza
+   panorámico, ya que las fotos de perfil casi siempre son retrato) */
 .cardPremium {
   grid-column: span 2;
+  flex-direction: row;
+  align-items: stretch;
+}
+.cardPremium .imageContainer {
+  width: 62%;
+  flex-shrink: 0;
+  aspect-ratio: auto;
+  height: auto;
+}
+.cardPremium .cardInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding: 20px 22px;
+}
+.cardPremium .name {
+  font-size: 1.25rem;
+}
+.cardPremium .details {
+  font-size: 0.92rem;
+  margin-top: 6px;
+}
+.cardPremium .actions {
+  margin-top: 16px;
 }
 
-/* Contenedor de la foto (Proporción 3:4 normal) */
+/* Contenedor de la foto (proporción 3:4, retrato) */
 .imageContainer {
   position: relative;
   width: 100%;
   aspect-ratio: 3 / 4;
   overflow: hidden;
-  background-color: #f3f4f6;
-}
-
-/* Para la premium, forzamos formato apaisado (16:9 aprox) para no ocupar media pantalla de alto */
-.cardPremium .imageContainer {
-  aspect-ratio: 16 / 10; 
+  background: linear-gradient(160deg, var(--brand-primary-tint), var(--accent-tint));
 }
 
 .photoImg {
@@ -61,9 +121,8 @@
   display: block;
   transition: transform 0.5s ease;
 }
-
 .card:hover .photoImg {
-  transform: scale(1.05); /* Suave zoom al pasar el ratón */
+  transform: scale(1.05);
 }
 
 .photoPlaceholder {
@@ -72,49 +131,111 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #e5e7eb;
-  color: #9ca3af;
-  font-size: 1rem;
+  color: var(--brand-primary-dark);
+  opacity: 0.55;
+  font-family: var(--font-voice, Georgia), serif;
+  font-size: 2rem;
+}
+
+.badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  background: var(--surface);
+  color: var(--success);
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 4px 10px;
+  border-radius: var(--radius-pill);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.fdot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
 }
 
 /* Información del perfil */
 .cardInfo {
-  padding: 14px 18px;
-  background: #ffffff;
+  padding: 14px 16px 16px;
+  background: var(--surface);
   display: flex;
-  flex-direction: column;
-  justify-content: center;
-  position: relative;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .name {
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--ink);
   margin: 0;
   display: flex;
   align-items: baseline;
-  gap: 6px;
+  gap: 5px;
+}
+.name span {
+  font-weight: 400;
+  color: var(--muted);
 }
 
 .details {
-  font-size: 0.9rem;
-  color: #6b7280;
-  margin: 4px 0 0 0;
+  font-size: 0.85rem;
+  color: var(--muted);
+  margin: 3px 0 0;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.iconBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--bg-main);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: var(--ink-soft);
+  transition: all 0.15s ease;
+}
+.iconBtn:hover {
+  border-color: var(--brand-primary);
+  color: var(--brand-primary);
+}
+.iconBtn.liked {
+  background: var(--brand-primary);
+  border-color: var(--brand-primary);
+  color: white;
+  box-shadow: 0 0 10px rgba(166, 57, 94, 0.4);
+}
+.iconBtn.favorited {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: white;
+  box-shadow: 0 0 10px rgba(232, 168, 124, 0.5);
 }
 
 /* --- PUBLICIDAD --- */
 .adSquare {
   grid-column: span 2;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border: 2px dashed #cbd5e1;
-  border-radius: 12px;
+  background: linear-gradient(135deg, var(--bg-main) 0%, var(--brand-primary-tint) 100%);
+  border: 2px dashed var(--line);
+  border-radius: var(--radius-card);
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 2rem;
   min-height: 250px;
-  color: #64748b;
+  color: var(--muted);
   font-size: 0.9rem;
   font-weight: bold;
   text-transform: uppercase;
@@ -124,15 +245,15 @@
 
 .adBanner {
   grid-column: 1 / -1;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border: 2px dashed #cbd5e1;
-  border-radius: 12px;
+  background: linear-gradient(135deg, var(--bg-main) 0%, var(--brand-primary-tint) 100%);
+  border: 2px dashed var(--line);
+  border-radius: var(--radius-card);
   height: 100px;
   margin: 1.5rem 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #64748b;
+  color: var(--muted);
   font-size: 0.9rem;
   font-weight: bold;
   text-transform: uppercase;
@@ -140,15 +261,33 @@
 }
 
 @media (max-width: 640px) {
+  /* Una sola columna: un perfil a la vez, sin tratamiento "destacado" */
   .grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
+    grid-template-columns: 1fr;
+    gap: 14px;
   }
-  .cardPremium,
-  .adSquare {
-    grid-column: span 2;
+  .cardPremium {
+    grid-column: span 1;
+    flex-direction: column;
   }
   .cardPremium .imageContainer {
-    aspect-ratio: 3 / 4; /* En móvil vuelve a ser vertical para verse bien */
+    width: 100%;
+    aspect-ratio: 3 / 4;
+  }
+  .cardPremium .name {
+    font-size: 1.05rem;
+  }
+  .cardPremium .details {
+    font-size: 0.85rem;
+  }
+
+  /* Anuncios: mismo tamaño/forma que una tarjeta de perfil, sin destacar de más */
+  .adSquare,
+  .adBanner {
+    grid-column: span 1;
+    aspect-ratio: 3 / 4;
+    height: auto;
+    min-height: auto;
+    margin: 0;
   }
 }

@@ -162,6 +162,28 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		add("p.star_sign = $%d", *f.StarSign)
 	}
 
+	// --- NUEVOS FILTROS: Hobbies (Fase 2) -------------------------------
+	//
+	// A diferencia de todos los filtros anteriores, un hobby no es una
+	// columna de `profiles`: vive en profile_hobbies, una fila por
+	// (perfil, hobby) que solo existe si el usuario contestó. Por eso
+	// no puede ser un simple "p.columna = $N": necesita un EXISTS contra
+	// esa tabla. Que la fila no exista (no contestado) o exista con
+	// liked=false (no le gusta) hace que el EXISTS sea falso en ambos
+	// casos — la regla de datos faltantes sale gratis de esto.
+	for _, hf := range f.Hobbies {
+		where = append(where, hobbyExistsClause(hf, &args))
+	}
+
+	// --- NUEVOS FILTROS: Personalidad (Fase 2) ---------------------------
+	//
+	// Mismo razonamiento que los hobbies, pero contra la vista agregada
+	// profile_personality_trait_scores (que ya solo tiene fila para los
+	// rasgos con al menos una respuesta).
+	for _, pf := range f.PersonalityTraits {
+		where = append(where, personalityExistsClause(pf, &args))
+	}
+
 	orderBy := orderByClause(params.Sort)
 
 	limitArg := len(args) + 1
@@ -232,6 +254,57 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		PageSize:   params.PageSize,
 		TotalPages: totalPages,
 	}, nil
+}
+
+// hobbyExistsClause construye el EXISTS para un HobbyFilter y añade sus
+// argumentos a *args, devolviendo la cláusula ya con los $N correctos.
+// Recibe *args (no lo devuelve) para poder usarse en un simple bucle
+// "for _, hf := range f.Hobbies" sin tener que reasignar args a mano en
+// cada vuelta.
+func hobbyExistsClause(hf HobbyFilter, args *[]any) string {
+	*args = append(*args, hf.Key)
+	keyArg := len(*args)
+
+	var b strings.Builder
+	fmt.Fprintf(&b, `EXISTS (
+		SELECT 1 FROM profile_hobbies ph
+		WHERE ph.profile_id = p.id AND ph.hobby_key = $%d AND ph.liked = true`, keyArg)
+
+	if hf.Min != nil {
+		*args = append(*args, *hf.Min)
+		fmt.Fprintf(&b, " AND ph.intensity >= $%d", len(*args))
+	}
+	if hf.Max != nil {
+		*args = append(*args, *hf.Max)
+		fmt.Fprintf(&b, " AND ph.intensity <= $%d", len(*args))
+	}
+	b.WriteString(")")
+
+	return b.String()
+}
+
+// personalityExistsClause es el equivalente de hobbyExistsClause para
+// un PersonalityFilter, contra la vista agregada por rasgo.
+func personalityExistsClause(pf PersonalityFilter, args *[]any) string {
+	*args = append(*args, pf.TraitKey)
+	keyArg := len(*args)
+
+	var b strings.Builder
+	fmt.Fprintf(&b, `EXISTS (
+		SELECT 1 FROM profile_personality_trait_scores pts
+		WHERE pts.profile_id = p.id AND pts.trait_key = $%d`, keyArg)
+
+	if pf.Min != nil {
+		*args = append(*args, *pf.Min)
+		fmt.Fprintf(&b, " AND pts.avg_score >= $%d", len(*args))
+	}
+	if pf.Max != nil {
+		*args = append(*args, *pf.Max)
+		fmt.Fprintf(&b, " AND pts.avg_score <= $%d", len(*args))
+	}
+	b.WriteString(")")
+
+	return b.String()
 }
 
 func orderByClause(sort Sort) string {

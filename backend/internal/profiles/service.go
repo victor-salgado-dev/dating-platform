@@ -25,6 +25,16 @@ const (
 	MaxLanguages        = 10
 	MaxPhotosPerProfile = 6
 	MaxPhotoSizeBytes   = 5 * 1024 * 1024 // 5 MB
+
+	MaxProfileQuoteLen      = 500
+	MaxDreamWishLen         = 500
+	MaxAboutPartnerTextLen  = 1000
+	MinPersonalityScore     = 1
+	MaxPersonalityScore     = 5
+	MinHobbyIntensity       = 1
+	MaxHobbyIntensity       = 5
+	MinPartnerImportance    = 1
+	MaxPartnerImportance    = 5
 )
 
 var countryCodePattern = regexp.MustCompile(`^[A-Z]{2}$`)
@@ -44,6 +54,20 @@ func IsValidGender(g Gender) bool {
 
 func IsValidRelationshipGoal(g RelationshipGoal) bool {
 	return allowedRelationshipGoals[g]
+}
+
+var allowedPersonalityTraits = map[PersonalityTrait]bool{
+	TraitExtraversion: true, TraitEmotionalStability: true, TraitConscientiousness: true,
+	TraitAgreeableness: true, TraitOpenness: true,
+}
+
+// IsValidPersonalityTrait existe por el mismo motivo que IsValidGender:
+// el paquete search (Fase 5) necesita validar un trait_key recibido por
+// query string antes de usarlo en una consulta, y los 5 rasgos son un
+// catálogo cerrado (a diferencia de las afirmaciones dentro de cada
+// rasgo, que sí viven en una tabla porque esas sí crecen).
+func IsValidPersonalityTrait(t PersonalityTrait) bool {
+	return allowedPersonalityTraits[t]
 }
 
 var allowedPhotoTypes = map[string]string{
@@ -92,6 +116,17 @@ type CreateProfileInput struct {
 	Religion              *string
 	ReligiousValues       *string
 	StarSign              *string
+
+	// --- NUEVOS CAMPOS (Über mich / estilo de vida) ---
+	FutureVision       []string
+	Sports             []string
+	LikesPets          *string
+	PetsOwned          []string
+	FavoriteSeason     *string
+	IdealVacationStyle []string
+	VacationActivities []string
+	ProfileQuote       *string
+	DreamWish          *string
 }
 
 type Service struct {
@@ -162,6 +197,12 @@ func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, in Create
 	if err := validateLanguages(in.Languages); err != nil {
 		return nil, err
 	}
+	if err := validateProfileQuote(in.ProfileQuote); err != nil {
+		return nil, err
+	}
+	if err := validateDreamWish(in.DreamWish); err != nil {
+		return nil, err
+	}
 
 	var nationality *string
 	if in.Nationality != nil {
@@ -209,6 +250,17 @@ func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, in Create
 		Religion:              in.Religion,
 		ReligiousValues:       in.ReligiousValues,
 		StarSign:              in.StarSign,
+
+		// Über mich / estilo de vida
+		FutureVision:       in.FutureVision,
+		Sports:             in.Sports,
+		LikesPets:          in.LikesPets,
+		PetsOwned:          in.PetsOwned,
+		FavoriteSeason:     in.FavoriteSeason,
+		IdealVacationStyle: in.IdealVacationStyle,
+		VacationActivities: in.VacationActivities,
+		ProfileQuote:       in.ProfileQuote,
+		DreamWish:          in.DreamWish,
 	}
 
 	if err := s.repo.Create(ctx, p); err != nil {
@@ -264,6 +316,16 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, patch Pro
 	}
 	if patch.LanguagesSet {
 		if err := validateLanguages(patch.Languages); err != nil {
+			return nil, err
+		}
+	}
+	if patch.ProfileQuoteSet {
+		if err := validateProfileQuote(patch.ProfileQuote); err != nil {
+			return nil, err
+		}
+	}
+	if patch.DreamWishSet {
+		if err := validateDreamWish(patch.DreamWish); err != nil {
 			return nil, err
 		}
 	}
@@ -373,6 +435,147 @@ func (s *Service) DeletePhoto(ctx context.Context, userID, photoID uuid.UUID) er
 	return nil
 }
 
+// --- Catálogos --------------------------------------------------------
+//
+// Son de solo lectura para el usuario final: no hay validación de
+// negocio que hacer aquí, el Service simplemente delega en el
+// Repository. Existen como métodos propios (en vez de exponer el
+// Repository directamente al Handler) para no filtrar el detalle de
+// implementación de que el catálogo vive en Postgres.
+
+func (s *Service) ListHobbyCatalog(ctx context.Context) ([]HobbyDefinition, error) {
+	return s.repo.ListHobbyDefinitions(ctx)
+}
+
+func (s *Service) ListPersonalityCatalog(ctx context.Context) ([]PersonalityStatement, error) {
+	return s.repo.ListPersonalityStatements(ctx)
+}
+
+// --- Hobbies del usuario -------------------------------------------------
+
+// SetHobby crea o actualiza la respuesta del usuario a un hobby del
+// catálogo. hobbyKey inexistente en el catálogo se traduce en un
+// ValidationError por parte del Repository (violación de FK).
+func (s *Service) SetHobby(ctx context.Context, userID uuid.UUID, hobbyKey string, liked bool, intensity *int) (*ProfileHobby, error) {
+	if !liked && intensity != nil {
+		return nil, invalidField("intensity", "no tiene sentido indicar una intensidad si no te gusta ese hobby")
+	}
+	if intensity != nil && (*intensity < MinHobbyIntensity || *intensity > MaxHobbyIntensity) {
+		return nil, invalidField("intensity", fmt.Sprintf("debe estar entre %d y %d", MinHobbyIntensity, MaxHobbyIntensity))
+	}
+
+	profile, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.UpsertProfileHobby(ctx, profile.ID, hobbyKey, liked, intensity)
+}
+
+func (s *Service) ListMyHobbies(ctx context.Context, userID uuid.UUID) ([]ProfileHobby, error) {
+	profile, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.ListProfileHobbies(ctx, profile.ID)
+}
+
+func (s *Service) ListPublicHobbies(ctx context.Context, viewerUserID, profileID uuid.UUID) ([]ProfileHobby, error) {
+	if _, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListProfileHobbies(ctx, profileID)
+}
+
+// DeleteHobby vuelve un hobby a "no contestado". Operación idempotente.
+func (s *Service) DeleteHobby(ctx context.Context, userID uuid.UUID, hobbyKey string) error {
+	profile, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	return s.repo.DeleteProfileHobby(ctx, profile.ID, hobbyKey)
+}
+
+// --- Personalidad del usuario ---------------------------------------------
+
+func (s *Service) SetPersonalityAnswer(ctx context.Context, userID uuid.UUID, statementKey string, score int) (*ProfilePersonalityAnswer, error) {
+	if score < MinPersonalityScore || score > MaxPersonalityScore {
+		return nil, invalidField("score", fmt.Sprintf("debe estar entre %d y %d", MinPersonalityScore, MaxPersonalityScore))
+	}
+
+	profile, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.UpsertPersonalityAnswer(ctx, profile.ID, statementKey, score)
+}
+
+// GetMyPersonality devuelve tanto las respuestas individuales como el
+// agregado ("Gesamt") por rasgo, calculado por la BD.
+func (s *Service) GetMyPersonality(ctx context.Context, userID uuid.UUID) ([]ProfilePersonalityAnswer, []PersonalityTraitScore, error) {
+	profile, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return s.getPersonality(ctx, profile.ID)
+}
+
+func (s *Service) GetPublicPersonality(ctx context.Context, viewerUserID, profileID uuid.UUID) ([]ProfilePersonalityAnswer, []PersonalityTraitScore, error) {
+	if _, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID); err != nil {
+		return nil, nil, err
+	}
+	return s.getPersonality(ctx, profileID)
+}
+
+func (s *Service) getPersonality(ctx context.Context, profileID uuid.UUID) ([]ProfilePersonalityAnswer, []PersonalityTraitScore, error) {
+	answers, err := s.repo.ListPersonalityAnswers(ctx, profileID)
+	if err != nil {
+		return nil, nil, err
+	}
+	scores, err := s.repo.GetPersonalityTraitScores(ctx, profileID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return answers, scores, nil
+}
+
+// --- Preferencias de pareja del usuario -------------------------------------
+
+func (s *Service) GetMyPartnerPreferences(ctx context.Context, userID uuid.UUID) (*PartnerPreferences, error) {
+	profile, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.GetPartnerPreferences(ctx, profile.ID)
+}
+
+func (s *Service) UpdatePartnerPreferences(ctx context.Context, userID uuid.UUID, patch PartnerPreferencesPatch) (*PartnerPreferences, error) {
+	if patch.AgeMinSet && patch.AgeMaxSet && patch.AgeMin != nil && patch.AgeMax != nil && *patch.AgeMin > *patch.AgeMax {
+		return nil, invalidField("age_min", "no puede ser mayor que age_max")
+	}
+	if patch.HeightMinSet && patch.HeightMaxSet && patch.HeightMin != nil && patch.HeightMax != nil && *patch.HeightMin > *patch.HeightMax {
+		return nil, invalidField("height_min", "no puede ser mayor que height_max")
+	}
+	if patch.AboutPartnerTextSet && patch.AboutPartnerText != nil && len([]rune(*patch.AboutPartnerText)) > MaxAboutPartnerTextLen {
+		return nil, invalidField("about_partner_text", fmt.Sprintf("no puede superar %d caracteres", MaxAboutPartnerTextLen))
+	}
+	for _, imp := range []*int{
+		patch.ImportanceSharedThoughts, patch.ImportanceSharedHobbies, patch.ImportanceIntimacy,
+		patch.ImportanceRomanticLove, patch.ImportanceFinancialSecurity, patch.ImportanceFun,
+		patch.ImportanceSharedFriends, patch.ImportanceSharedHumor, patch.ImportancePersonalSpace,
+		patch.ImportanceIndependence,
+	} {
+		if imp != nil && (*imp < MinPartnerImportance || *imp > MaxPartnerImportance) {
+			return nil, invalidField("importance", fmt.Sprintf("debe estar entre %d y %d", MinPartnerImportance, MaxPartnerImportance))
+		}
+	}
+
+	profile, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.UpsertPartnerPreferences(ctx, profile.ID, patch)
+}
+
 // --- Validaciones auxiliares ---
 
 func validateDisplayName(v string) error {
@@ -453,6 +656,26 @@ func validateLanguages(v []string) error {
 		if strings.TrimSpace(l) == "" {
 			return invalidField("languages", "no puede contener valores vacíos")
 		}
+	}
+	return nil
+}
+
+func validateProfileQuote(v *string) error {
+	if v == nil {
+		return nil
+	}
+	if len([]rune(*v)) > MaxProfileQuoteLen {
+		return invalidField("profile_quote", fmt.Sprintf("no puede superar %d caracteres", MaxProfileQuoteLen))
+	}
+	return nil
+}
+
+func validateDreamWish(v *string) error {
+	if v == nil {
+		return nil
+	}
+	if len([]rune(*v)) > MaxDreamWishLen {
+		return invalidField("dream_wish", fmt.Sprintf("no puede superar %d caracteres", MaxDreamWishLen))
 	}
 	return nil
 }

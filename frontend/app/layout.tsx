@@ -1,13 +1,48 @@
 import type { Metadata } from 'next';
+import { Fraunces, Public_Sans } from 'next/font/google';
 import Link from 'next/link';
-import AccountNav from './account-nav';
+import HeaderChrome, { type NavLinkItem, type FilterLinkItem } from './header-chrome';
 import './globals.css';
 import styles from './layout.module.css';
+
+// Serif cálida para marca/títulos + sans humanista muy legible para el resto.
+// Se exponen como variables CSS (--font-voice / --font-ui) y se consumen
+// desde globals.css y layout.module.css.
+const fraunces = Fraunces({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-voice',
+  display: 'swap',
+});
+
+const publicSans = Public_Sans({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-ui',
+  display: 'swap',
+});
 
 export const metadata: Metadata = {
   title: 'Dating Platform',
   description: 'Plataforma internacional de dating/relaciones',
 };
+
+const NAV_LINKS: NavLinkItem[] = [
+  { href: '/', label: 'Inicio' },
+  { href: '/discover', label: 'Descubrir' },
+  { href: '/activity', label: 'Actividad' },
+  { href: '/likes', label: 'Likes' },
+  { href: '/matches', label: 'Matches' },
+  { href: '/messages', label: 'Mensajes' },
+];
+
+const FILTER_LINKS: FilterLinkItem[] = [
+  { href: '/', label: 'Populares', active: true },
+  { href: '/online', label: 'En línea', online: true },
+  { href: '/new', label: 'Nuevos miembros' },
+  { href: '/favorites', label: 'Favoritos' },
+  { href: '/search', label: 'Búsqueda avanzada' },
+];
 
 export default function RootLayout({
   children,
@@ -15,36 +50,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="es">
+    <html lang="es" className={`${fraunces.variable} ${publicSans.variable}`}>
       <body>
-        {/* Barra superior (Roja) - SECCIONES PRINCIPALES */}
-        <header className={styles.headerTop}>
-          <Link href="/" className={styles.brand}>
-            🤍 Dating Platform
-          </Link>
-
-          <nav className={styles.topNav}>
-            <Link href="/">Inicio</Link>
-            <Link href="/discover">Descubrir</Link>
-            <Link href="/activity">Actividad</Link>
-            <Link href="/likes">Likes</Link>
-            <Link href="/matches">Matches</Link>
-            <Link href="/messages">Mensajes</Link>
-          </nav>
-
-          <div className={styles.account}>
-            <AccountNav />
-          </div>
-        </header>
-
-        {/* Barra secundaria (Blanca) - FILTROS Y VISTAS */}
-        <nav className={styles.headerBottom}>
-          <Link href="/" className={styles.activeTab}>⭐ Populares</Link>
-          <Link href="/online">🟢 En línea</Link>
-          <Link href="/new">✨ Nuevos miembros</Link>
-          <Link href="/favorites">💖 Favoritos</Link>
-          <Link href="/search">🔍 Búsqueda Avanzada</Link> 
-        </nav>
+        <HeaderChrome navLinks={NAV_LINKS} filterLinks={FILTER_LINKS} />
 
         {children}
 

@@ -15,7 +15,8 @@ import (
 	"dating-platform/backend/internal/users"
 )
 
-func createUserWithProfile(t *testing.T, ctx context.Context, usersRepo users.Repository, profilesRepo profiles.Repository, wantsChildren *bool) uuid.UUID {
+// Cambiado wantsChildren de *bool a *string
+func createUserWithProfile(t *testing.T, ctx context.Context, usersRepo users.Repository, profilesRepo profiles.Repository, wantsChildren *string) uuid.UUID {
 	t.Helper()
 
 	u := &users.User{Email: testutil.UniqueEmail(), PasswordHash: "x"}
@@ -46,11 +47,8 @@ func containsProfile(items []search.ResultItem, id uuid.UUID) bool {
 	return false
 }
 
-// TestIntegration_Search_MissingDataRule es EL test que verifica, contra
-// PostgreSQL real, la regla fundamental de la sección 8: un perfil que
-// no ha indicado un dato no debe aparecer cuando la búsqueda exige
-// explícitamente ese dato, pero sí debe aparecer en una búsqueda que no
-// lo exige.
+// TestIntegration_Search_MissingDataRule verifica contra PostgreSQL real
+// la regla fundamental de la sección 8 con el nuevo formato string ("yes").
 func TestIntegration_Search_MissingDataRule(t *testing.T) {
 	pool := testutil.RequireDB(t)
 	ctx := context.Background()
@@ -64,12 +62,11 @@ func TestIntegration_Search_MissingDataRule(t *testing.T) {
 		t.Fatalf("crear usuario buscador: %v", err)
 	}
 
-	yes := true
+	yes := "yes"
 	withData := createUserWithProfile(t, ctx, usersRepo, profilesRepo, &yes)
 	withoutData := createUserWithProfile(t, ctx, usersRepo, profilesRepo, nil)
 
-	// Sin filtro: ambos perfiles pueden aparecer (ninguno se excluye
-	// por indicar o no wants_children).
+	// Sin filtro: ambos perfiles deben aparecer
 	resultAll, err := searchRepo.Search(ctx, search.Params{
 		ExcludeUserID: searcher.ID, Sort: search.SortRecent, Page: 1, PageSize: 50,
 	})
@@ -83,17 +80,17 @@ func TestIntegration_Search_MissingDataRule(t *testing.T) {
 		t.Error("sin filtro, el perfil que NO indicó el dato también debería aparecer")
 	}
 
-	// Con filtro wants_children=true: SOLO quien lo indicó explícitamente.
-	trueVal := true
+	// Con filtro wants_children="yes": SOLO quien lo indicó explícitamente
+	yesVal := "yes"
 	resultFiltered, err := searchRepo.Search(ctx, search.Params{
 		ExcludeUserID: searcher.ID, Sort: search.SortRecent, Page: 1, PageSize: 50,
-		Filters: search.Filters{WantsChildren: &trueVal},
+		Filters: search.Filters{WantsChildren: &yesVal},
 	})
 	if err != nil {
-		t.Fatalf("Search con filtro wants_children=true: %v", err)
+		t.Fatalf("Search con filtro wants_children=yes: %v", err)
 	}
 	if !containsProfile(resultFiltered.Items, withData) {
-		t.Error("el perfil que indicó wants_children=true debería aparecer al filtrar por ese valor")
+		t.Error("el perfil que indicó wants_children=yes debería aparecer al filtrar por ese valor")
 	}
 	if containsProfile(resultFiltered.Items, withoutData) {
 		t.Error("REGLA DE DATOS FALTANTES: un perfil que no indicó wants_children NO debería aparecer al filtrar por ese campo")
@@ -112,8 +109,6 @@ func TestIntegration_Search_ExcludesSelf(t *testing.T) {
 	if err := usersRepo.Create(ctx, u); err != nil {
 		t.Fatalf("crear usuario: %v", err)
 	}
-	// Perfil de otra persona en la base de datos, para comprobar que el
-	// self-exclude funciona aunque haya más gente en los resultados.
 	createUserWithProfile(t, ctx, usersRepo, profilesRepo, nil)
 
 	p := &profiles.Profile{

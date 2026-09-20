@@ -1,11 +1,56 @@
 :root {
-  --brand-primary: #8b1836; /* Rojo estilo Cupid */
-  --brand-dark: #631025;
-  --bg-main: #f5f6f8;
-  --text-main: #333333;
-  --text-muted: #777777;
-  
-  color-scheme: light; /* Forzamos claro de momento para mantener la estética */
+  /* Paleta */
+  --ink: #2B1F23;
+  --ink-soft: #5B4A4E;
+  --muted: #8A7A7D;
+  --bg-main: #FAF6F2;
+  --surface: #FFFFFF;
+  --line: #ECE3DC;
+
+  --brand-primary: #A6395E;
+  --brand-primary-dark: #7E2A48;
+  --brand-primary-light: #C05678;
+  --brand-primary-tint: #F3DEE5;
+  --accent: #E8A87C;
+  --accent-tint: #FBEBDD;
+
+  --success: #4C7A5E;
+  --success-tint: #E2EFE6;
+
+  --received-like: #E8607F;
+  --received-fav: #D4A24C;
+
+  --header-gradient: linear-gradient(135deg, var(--brand-primary) 0%, var(--brand-primary-dark) 100%);
+
+  /* Compatibilidad con nombres usados en el resto de la app */
+  --brand-dark: var(--brand-primary-dark);
+  --bg-main: #FAF6F2;
+  --text-main: var(--ink);
+  --text-muted: var(--muted);
+
+  --radius-card: 18px;
+  --radius-pill: 999px;
+
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --ink: #F3ECE8;
+    --ink-soft: #D8C9CB;
+    --muted: #A79599;
+    --bg-main: #211A1C;
+    --surface: #2B2224;
+    --line: #3C3134;
+    --brand-primary: #E27EA0;
+    --brand-primary-dark: #F0A3BE;
+    --brand-primary-light: #E27EA0;
+    --brand-primary-tint: #3E2530;
+    --accent: #E8A87C;
+    --accent-tint: #3A2A20;
+    --success: #8FC7A4;
+    --success-tint: #223229;
+  }
 }
 
 * {
@@ -14,12 +59,19 @@
 
 body {
   margin: 0;
-  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* --font-voice / --font-ui se definen en layout.tsx vía next/font */
+  font-family: var(--font-ui, system-ui), -apple-system, 'Segoe UI', Roboto, sans-serif;
   background-color: var(--bg-main);
   color: var(--text-main);
+  font-size: 16px;
+  line-height: 1.5;
 }
 
 a {
   text-decoration: none;
   color: inherit;
+}
+
+.fontVoice {
+  font-family: var(--font-voice, Georgia), Georgia, serif;
 }

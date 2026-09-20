@@ -50,14 +50,14 @@ type Profile struct {
 	Region           *string
 	Languages        []string
 	RelationshipGoal *RelationshipGoal
-	
-	// Han pasado a string para soportar opciones extra (ej: "not_sure", "prefer_not_to_say")
-	HasChildren      *string
-	WantsChildren    *string
-	Bio              *string
-	Interests        []string
 
-	// --- NUEVOS CAMPOS (Físico y Apariencia) ---
+	// Han pasado a string para soportar opciones extra (ej: "not_sure", "prefer_not_to_say")
+	HasChildren   *string
+	WantsChildren *string
+	Bio           *string
+	Interests     []string
+
+	// --- Físico y Apariencia ---
 	Height           *int
 	Weight           *int
 	BodyType         *string
@@ -67,7 +67,7 @@ type Profile struct {
 	EyeColor         *string
 	BodyArt          []string
 
-	// --- NUEVOS CAMPOS (Estilo de Vida y Familia) ---
+	// --- Estilo de Vida y Familia ---
 	SmokingHabit          *string
 	DrinkingHabit         *string
 	RelocationWillingness []string
@@ -80,13 +80,26 @@ type Profile struct {
 	IncomeLevel           *string
 	LivingSituation       *string
 
-	// --- NUEVOS CAMPOS (Fondo, Cultura y Valores) ---
-	Nationality      *string
-	EducationLevel   *string
-	EnglishAbility   *string
-	Religion         *string
-	ReligiousValues  *string
-	StarSign         *string
+	// --- Fondo, Cultura y Valores ---
+	Nationality     *string
+	EducationLevel  *string
+	EnglishAbility  *string
+	Religion        *string
+	ReligiousValues *string
+	StarSign        *string
+
+	// --- NUEVOS CAMPOS (Über mich / estilo de vida) -----------------
+	// smoking_habit y drinking_habit ya cubren "¿Fumo? / ¿Bebo?" desde
+	// la 000012, se reutilizan tal cual.
+	FutureVision       []string // "Meine ideale Zukunftsvorstellung?"
+	Sports             []string // "Welchen Sport treibe ich?"
+	LikesPets          *string  // "Mag ich Haustiere?" (yes/neutral/no)
+	PetsOwned          []string // "Welche Haustiere besitze ich?"
+	FavoriteSeason     *string  // "Was ist meine Lieblingsjahreszeit?"
+	IdealVacationStyle []string // "Wie sieht mein Idealurlaub aus?"
+	VacationActivities []string // "Meine liebsten Aktivitäten im Urlaub?"
+	ProfileQuote       *string  // frase/cita corta de presentación
+	DreamWish          *string  // "¿Cuál es mi sueño más loco?"
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

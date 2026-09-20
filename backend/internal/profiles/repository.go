@@ -6,7 +6,8 @@ import (
 	"github.com/google/uuid"
 )
 
-// Repository persiste perfiles y sus fotos.
+// Repository persiste perfiles y todo lo que cuelga de ellos: fotos,
+// hobbies, respuestas de personalidad y preferencias de pareja.
 type Repository interface {
 	// Create inserta un perfil nuevo. Rellena p.ID/CreatedAt/UpdatedAt.
 	// Devuelve ErrAlreadyExists si el usuario ya tiene perfil.
@@ -59,4 +60,56 @@ type Repository interface {
 	// hace el Service llamando a storage.Storage por separado).
 	// Devuelve ErrPhotoNotFound si no existe o no pertenece al perfil.
 	DeletePhoto(ctx context.Context, profileID, photoID uuid.UUID) error
+
+	// --- Catálogos (semi-estáticos, iguales para todos los perfiles) --
+
+	// ListHobbyDefinitions devuelve el catálogo completo de hobbies,
+	// ordenado por categoría y posición.
+	ListHobbyDefinitions(ctx context.Context) ([]HobbyDefinition, error)
+
+	// ListPersonalityStatements devuelve el catálogo completo de
+	// afirmaciones de personalidad, ordenado por rasgo y posición.
+	ListPersonalityStatements(ctx context.Context) ([]PersonalityStatement, error)
+
+	// --- Hobbies del perfil --------------------------------------------
+
+	// UpsertProfileHobby crea o actualiza la respuesta de un perfil a un
+	// hobby del catálogo. Devuelve invalidField si hobbyKey no existe en
+	// el catálogo o si liked/intensity no cumplen la regla de negocio
+	// (intensity solo tiene sentido si liked = true).
+	UpsertProfileHobby(ctx context.Context, profileID uuid.UUID, hobbyKey string, liked bool, intensity *int) (*ProfileHobby, error)
+
+	// ListProfileHobbies devuelve todas las respuestas de hobbies de un
+	// perfil. Los hobbies sin respuesta simplemente no aparecen.
+	ListProfileHobbies(ctx context.Context, profileID uuid.UUID) ([]ProfileHobby, error)
+
+	// DeleteProfileHobby borra la respuesta a un hobby (vuelve a "no
+	// contestado"). Operación idempotente: no falla si no había fila.
+	DeleteProfileHobby(ctx context.Context, profileID uuid.UUID, hobbyKey string) error
+
+	// --- Personalidad del perfil ----------------------------------------
+
+	// UpsertPersonalityAnswer crea o actualiza la puntuación (1-5) que
+	// un perfil da a una afirmación del catálogo.
+	UpsertPersonalityAnswer(ctx context.Context, profileID uuid.UUID, statementKey string, score int) (*ProfilePersonalityAnswer, error)
+
+	// ListPersonalityAnswers devuelve todas las respuestas de
+	// personalidad de un perfil.
+	ListPersonalityAnswers(ctx context.Context, profileID uuid.UUID) ([]ProfilePersonalityAnswer, error)
+
+	// GetPersonalityTraitScores devuelve el agregado ("Gesamt") por
+	// rasgo, calculado a partir de las respuestas individuales. Un rasgo
+	// sin ninguna respuesta contestada no aparece en el resultado.
+	GetPersonalityTraitScores(ctx context.Context, profileID uuid.UUID) ([]PersonalityTraitScore, error)
+
+	// --- Preferencias de pareja -------------------------------------------
+
+	// GetPartnerPreferences devuelve las preferencias de pareja de un
+	// perfil. Si el usuario todavía no las ha rellenado, no es un error:
+	// devuelve un valor con todos los campos a nil/zero.
+	GetPartnerPreferences(ctx context.Context, profileID uuid.UUID) (*PartnerPreferences, error)
+
+	// UpsertPartnerPreferences aplica un patch parcial (crea la fila si
+	// todavía no existía) y devuelve el resultado.
+	UpsertPartnerPreferences(ctx context.Context, profileID uuid.UUID, patch PartnerPreferencesPatch) (*PartnerPreferences, error)
 }

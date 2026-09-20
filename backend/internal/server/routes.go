@@ -86,6 +86,10 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("POST /api/v1/auth/email/resend", authRateLimit(requireAuth(http.HandlerFunc(deps.AuthHandler.ResendVerification))))
 	mux.Handle("DELETE /api/v1/auth/account", requireAuth(http.HandlerFunc(deps.AuthHandler.DeleteAccount)))
 
+	// --- Catálogos (Fase 2) -------------------------------------------
+	mux.Handle("GET /api/v1/catalog/hobbies", http.HandlerFunc(deps.ProfilesHandler.ListHobbyCatalog))
+	mux.Handle("GET /api/v1/catalog/personality-statements", http.HandlerFunc(deps.ProfilesHandler.ListPersonalityCatalog))
+
 	// --- Profiles (Fase 4) --------------------------------------------
 	// Todo bajo /profiles/me: en V1 solo se gestiona el propio perfil.
 	// Ver perfiles de otras personas es Fase 6 (Perfiles públicos).
@@ -98,6 +102,19 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/profiles/me/photos/{id}/file", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ServePhoto)))
 	mux.Handle("DELETE /api/v1/profiles/me/photos/{id}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.DeletePhoto)))
 
+	// --- Hobbies del usuario (Fase 2) ---------------------------------
+	mux.Handle("GET /api/v1/profiles/me/hobbies", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListMyHobbies)))
+	mux.Handle("PUT /api/v1/profiles/me/hobbies/{key}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.SetHobby)))
+	mux.Handle("DELETE /api/v1/profiles/me/hobbies/{key}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.DeleteHobby)))
+
+	// --- Personalidad del usuario (Fase 2) ----------------------------
+	mux.Handle("GET /api/v1/profiles/me/personality", requireAuth(http.HandlerFunc(deps.ProfilesHandler.GetMyPersonality)))
+	mux.Handle("PUT /api/v1/profiles/me/personality/{key}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.SetPersonalityAnswer)))
+
+	// --- Preferencias de pareja del usuario (Fase 2) ------------------
+	mux.Handle("GET /api/v1/profiles/me/partner-preferences", requireAuth(http.HandlerFunc(deps.ProfilesHandler.GetMyPartnerPreferences)))
+	mux.Handle("PATCH /api/v1/profiles/me/partner-preferences", requireAuth(http.HandlerFunc(deps.ProfilesHandler.UpdatePartnerPreferences)))
+
 	// --- Perfiles públicos (Fase 6) -------------------------------------
 	// Rutas de solo lectura sobre el perfil de OTRA persona. "me" es un
 	// segmento literal y siempre gana sobre {profileID} en las rutas de
@@ -105,6 +122,8 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/profiles/{profileID}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.GetPublic)))
 	mux.Handle("GET /api/v1/profiles/{profileID}/photos", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListPublicPhotos)))
 	mux.Handle("GET /api/v1/profiles/{profileID}/photos/{photoID}/file", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ServePublicPhoto)))
+	mux.Handle("GET /api/v1/profiles/{profileID}/hobbies", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListPublicHobbies)))
+	mux.Handle("GET /api/v1/profiles/{profileID}/personality", requireAuth(http.HandlerFunc(deps.ProfilesHandler.GetPublicPersonality)))
 
 	// --- Search (Fase 5) ------------------------------------------------
 	// Devuelve fichas resumidas con el profile_id de cada resultado; la

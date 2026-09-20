@@ -122,4 +122,32 @@ type ProfilePatch struct {
 
 	StarSignSet bool
 	StarSign    *string
+
+	// --- NUEVOS CAMPOS (Über mich / estilo de vida) -----------------
+	FutureVisionSet bool
+	FutureVision    []string
+
+	SportsSet bool
+	Sports    []string
+
+	LikesPetsSet bool
+	LikesPets    *string
+
+	PetsOwnedSet bool
+	PetsOwned    []string
+
+	FavoriteSeasonSet bool
+	FavoriteSeason    *string
+
+	IdealVacationStyleSet bool
+	IdealVacationStyle    []string
+
+	VacationActivitiesSet bool
+	VacationActivities    []string
+
+	ProfileQuoteSet bool
+	ProfileQuote    *string
+
+	DreamWishSet bool
+	DreamWish    *string
 }

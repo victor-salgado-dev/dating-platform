@@ -2,6 +2,8 @@ package search
 
 import (
 	"context"
+	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 
@@ -51,6 +53,19 @@ type RawQuery struct {
 	Religion              string
 	ReligiousValues       string
 	StarSign              string
+
+	// --- NUEVOS: Hobbies y personalidad (Fase 2) -----------------------
+	//
+	// Hobbies es la lista de claves pedidas "en bruto" (?hobby=cooking,travelling):
+	// sin más equivale a "me gusta, cualquier intensidad".
+	//
+	// HobbyBounds/PersonalityTraitBounds llegan con clave dinámica
+	// (?hobby_travelling_min=4, ?trait_openness_max=3): el Handler las
+	// arma recorriendo la query string, porque el nombre del parámetro
+	// no se conoce de antemano (depende del catálogo de hobbies/rasgos).
+	Hobbies                []string
+	HobbyBounds            map[string]RawBounds
+	PersonalityTraitBounds map[string]RawBounds
 }
 
 type Service struct {
@@ -156,20 +171,48 @@ func buildParams(excludeUserID uuid.UUID, raw RawQuery) (Params, error) {
 		return &n, nil
 	}
 
+	// parseFloat es el equivalente de parseInt para los límites de
+	// puntuación de personalidad, que al ser una media pueden traer
+	// decimales (ej: trait_openness_min=3.5).
+	parseFloat := func(field, raw string, min, max float64) (*float64, error) {
+		trimmed := strings.TrimSpace(raw)
+		if trimmed == "" {
+			return nil, nil
+		}
+		n, err := strconv.ParseFloat(trimmed, 64)
+		if err != nil {
+			return nil, invalidParam(field, "debe ser un número")
+		}
+		if n < min || n > max {
+			return nil, invalidParam(field, "valor fuera de rango permitido")
+		}
+		return &n, nil
+	}
+
 	var err error
-	if f.MinHeight, err = parseInt("min_height", raw.MinHeight, 50, 300); err != nil { return Params{}, err }
-	if f.MaxHeight, err = parseInt("max_height", raw.MaxHeight, 50, 300); err != nil { return Params{}, err }
+	if f.MinHeight, err = parseInt("min_height", raw.MinHeight, 50, 300); err != nil {
+		return Params{}, err
+	}
+	if f.MaxHeight, err = parseInt("max_height", raw.MaxHeight, 50, 300); err != nil {
+		return Params{}, err
+	}
 	if f.MinHeight != nil && f.MaxHeight != nil && *f.MinHeight > *f.MaxHeight {
 		return Params{}, invalidParam("min_height", "no puede ser mayor que max_height")
 	}
 
-	if f.MinWeight, err = parseInt("min_weight", raw.MinWeight, 20, 400); err != nil { return Params{}, err }
-	if f.MaxWeight, err = parseInt("max_weight", raw.MaxWeight, 20, 400); err != nil { return Params{}, err }
+	if f.MinWeight, err = parseInt("min_weight", raw.MinWeight, 20, 400); err != nil {
+		return Params{}, err
+	}
+	if f.MaxWeight, err = parseInt("max_weight", raw.MaxWeight, 20, 400); err != nil {
+		return Params{}, err
+	}
 	if f.MinWeight != nil && f.MaxWeight != nil && *f.MinWeight > *f.MaxWeight {
 		return Params{}, invalidParam("min_weight", "no puede ser mayor que max_weight")
 	}
 
-	if f.MaxChildren, err = parseInt("max_children", raw.MaxChildren, 0, 30); err != nil { return Params{}, err }
+	if f.MaxChildren, err = parseInt("max_children", raw.MaxChildren, 0, 30); err != nil {
+		return Params{}, err
+	}
 
 	// --- Mapeo de opciones de texto simples ---
 	f.BodyType = nonEmptyPtr(raw.BodyType)
@@ -209,11 +252,88 @@ func buildParams(excludeUserID uuid.UUID, raw RawQuery) (Params, error) {
 	f.BodyArt = cleanSlice(raw.BodyArt)
 	f.RelocationWillingness = cleanSlice(raw.RelocationWillingness)
 
+	// --- NUEVO: Hobbies -----------------------------------------------
+	//
+	// Se combinan dos fuentes en un único filtro por hobby: la lista
+	// "en bruto" (?hobby=x,y → "me gusta, cualquier intensidad") y los
+	// límites con clave dinámica (?hobby_x_min=4). Si una clave aparece
+	// en ambas, los límites se añaden al mismo filtro (no se duplica).
+	hobbyFilters := map[string]HobbyFilter{}
+	for _, key := range raw.Hobbies {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		if _, exists := hobbyFilters[key]; !exists {
+			hobbyFilters[key] = HobbyFilter{Key: key}
+		}
+	}
+	for key, bounds := range raw.HobbyBounds {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		hf := hobbyFilters[key]
+		hf.Key = key
+
+		if hf.Min, err = parseInt(fmt.Sprintf("hobby_%s_min", key), bounds.Min, profiles.MinHobbyIntensity, profiles.MaxHobbyIntensity); err != nil {
+			return Params{}, err
+		}
+		if hf.Max, err = parseInt(fmt.Sprintf("hobby_%s_max", key), bounds.Max, profiles.MinHobbyIntensity, profiles.MaxHobbyIntensity); err != nil {
+			return Params{}, err
+		}
+		if hf.Min != nil && hf.Max != nil && *hf.Min > *hf.Max {
+			return Params{}, invalidParam(fmt.Sprintf("hobby_%s_min", key), "no puede ser mayor que el máximo")
+		}
+		hobbyFilters[key] = hf
+	}
+	for _, key := range sortedKeys(hobbyFilters) {
+		f.Hobbies = append(f.Hobbies, hobbyFilters[key])
+	}
+
+	// --- NUEVO: Personalidad -------------------------------------------
+	//
+	// A diferencia de los hobbies, un rasgo sin ningún límite no tiene
+	// sentido (no hay equivalente a "liked"), así que aquí solo se
+	// generan filtros a partir de HobbyBounds — no existe una lista "en
+	// bruto" de rasgos.
+	traitKeys := make([]string, 0, len(raw.PersonalityTraitBounds))
+	for key := range raw.PersonalityTraitBounds {
+		traitKeys = append(traitKeys, key)
+	}
+	sort.Strings(traitKeys)
+
+	for _, key := range traitKeys {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		trait := profiles.PersonalityTrait(key)
+		if !profiles.IsValidPersonalityTrait(trait) {
+			return Params{}, invalidParam("trait_"+key, "rasgo de personalidad no reconocido")
+		}
+
+		bounds := raw.PersonalityTraitBounds[key]
+		pf := PersonalityFilter{TraitKey: key}
+
+		if pf.Min, err = parseFloat(fmt.Sprintf("trait_%s_min", key), bounds.Min, float64(profiles.MinPersonalityScore), float64(profiles.MaxPersonalityScore)); err != nil {
+			return Params{}, err
+		}
+		if pf.Max, err = parseFloat(fmt.Sprintf("trait_%s_max", key), bounds.Max, float64(profiles.MinPersonalityScore), float64(profiles.MaxPersonalityScore)); err != nil {
+			return Params{}, err
+		}
+		if pf.Min != nil && pf.Max != nil && *pf.Min > *pf.Max {
+			return Params{}, invalidParam(fmt.Sprintf("trait_%s_min", key), "no puede ser mayor que el máximo")
+		}
+
+		f.PersonalityTraits = append(f.PersonalityTraits, pf)
+	}
+
 	// Ordenación y Paginación
-	sort := Sort(raw.Sort)
-	switch sort {
+	sortValue := Sort(raw.Sort)
+	switch sortValue {
 	case "":
-		sort = SortRecent
+		sortValue = SortRecent
 	case SortRecent, SortAgeAsc, SortAgeDesc:
 		// válido
 	default:
@@ -244,10 +364,22 @@ func buildParams(excludeUserID uuid.UUID, raw RawQuery) (Params, error) {
 	return Params{
 		Filters:       f,
 		ExcludeUserID: excludeUserID,
-		Sort:          sort,
+		Sort:          sortValue,
 		Page:          page,
 		PageSize:      pageSize,
 	}, nil
+}
+
+// sortedKeys devuelve las claves de un map[string]HobbyFilter en orden
+// alfabético, solo para que el WHERE generado (y los tests) sean
+// deterministas — el orden de los filtros no cambia el resultado.
+func sortedKeys(m map[string]HobbyFilter) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func parseAge(field, raw string) (int, error) {

@@ -39,6 +39,38 @@ func (r *profileRepoStub) GetPhoto(context.Context, uuid.UUID, uuid.UUID) (*prof
 }
 func (r *profileRepoStub) DeletePhoto(context.Context, uuid.UUID, uuid.UUID) error { return nil }
 
+// --- Métodos de Hobbies, Personalidad y Pareja requeridos por profiles.Repository ---
+func (r *profileRepoStub) ListHobbyDefinitions(context.Context) ([]profiles.HobbyDefinition, error) {
+	return nil, nil
+}
+func (r *profileRepoStub) ListPersonalityStatements(context.Context) ([]profiles.PersonalityStatement, error) {
+	return nil, nil
+}
+func (r *profileRepoStub) UpsertProfileHobby(context.Context, uuid.UUID, string, bool, *int) (*profiles.ProfileHobby, error) {
+	return nil, nil
+}
+func (r *profileRepoStub) ListProfileHobbies(context.Context, uuid.UUID) ([]profiles.ProfileHobby, error) {
+	return nil, nil
+}
+func (r *profileRepoStub) DeleteProfileHobby(context.Context, uuid.UUID, string) error {
+	return nil
+}
+func (r *profileRepoStub) UpsertPersonalityAnswer(context.Context, uuid.UUID, string, int) (*profiles.ProfilePersonalityAnswer, error) {
+	return nil, nil
+}
+func (r *profileRepoStub) ListPersonalityAnswers(context.Context, uuid.UUID) ([]profiles.ProfilePersonalityAnswer, error) {
+	return nil, nil
+}
+func (r *profileRepoStub) GetPersonalityTraitScores(context.Context, uuid.UUID) ([]profiles.PersonalityTraitScore, error) {
+	return nil, nil
+}
+func (r *profileRepoStub) GetPartnerPreferences(context.Context, uuid.UUID) (*profiles.PartnerPreferences, error) {
+	return nil, nil
+}
+func (r *profileRepoStub) UpsertPartnerPreferences(context.Context, uuid.UUID, profiles.PartnerPreferencesPatch) (*profiles.PartnerPreferences, error) {
+	return nil, nil
+}
+
 type repoStub struct {
 	matched  bool
 	removed  bool

@@ -67,6 +67,17 @@ type profileResponse struct {
 	ReligiousValues       *string  `json:"religious_values"`
 	StarSign              *string  `json:"star_sign"`
 
+	// --- NUEVOS CAMPOS (Über mich / estilo de vida) ---
+	FutureVision       []string `json:"future_vision"`
+	Sports             []string `json:"sports"`
+	LikesPets          *string  `json:"likes_pets"`
+	PetsOwned          []string `json:"pets_owned"`
+	FavoriteSeason     *string  `json:"favorite_season"`
+	IdealVacationStyle []string `json:"ideal_vacation_style"`
+	VacationActivities []string `json:"vacation_activities"`
+	ProfileQuote       *string  `json:"profile_quote"`
+	DreamWish          *string  `json:"dream_wish"`
+
 	CreatedAt string `json:"created_at"`
 	UpdatedAt string `json:"updated_at"`
 }
@@ -117,6 +128,16 @@ func toProfileResponse(p *Profile) profileResponse {
 		Religion:              p.Religion,
 		ReligiousValues:       p.ReligiousValues,
 		StarSign:              p.StarSign,
+
+		FutureVision:       p.FutureVision,
+		Sports:             p.Sports,
+		LikesPets:          p.LikesPets,
+		PetsOwned:          p.PetsOwned,
+		FavoriteSeason:     p.FavoriteSeason,
+		IdealVacationStyle: p.IdealVacationStyle,
+		VacationActivities: p.VacationActivities,
+		ProfileQuote:       p.ProfileQuote,
+		DreamWish:          p.DreamWish,
 
 		CreatedAt: p.CreatedAt.Format(time.RFC3339),
 		UpdatedAt: p.UpdatedAt.Format(time.RFC3339),
@@ -186,6 +207,179 @@ type createProfileRequest struct {
 	Religion              *string  `json:"religion"`
 	ReligiousValues       *string  `json:"religious_values"`
 	StarSign              *string  `json:"star_sign"`
+
+	// --- NUEVOS CAMPOS (Über mich / estilo de vida) ---
+	FutureVision       []string `json:"future_vision"`
+	Sports             []string `json:"sports"`
+	LikesPets          *string  `json:"likes_pets"`
+	PetsOwned          []string `json:"pets_owned"`
+	FavoriteSeason     *string  `json:"favorite_season"`
+	IdealVacationStyle []string `json:"ideal_vacation_style"`
+	VacationActivities []string `json:"vacation_activities"`
+	ProfileQuote       *string  `json:"profile_quote"`
+	DreamWish          *string  `json:"dream_wish"`
+}
+
+// --- DTOs: hobbies ----------------------------------------------------
+
+type hobbyDefinitionResponse struct {
+	Key       string `json:"key"`
+	Category  string `json:"category"`
+	Label     string `json:"label"`
+	SortOrder int    `json:"sort_order"`
+}
+
+func toHobbyDefinitionResponse(d HobbyDefinition) hobbyDefinitionResponse {
+	return hobbyDefinitionResponse{Key: d.Key, Category: d.Category, Label: d.Label, SortOrder: d.SortOrder}
+}
+
+type profileHobbyResponse struct {
+	HobbyKey  string `json:"hobby_key"`
+	Liked     bool   `json:"liked"`
+	Intensity *int   `json:"intensity"`
+	UpdatedAt string `json:"updated_at"`
+}
+
+func toProfileHobbyResponse(ph ProfileHobby) profileHobbyResponse {
+	return profileHobbyResponse{
+		HobbyKey:  ph.HobbyKey,
+		Liked:     ph.Liked,
+		Intensity: ph.Intensity,
+		UpdatedAt: ph.UpdatedAt.Format(time.RFC3339),
+	}
+}
+
+// setHobbyRequest: liked es obligatorio; intensity solo tiene sentido si
+// liked=true (si no, el Service lo rechaza con un invalidField).
+type setHobbyRequest struct {
+	Liked     bool `json:"liked"`
+	Intensity *int `json:"intensity"`
+}
+
+// --- DTOs: personalidad -------------------------------------------------
+
+type personalityStatementResponse struct {
+	Key       string `json:"key"`
+	TraitKey  string `json:"trait_key"`
+	Label     string `json:"label"`
+	SortOrder int    `json:"sort_order"`
+}
+
+func toPersonalityStatementResponse(s PersonalityStatement) personalityStatementResponse {
+	return personalityStatementResponse{Key: s.Key, TraitKey: string(s.TraitKey), Label: s.Label, SortOrder: s.SortOrder}
+}
+
+type personalityAnswerResponse struct {
+	StatementKey string `json:"statement_key"`
+	Score        int    `json:"score"`
+	UpdatedAt    string `json:"updated_at"`
+}
+
+func toPersonalityAnswerResponse(a ProfilePersonalityAnswer) personalityAnswerResponse {
+	return personalityAnswerResponse{
+		StatementKey: a.StatementKey,
+		Score:        a.Score,
+		UpdatedAt:    a.UpdatedAt.Format(time.RFC3339),
+	}
+}
+
+type personalityTraitScoreResponse struct {
+	TraitKey      string  `json:"trait_key"`
+	AverageScore  float64 `json:"average_score"`
+	AnsweredCount int     `json:"answered_count"`
+}
+
+func toPersonalityTraitScoreResponse(s PersonalityTraitScore) personalityTraitScoreResponse {
+	return personalityTraitScoreResponse{
+		TraitKey:      string(s.TraitKey),
+		AverageScore:  s.AverageScore,
+		AnsweredCount: s.AnsweredCount,
+	}
+}
+
+// personalityResponse agrupa las respuestas individuales y el agregado
+// por rasgo (el "Gesamt"), para que el cliente no tenga que hacer dos
+// peticiones ni recalcular la media él mismo.
+type personalityResponse struct {
+	Answers     []personalityAnswerResponse    `json:"answers"`
+	TraitScores []personalityTraitScoreResponse `json:"trait_scores"`
+}
+
+func toPersonalityResponse(answers []ProfilePersonalityAnswer, scores []PersonalityTraitScore) personalityResponse {
+	ar := make([]personalityAnswerResponse, 0, len(answers))
+	for _, a := range answers {
+		ar = append(ar, toPersonalityAnswerResponse(a))
+	}
+	sr := make([]personalityTraitScoreResponse, 0, len(scores))
+	for _, s := range scores {
+		sr = append(sr, toPersonalityTraitScoreResponse(s))
+	}
+	return personalityResponse{Answers: ar, TraitScores: sr}
+}
+
+type setPersonalityAnswerRequest struct {
+	Score int `json:"score"`
+}
+
+// --- DTOs: preferencias de pareja -----------------------------------------
+
+type partnerPreferencesResponse struct {
+	AgeMin    *int `json:"age_min"`
+	AgeMax    *int `json:"age_max"`
+	HeightMin *int `json:"height_min"`
+	HeightMax *int `json:"height_max"`
+
+	DesiredTraits []string `json:"desired_traits"`
+
+	PartnerMayHaveChildren    *string  `json:"partner_may_have_children"`
+	PartnerReligionPreference *string  `json:"partner_religion_preference"`
+	AboutPartnerText          *string  `json:"about_partner_text"`
+	FirstMeetingPreference    *string  `json:"first_meeting_preference"`
+	DesiredLivingPlace        []string `json:"desired_living_place"`
+
+	ImportanceSharedThoughts    *int `json:"importance_shared_thoughts"`
+	ImportanceSharedHobbies     *int `json:"importance_shared_hobbies"`
+	ImportanceIntimacy          *int `json:"importance_intimacy"`
+	ImportanceRomanticLove      *int `json:"importance_romantic_love"`
+	ImportanceFinancialSecurity *int `json:"importance_financial_security"`
+	ImportanceFun               *int `json:"importance_fun"`
+	ImportanceSharedFriends     *int `json:"importance_shared_friends"`
+	ImportanceSharedHumor       *int `json:"importance_shared_humor"`
+	ImportancePersonalSpace     *int `json:"importance_personal_space"`
+	ImportanceIndependence      *int `json:"importance_independence"`
+
+	UpdatedAt string `json:"updated_at,omitempty"`
+}
+
+func toPartnerPreferencesResponse(pp *PartnerPreferences) partnerPreferencesResponse {
+	var updatedAt string
+	if !pp.UpdatedAt.IsZero() {
+		updatedAt = pp.UpdatedAt.Format(time.RFC3339)
+	}
+	return partnerPreferencesResponse{
+		AgeMin: pp.AgeMin, AgeMax: pp.AgeMax, HeightMin: pp.HeightMin, HeightMax: pp.HeightMax,
+
+		DesiredTraits: pp.DesiredTraits,
+
+		PartnerMayHaveChildren:    pp.PartnerMayHaveChildren,
+		PartnerReligionPreference: pp.PartnerReligionPreference,
+		AboutPartnerText:          pp.AboutPartnerText,
+		FirstMeetingPreference:    pp.FirstMeetingPreference,
+		DesiredLivingPlace:        pp.DesiredLivingPlace,
+
+		ImportanceSharedThoughts:    pp.ImportanceSharedThoughts,
+		ImportanceSharedHobbies:     pp.ImportanceSharedHobbies,
+		ImportanceIntimacy:          pp.ImportanceIntimacy,
+		ImportanceRomanticLove:      pp.ImportanceRomanticLove,
+		ImportanceFinancialSecurity: pp.ImportanceFinancialSecurity,
+		ImportanceFun:               pp.ImportanceFun,
+		ImportanceSharedFriends:     pp.ImportanceSharedFriends,
+		ImportanceSharedHumor:       pp.ImportanceSharedHumor,
+		ImportancePersonalSpace:     pp.ImportancePersonalSpace,
+		ImportanceIndependence:      pp.ImportanceIndependence,
+
+		UpdatedAt: updatedAt,
+	}
 }
 
 // --- Handlers: perfil -------------------------------------------------
@@ -273,6 +467,16 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		Religion:              req.Religion,
 		ReligiousValues:       req.ReligiousValues,
 		StarSign:              req.StarSign,
+
+		FutureVision:       req.FutureVision,
+		Sports:             req.Sports,
+		LikesPets:          req.LikesPets,
+		PetsOwned:          req.PetsOwned,
+		FavoriteSeason:     req.FavoriteSeason,
+		IdealVacationStyle: req.IdealVacationStyle,
+		VacationActivities: req.VacationActivities,
+		ProfileQuote:       req.ProfileQuote,
+		DreamWish:          req.DreamWish,
 	})
 	if err != nil {
 		writeProfileError(w, err)
@@ -441,6 +645,17 @@ func buildProfilePatch(raw map[string]json.RawMessage) (ProfilePatch, error) {
 	if err := parseString("religion", &patch.Religion, &patch.ReligionSet); err != nil { return patch, err }
 	if err := parseString("religious_values", &patch.ReligiousValues, &patch.ReligiousValuesSet); err != nil { return patch, err }
 	if err := parseString("star_sign", &patch.StarSign, &patch.StarSignSet); err != nil { return patch, err }
+
+	// Nuevos campos (Über mich / estilo de vida)
+	if err := parseSlice("future_vision", &patch.FutureVision, &patch.FutureVisionSet); err != nil { return patch, err }
+	if err := parseSlice("sports", &patch.Sports, &patch.SportsSet); err != nil { return patch, err }
+	if err := parseString("likes_pets", &patch.LikesPets, &patch.LikesPetsSet); err != nil { return patch, err }
+	if err := parseSlice("pets_owned", &patch.PetsOwned, &patch.PetsOwnedSet); err != nil { return patch, err }
+	if err := parseString("favorite_season", &patch.FavoriteSeason, &patch.FavoriteSeasonSet); err != nil { return patch, err }
+	if err := parseSlice("ideal_vacation_style", &patch.IdealVacationStyle, &patch.IdealVacationStyleSet); err != nil { return patch, err }
+	if err := parseSlice("vacation_activities", &patch.VacationActivities, &patch.VacationActivitiesSet); err != nil { return patch, err }
+	if err := parseString("profile_quote", &patch.ProfileQuote, &patch.ProfileQuoteSet); err != nil { return patch, err }
+	if err := parseString("dream_wish", &patch.DreamWish, &patch.DreamWishSet); err != nil { return patch, err }
 
 	return patch, nil
 }
@@ -626,6 +841,316 @@ func (h *Handler) ServePublicPhoto(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", ph.ContentType)
 	w.Header().Set("Cache-Control", "private, max-age=86400")
 	_, _ = io.Copy(w, rc)
+}
+
+// --- Handlers: catálogos ---------------------------------------------
+//
+// De solo lectura, iguales para cualquier usuario autenticado: el
+// frontend los usa para renderizar los checkboxes/afirmaciones sin
+// tener que hardcodear las listas.
+
+func (h *Handler) ListHobbyCatalog(w http.ResponseWriter, r *http.Request) {
+	defs, err := h.svc.ListHobbyCatalog(r.Context())
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	resp := make([]hobbyDefinitionResponse, 0, len(defs))
+	for _, d := range defs {
+		resp = append(resp, toHobbyDefinitionResponse(d))
+	}
+	httpx.WriteJSON(w, http.StatusOK, resp)
+}
+
+func (h *Handler) ListPersonalityCatalog(w http.ResponseWriter, r *http.Request) {
+	stmts, err := h.svc.ListPersonalityCatalog(r.Context())
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	resp := make([]personalityStatementResponse, 0, len(stmts))
+	for _, s := range stmts {
+		resp = append(resp, toPersonalityStatementResponse(s))
+	}
+	httpx.WriteJSON(w, http.StatusOK, resp)
+}
+
+// --- Handlers: hobbies del usuario -------------------------------------
+
+func (h *Handler) ListMyHobbies(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	hobbies, err := h.svc.ListMyHobbies(r.Context(), userID)
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	resp := make([]profileHobbyResponse, 0, len(hobbies))
+	for _, ph := range hobbies {
+		resp = append(resp, toProfileHobbyResponse(ph))
+	}
+	httpx.WriteJSON(w, http.StatusOK, resp)
+}
+
+// SetHobby espera el hobby_key en el path (ej. PUT /profiles/me/hobbies/{key}).
+func (h *Handler) SetHobby(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	hobbyKey := r.PathValue("key")
+
+	var req setHobbyRequest
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_body", "El cuerpo de la petición no es válido.")
+		return
+	}
+
+	ph, err := h.svc.SetHobby(r.Context(), userID, hobbyKey, req.Liked, req.Intensity)
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, toProfileHobbyResponse(*ph))
+}
+
+// DeleteHobby vuelve un hobby a "no contestado" (idempotente).
+func (h *Handler) DeleteHobby(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	hobbyKey := r.PathValue("key")
+
+	if err := h.svc.DeleteHobby(r.Context(), userID, hobbyKey); err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) ListPublicHobbies(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	profileID, err := uuid.Parse(r.PathValue("profileID"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+		return
+	}
+
+	hobbies, err := h.svc.ListPublicHobbies(r.Context(), viewerID, profileID)
+	if err != nil {
+		writePublicProfileError(w, err)
+		return
+	}
+
+	resp := make([]profileHobbyResponse, 0, len(hobbies))
+	for _, ph := range hobbies {
+		resp = append(resp, toProfileHobbyResponse(ph))
+	}
+	httpx.WriteJSON(w, http.StatusOK, resp)
+}
+
+// --- Handlers: personalidad del usuario ----------------------------------
+
+func (h *Handler) GetMyPersonality(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	answers, scores, err := h.svc.GetMyPersonality(r.Context(), userID)
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, toPersonalityResponse(answers, scores))
+}
+
+// SetPersonalityAnswer espera statement_key en el path (ej. PUT
+// /profiles/me/personality/{key}).
+func (h *Handler) SetPersonalityAnswer(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	statementKey := r.PathValue("key")
+
+	var req setPersonalityAnswerRequest
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_body", "El cuerpo de la petición no es válido.")
+		return
+	}
+
+	a, err := h.svc.SetPersonalityAnswer(r.Context(), userID, statementKey, req.Score)
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, toPersonalityAnswerResponse(*a))
+}
+
+func (h *Handler) GetPublicPersonality(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	profileID, err := uuid.Parse(r.PathValue("profileID"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+		return
+	}
+
+	answers, scores, err := h.svc.GetPublicPersonality(r.Context(), viewerID, profileID)
+	if err != nil {
+		writePublicProfileError(w, err)
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, toPersonalityResponse(answers, scores))
+}
+
+// --- Handlers: preferencias de pareja ------------------------------------
+
+func (h *Handler) GetMyPartnerPreferences(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	pp, err := h.svc.GetMyPartnerPreferences(r.Context(), userID)
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, toPartnerPreferencesResponse(pp))
+}
+
+func (h *Handler) UpdatePartnerPreferences(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	var raw map[string]json.RawMessage
+	if err := httpx.DecodeJSON(r, &raw); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_body", "El cuerpo de la petición no es válido.")
+		return
+	}
+
+	patch, err := buildPartnerPreferencesPatch(raw)
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	pp, err := h.svc.UpdatePartnerPreferences(r.Context(), userID, patch)
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, toPartnerPreferencesResponse(pp))
+}
+
+// buildPartnerPreferencesPatch sigue el mismo patrón que buildProfilePatch:
+// helpers locales que distinguen "clave ausente" (no tocar) de "clave a
+// null" (borrar), a partir de un mapa de json.RawMessage.
+func buildPartnerPreferencesPatch(raw map[string]json.RawMessage) (PartnerPreferencesPatch, error) {
+	var patch PartnerPreferencesPatch
+
+	parseString := func(key string, target **string, flag *bool) error {
+		if v, ok := raw[key]; ok {
+			*flag = true
+			if !isJSONNull(v) {
+				var s string
+				if err := json.Unmarshal(v, &s); err != nil {
+					return invalidField(key, "debe ser texto o null")
+				}
+				*target = &s
+			}
+		}
+		return nil
+	}
+
+	parseInt := func(key string, target **int, flag *bool) error {
+		if v, ok := raw[key]; ok {
+			*flag = true
+			if !isJSONNull(v) {
+				var i int
+				if err := json.Unmarshal(v, &i); err != nil {
+					return invalidField(key, "debe ser un entero o null")
+				}
+				*target = &i
+			}
+		}
+		return nil
+	}
+
+	parseSlice := func(key string, target *[]string, flag *bool) error {
+		if v, ok := raw[key]; ok {
+			*flag = true
+			if !isJSONNull(v) {
+				var sl []string
+				if err := json.Unmarshal(v, &sl); err != nil {
+					return invalidField(key, "debe ser una lista de textos o null")
+				}
+				*target = sl
+			}
+		}
+		return nil
+	}
+
+	if err := parseInt("age_min", &patch.AgeMin, &patch.AgeMinSet); err != nil { return patch, err }
+	if err := parseInt("age_max", &patch.AgeMax, &patch.AgeMaxSet); err != nil { return patch, err }
+	if err := parseInt("height_min", &patch.HeightMin, &patch.HeightMinSet); err != nil { return patch, err }
+	if err := parseInt("height_max", &patch.HeightMax, &patch.HeightMaxSet); err != nil { return patch, err }
+	if err := parseSlice("desired_traits", &patch.DesiredTraits, &patch.DesiredTraitsSet); err != nil { return patch, err }
+	if err := parseString("partner_may_have_children", &patch.PartnerMayHaveChildren, &patch.PartnerMayHaveChildrenSet); err != nil { return patch, err }
+	if err := parseString("partner_religion_preference", &patch.PartnerReligionPreference, &patch.PartnerReligionPreferenceSet); err != nil { return patch, err }
+	if err := parseString("about_partner_text", &patch.AboutPartnerText, &patch.AboutPartnerTextSet); err != nil { return patch, err }
+	if err := parseString("first_meeting_preference", &patch.FirstMeetingPreference, &patch.FirstMeetingPreferenceSet); err != nil { return patch, err }
+	if err := parseSlice("desired_living_place", &patch.DesiredLivingPlace, &patch.DesiredLivingPlaceSet); err != nil { return patch, err }
+
+	if err := parseInt("importance_shared_thoughts", &patch.ImportanceSharedThoughts, &patch.ImportanceSharedThoughtsSet); err != nil { return patch, err }
+	if err := parseInt("importance_shared_hobbies", &patch.ImportanceSharedHobbies, &patch.ImportanceSharedHobbiesSet); err != nil { return patch, err }
+	if err := parseInt("importance_intimacy", &patch.ImportanceIntimacy, &patch.ImportanceIntimacySet); err != nil { return patch, err }
+	if err := parseInt("importance_romantic_love", &patch.ImportanceRomanticLove, &patch.ImportanceRomanticLoveSet); err != nil { return patch, err }
+	if err := parseInt("importance_financial_security", &patch.ImportanceFinancialSecurity, &patch.ImportanceFinancialSecuritySet); err != nil { return patch, err }
+	if err := parseInt("importance_fun", &patch.ImportanceFun, &patch.ImportanceFunSet); err != nil { return patch, err }
+	if err := parseInt("importance_shared_friends", &patch.ImportanceSharedFriends, &patch.ImportanceSharedFriendsSet); err != nil { return patch, err }
+	if err := parseInt("importance_shared_humor", &patch.ImportanceSharedHumor, &patch.ImportanceSharedHumorSet); err != nil { return patch, err }
+	if err := parseInt("importance_personal_space", &patch.ImportancePersonalSpace, &patch.ImportancePersonalSpaceSet); err != nil { return patch, err }
+	if err := parseInt("importance_independence", &patch.ImportanceIndependence, &patch.ImportanceIndependenceSet); err != nil { return patch, err }
+
+	return patch, nil
 }
 
 // --- Errores --------------------------------------------------------------

@@ -102,12 +102,16 @@ function ProfileCard({
   profile, 
   isPremium,
   initialLiked, 
-  initialFavorited 
+  initialFavorited,
+  receivedLike,
+  receivedFavorite,
 }: { 
   profile: ProfileItem; 
   isPremium: boolean;
   initialLiked: boolean;
   initialFavorited: boolean;
+  receivedLike: boolean;
+  receivedFavorite: boolean;
 }) {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
@@ -169,17 +173,31 @@ function ProfileCard({
     }
   };
 
+  const receivedClass = receivedLike && receivedFavorite
+    ? styles.receivedBoth
+    : receivedLike
+    ? styles.receivedLike
+    : receivedFavorite
+    ? styles.receivedFav
+    : '';
+
   return (
     <>
       <Link
         href={`/profiles/${profile.profile_id}`}
-        className={`${styles.card} ${isPremium ? styles.cardPremium : ''}`}
+        className={`${styles.card} ${isPremium ? styles.cardPremium : ''} ${receivedClass}`}
       >
         <div className={styles.imageContainer}>
           {photoUrl ? (
             <img src={photoUrl} alt={profile.display_name} className={styles.photoImg} />
           ) : (
             <div className={styles.photoPlaceholder}>Sin Foto</div>
+          )}
+          {(receivedLike || receivedFavorite) && (
+            <div className={styles.receivedBadges}>
+              {receivedLike && <span className={styles.badgeLike}>♥</span>}
+              {receivedFavorite && <span className={styles.badgeFav}>★</span>}
+            </div>
           )}
         </div>
 
@@ -266,6 +284,10 @@ export default function HomePage() {
   // Listas de perfiles con like/favorito traídas del servidor
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [favoritedIds, setFavoritedIds] = useState<Set<string>>(new Set());
+
+  // Quién te ha dado like / favorito a TI (para el borde + insignia en la tarjeta)
+  const [receivedLikeIds, setReceivedLikeIds] = useState<Set<string>>(new Set());
+  const [receivedFavIds, setReceivedFavIds] = useState<Set<string>>(new Set());
   
   const [randomAdIndex, setRandomAdIndex] = useState(-1);
 
@@ -297,6 +319,24 @@ export default function HomePage() {
         setFavoritedIds(ids);
       })
       .catch(() => {});
+
+    // Quién te ha dado like / favorito a ti. OJO: estos dos endpoints
+    // (/likes/received y /favorites/received) son una suposición siguiendo
+    // el mismo patrón que /likes/sent — confirma o ajusta las rutas reales
+    // de tu API antes de dar esto por definitivo.
+    apiFetch<LikesResponse>('/likes/received?page_size=100')
+      .then((res) => {
+        const ids = new Set(res.items.map((item) => item.profile_id));
+        setReceivedLikeIds(ids);
+      })
+      .catch(() => {});
+
+    apiFetch<FavoritesResponse>('/favorites/received?page_size=100')
+      .then((res) => {
+        const ids = new Set(res.items.map((item) => item.profile_id));
+        setReceivedFavIds(ids);
+      })
+      .catch(() => {});
   }, []);
 
   const profiles = data?.items ?? [];
@@ -315,6 +355,8 @@ export default function HomePage() {
           // Comprobamos contra la base de datos real
           const isLiked = likedIds.has(profile.profile_id);
           const isFavorited = favoritedIds.has(profile.profile_id);
+          const gotLike = receivedLikeIds.has(profile.profile_id);
+          const gotFavorite = receivedFavIds.has(profile.profile_id);
 
           return (
             <React.Fragment key={profile.profile_id}>
@@ -326,6 +368,8 @@ export default function HomePage() {
                 isPremium={isPremium} 
                 initialLiked={isLiked}
                 initialFavorited={isFavorited}
+                receivedLike={gotLike}
+                receivedFavorite={gotFavorite}
               />
             </React.Fragment>
           );

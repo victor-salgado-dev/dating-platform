@@ -1,164 +1,499 @@
-.headerTop {
-  background-color: var(--brand-primary);
-  color: white;
+/* ==========================================================================
+   HEADER DE ESCRITORIO
+   Barra + bulto del avatar recortados como UNA sola forma con clip-path
+   (ver header-chrome.tsx, que calcula la ruta por JS según el ancho real).
+   ========================================================================== */
+
+.headerBlock {
+  position: relative;
+  margin-bottom: 68px;
+}
+
+.headerShapeWrap {
+  position: relative;
+  height: 78px;
+  z-index: 5;
+}
+
+.headerShape {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 140px; /* alto + margen para el bulto; el clip-path recorta el resto */
+  background: var(--header-gradient);
+  z-index: 1;
+}
+
+.headerContent {
+  position: relative;
+  z-index: 2;
+  height: 78px;
   display: flex;
   align-items: center;
-  padding: 0 1.5rem;
-  height: 65px; /* Un poco más alto para respirar */
-  position: relative;
-  z-index: 20; /* Necesario para que el avatar monte sobre la barra de abajo */
+  padding: 0 clamp(1.25rem, 3vw, 3rem);
+  padding-right: 260px; /* valor de respaldo; header-chrome.tsx lo recalcula por JS */
 }
 
 .brand {
+  font-family: var(--font-voice, Georgia), serif;
   font-size: 1.5rem;
-  font-weight: bold;
+  font-weight: 600;
+  color: white;
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.6rem;
+  flex-shrink: 0;
 }
 
-.topNav {
+.mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.35);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+}
+
+/* ---------- Franjas deslizantes (nav + filtros) ---------- */
+
+.navScroller {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1 1 auto;
+  margin-left: 2.5rem;
+}
+
+.navTrack {
   display: flex;
   gap: 2rem;
-  margin-left: 3rem;
-  font-weight: 500;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+.navTrack::-webkit-scrollbar {
+  display: none;
 }
 
 .topNav a {
-  padding: 0.5rem 0;
+  padding: 0.4rem 0;
+  color: rgba(255, 255, 255, 0.82);
   border-bottom: 2px solid transparent;
-  transition: all 0.2s ease;
+  font-weight: 500;
+  font-size: 0.96rem;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.topNav a:hover,
+.topNav a.active {
+  color: white;
+  border-bottom-color: white;
 }
 
-.topNav a:hover {
-  border-bottom: 2px solid white;
-  opacity: 0.9;
-}
-
-.account {
-  margin-left: auto;
-  display: flex;
+.scrollArrow {
+  display: none;
   align-items: center;
-  gap: 1rem;
-}
-
-.accountMenu {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.accountButton {
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-weight: 600;
-}
-
-/* El círculo con progreso */
-.avatarWrapper {
-  position: relative;
-  width: 76px;
-  height: 76px;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
   border-radius: 50%;
-  /* conic-gradient se inyecta dinámicamente desde React */
+  border: 0;
+  cursor: pointer;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.18);
+  color: white;
+  font-size: 1rem;
+  margin-right: 10px;
+}
+.scrollArrow.right {
+  margin-right: 0;
+  margin-left: 10px;
+}
+.scrollArrow:hover {
+  background: rgba(255, 255, 255, 0.32);
+}
+.navScroller.overflowing .scrollArrow {
+  display: flex;
+}
+
+.filterScroller .scrollArrow {
+  background: var(--surface);
+  color: var(--brand-primary-dark);
+  box-shadow: 0 2px 6px rgba(126, 42, 72, 0.12);
+}
+.filterScroller .scrollArrow:hover {
+  background: var(--brand-primary-tint);
+}
+
+/* ---------- Filtros (barra secundaria) ---------- */
+
+.headerBottom {
+  background: var(--brand-primary-tint);
+  display: flex;
+  align-items: center;
+  padding: 12px clamp(1.25rem, 3vw, 3rem);
+  padding-right: 260px; /* recalculado por JS, igual que headerContent */
+  position: relative;
+  z-index: 3;
+}
+.headerBottom .navScroller {
+  margin-left: 0;
+  justify-content: center;
+}
+
+.filterTrack {
+  gap: 0.5rem;
+}
+
+.filterBtn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 9px 16px;
+  border-radius: var(--radius-pill);
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--brand-primary-dark);
+  background: transparent;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+.filterBtn:hover {
+  background: rgba(255, 255, 255, 0.55);
+}
+.filterBtn.active {
+  background: var(--surface);
+  box-shadow: 0 2px 6px rgba(126, 42, 72, 0.15);
+}
+
+.fdot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--success);
+  flex-shrink: 0;
+}
+
+/* ---------- Cuenta: texto + aro + foto sobre el bulto de la barra ---------- */
+
+.accountPill {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  height: 78px;
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: rgba(255, 255, 255, 0.92);
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  padding: 8px 14px 8px 0;
+}
+
+/* Resaltado fundido (pastilla + círculo, un único color plano) que solo
+   aparece al pasar el ratón o abrir el menú */
+.accountHighlightPill,
+.accountHighlightCircle {
+  position: absolute;
+  z-index: 3;
+  background: #e0b5c3;
+  opacity: 0;
+  transition: opacity 0.18s ease;
+  pointer-events: none;
+}
+.accountHighlightPill {
+  border-radius: 23px 0 0 23px;
+}
+.accountHighlightCircle {
+  border-radius: 50%;
+}
+.headerShapeWrap:has(.accountDropdown.open) .accountHighlightPill,
+.headerShapeWrap:has(.accountDropdown.open) .accountHighlightCircle,
+.headerShapeWrap:has(.accountPill:hover) .accountHighlightPill,
+.headerShapeWrap:has(.accountPill:hover) .accountHighlightCircle,
+.headerShapeWrap:has(.avatarAssembly:hover) .accountHighlightPill,
+.headerShapeWrap:has(.avatarAssembly:hover) .accountHighlightCircle {
+  opacity: 1;
+}
+
+.avatarAssembly {
+  position: absolute;
+  z-index: 4;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: -35px; /* Aquí está la magia: asoma 35px hacia abajo */
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
-  transition: transform 0.2s ease;
-  z-index: 30;
+  cursor: pointer;
 }
 
-.avatarWrapper:hover {
-  transform: scale(1.05);
-}
-
-.avatarInner {
-  width: 66px;
-  height: 66px;
+.avatarWrapper {
+  position: relative;
+  width: 100%;
+  height: 100%;
   border-radius: 50%;
-  background-color: white;
-  border: 3px solid white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px;
+  box-shadow: 0 8px 16px rgba(126, 42, 72, 0.22);
+}
+
+.avatarInner,
+.avatarInnerImg {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 3px solid var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand-primary-dark);
+  font-family: var(--font-voice, Georgia), serif;
+  font-weight: 600;
+  font-size: 1.4rem;
+}
+.avatarInnerImg {
   object-fit: cover;
+}
+
+.bumpLabel {
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--brand-primary-dark);
+  background: var(--surface);
+  padding: 2px 9px;
+  border-radius: var(--radius-pill);
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
 }
 
 .accountDropdown {
   position: absolute;
-  top: calc(100% + 1.5rem);
-  right: 0;
-  z-index: 40;
-  display: flex;
-  min-width: 180px;
+  z-index: 7;
+  min-width: 190px;
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.16);
+  padding: 8px;
+  display: none;
   flex-direction: column;
-  padding: 0.5rem 0;
-  background: white;
-  border-radius: 8px;
-  border: 1px solid #e0e0e0;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
-  overflow: hidden;
+  gap: 2px;
 }
-
+.accountDropdown::before {
+  content: '';
+  position: absolute;
+  top: -7px;
+  right: 38px;
+  width: 14px;
+  height: 14px;
+  background: var(--surface);
+  transform: rotate(45deg);
+  border-radius: 3px 0 0 0;
+}
+.accountDropdown.open {
+  display: flex;
+}
 .accountDropdown a,
-.accountDropdown button {
-  padding: 0.75rem 1.25rem;
+.accountDropdown button.item {
+  padding: 10px 12px;
+  border-radius: 8px;
   border: 0;
   background: transparent;
-  color: #333;
+  color: var(--ink);
   font: inherit;
   font-weight: 500;
   text-align: left;
-  text-decoration: none;
   cursor: pointer;
-  transition: background 0.2s;
+  display: block;
+  width: 100%;
 }
-
 .accountDropdown a:hover,
-.accountDropdown button:hover {
-  background: #f0fdf4;
+.accountDropdown button.item:hover {
+  background: var(--bg-main);
   color: var(--brand-primary);
 }
 
-.headerBottom {
-  background-color: white;
-  border-bottom: 1px solid #e0e0e0;
-  display: flex;
-  align-items: center;
-  justify-content: center; 
-  gap: 2.5rem;
-  height: 55px;
-  font-size: 0.95rem;
-  font-weight: 600;
-  color: var(--text-muted);
-  box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+.desktopLoginBtn {
+  position: absolute;
+  z-index: 4;
+  right: clamp(1.25rem, 3vw, 3rem);
+  top: 50%;
+  transform: translateY(-50%);
+  font-weight: bold;
+  color: white;
+  border: 1px solid white;
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+}
+
+/* ==========================================================================
+   HEADER MÓVIL — bloque independiente, sin clip-path ni cálculos de JS
+   ========================================================================== */
+
+.mobileHeaderBlock {
+  display: none;
   position: relative;
-  z-index: 10;
 }
 
-.headerBottom a {
+.mobileHeaderTop {
+  background: var(--header-gradient);
   display: flex;
   align-items: center;
+  gap: 10px;
+  padding: 0 14px;
+  height: 58px;
+}
+
+.mobileHamburger {
+  background: none;
+  border: 0;
+  color: white;
+  padding: 6px;
+  flex-shrink: 0;
+  cursor: pointer;
+  display: flex;
+}
+.mobileHamburger svg {
+  width: 22px;
+  height: 22px;
+}
+
+.mobileBrand {
+  flex: 1;
+  min-width: 0;
+  font-family: var(--font-voice, Georgia), serif;
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: white;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.mobileAccountBtn {
+  position: relative;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  padding: 3px;
+  border: 0;
+  cursor: pointer;
+}
+.mobileAvatarImg,
+.inner {
+  width: 100%;
   height: 100%;
-  border-bottom: 3px solid transparent;
-  transition: all 0.2s ease;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--surface);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--brand-primary-dark);
+  font-family: var(--font-voice, Georgia), serif;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.mobileAvatarImg {
+  object-fit: cover;
 }
 
-.headerBottom a:hover {
+.mobileLoginBtn {
+  font-weight: bold;
+  color: white;
+  border: 1px solid white;
+  padding: 0.4rem 0.8rem;
+  border-radius: 4px;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.mobileFilterBar {
+  background: var(--brand-primary-tint);
+  display: flex;
+  gap: 8px;
+  padding: 10px 14px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.mobileFilterBar::-webkit-scrollbar {
+  display: none;
+}
+.mobileFilterBar .filterBtn {
+  flex-shrink: 0;
+}
+
+.mobileDropdown {
+  display: none;
+  position: absolute;
+  z-index: 8;
+  min-width: 190px;
+  background: var(--surface);
+  border-radius: 14px;
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.18);
+  padding: 8px;
+  flex-direction: column;
+  gap: 2px;
+}
+.mobileDropdown.open {
+  display: flex;
+}
+.mobileDropdown a,
+.mobileDropdown button.item {
+  padding: 11px 14px;
+  border-radius: 9px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+  display: block;
+  width: 100%;
+}
+.mobileDropdown a.active {
   color: var(--brand-primary);
-  border-bottom: 3px solid #ffccd5;
+  background: var(--brand-primary-tint);
+}
+.mobileDropdown a:hover,
+.mobileDropdown button.item:hover {
+  background: var(--bg-main);
 }
 
-.activeTab {
-  color: var(--brand-primary) !important;
-  border-bottom: 3px solid var(--brand-primary) !important;
+@media (max-width: 680px) {
+  .headerBlock {
+    display: none;
+  }
+  .mobileHeaderBlock {
+    display: block;
+    margin-bottom: 28px;
+    box-shadow: 0 6px 16px rgba(126, 42, 72, 0.14);
+  }
 }
+
+/* ==========================================================================
+   FOOTER
+   ========================================================================== */
 
 .footer {
   display: flex;
@@ -166,12 +501,11 @@
   justify-content: center;
   padding: 2rem 1.5rem;
   margin-top: 3rem;
-  background-color: white;
-  border-top: 1px solid #e0e0e0;
+  background-color: var(--surface);
+  border-top: 1px solid var(--line);
   font-size: 0.85rem;
-  color: var(--text-muted);
+  color: var(--muted);
 }
-
 .footer a:hover {
   color: var(--brand-primary);
 }

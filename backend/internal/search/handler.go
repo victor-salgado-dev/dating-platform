@@ -3,6 +3,7 @@ package search
 import (
 	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -86,6 +87,19 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 		Religion:              q.Get("religion"),
 		ReligiousValues:       q.Get("religious_values"),
 		StarSign:              q.Get("star_sign"),
+
+		// --- NUEVOS: Hobbies y personalidad (Fase 2) -------------------
+		//
+		// ?hobby=cooking_baking,travelling            -> "me gusta", cualquier intensidad
+		// ?hobby_travelling_min=4&hobby_gardening_max=3 -> acotan por clave
+		// ?trait_openness_min=4                         -> acota un rasgo de personalidad
+		//
+		// La clave (hobby o rasgo) forma parte del propio nombre del
+		// parámetro, así que no se puede leer con q.Get(fijo): hace
+		// falta recorrer toda la query string buscando ese prefijo.
+		Hobbies:                splitMulti(q["hobby"]),
+		HobbyBounds:            parseKeyedBounds(q, "hobby_"),
+		PersonalityTraitBounds: parseKeyedBounds(q, "trait_"),
 	}
 
 	result, err := h.svc.Search(r.Context(), userID, raw)
@@ -143,4 +157,51 @@ func splitMulti(values []string) []string {
 		}
 	}
 	return out
+}
+
+// parseKeyedBounds recorre toda la query string buscando parámetros con
+// forma "<prefix><clave>_min" / "<prefix><clave>_max" (ej. prefix
+// "hobby_" sobre "hobby_travelling_min=4") y los agrupa por clave.
+//
+// Se recorta el sufijo "_min"/"_max" en vez de partir por "_", porque
+// la propia clave puede contener guiones bajos (hobbies como
+// "cooking_baking" o "meeting_new_people"); recortar un sufijo fijo al
+// final no tiene esa ambigüedad.
+func parseKeyedBounds(q url.Values, prefix string) map[string]RawBounds {
+	result := map[string]RawBounds{}
+
+	for param, values := range q {
+		if len(values) == 0 || values[0] == "" {
+			continue
+		}
+		if !strings.HasPrefix(param, prefix) {
+			continue
+		}
+		rest := strings.TrimPrefix(param, prefix)
+
+		var key, bound string
+		switch {
+		case strings.HasSuffix(rest, "_min"):
+			key = strings.TrimSuffix(rest, "_min")
+			bound = "min"
+		case strings.HasSuffix(rest, "_max"):
+			key = strings.TrimSuffix(rest, "_max")
+			bound = "max"
+		default:
+			continue
+		}
+		if key == "" {
+			continue
+		}
+
+		b := result[key]
+		if bound == "min" {
+			b.Min = values[0]
+		} else {
+			b.Max = values[0]
+		}
+		result[key] = b
+	}
+
+	return result
 }
