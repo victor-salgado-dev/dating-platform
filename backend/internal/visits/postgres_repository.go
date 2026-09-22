@@ -29,10 +29,10 @@ DO UPDATE SET visited_at = now()
 `
 if _, err := r.db.Exec(ctx, query, visitorProfileID, visitedProfileID); err != nil {
 if pgErr, ok := err.(*pgconn.PgError); ok {
-if pgErr.Code == "23503" { // foreign key violation
+if pgErr.Code == "23503" {
 return profiles.ErrNotFound
 }
-if pgErr.Code == "23514" { // check violation
+if pgErr.Code == "23514" {
 return ErrCannotVisitSelf
 }
 }
@@ -58,7 +58,7 @@ profileColumn = "v.visitor_profile_id"
 }
 query := fmt.Sprintf(`
 SELECT p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
-       p.relationship_goal, v.visited_at,
+       v.visited_at,
        EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id),
        COUNT(*) OVER()
 FROM profile_visits v
@@ -87,18 +87,23 @@ total := 0
 for rows.Next() {
 var item ListItem
 var gender string
-var rel *string
 var birth time.Time
 var totalCount int
-if err := rows.Scan(&item.ProfileID, &item.DisplayName, &birth, &gender, &item.CountryCode, &item.Region, &rel, &item.VisitedAt, &item.HasPhoto, &totalCount); err != nil {
+if err := rows.Scan(
+&item.ProfileID,
+&item.DisplayName,
+&birth,
+&gender,
+&item.CountryCode,
+&item.Region,
+&item.VisitedAt,
+&item.HasPhoto,
+&totalCount,
+); err != nil {
 return nil, fmt.Errorf("visits: leer visita: %w", err)
 }
 item.Age = profiles.AgeAt(birth, now)
 item.Gender = profiles.Gender(gender)
-if rel != nil {
-goal := profiles.RelationshipGoal(*rel)
-item.RelationshipGoal = &goal
-}
 total = totalCount
 items = append(items, item)
 }
