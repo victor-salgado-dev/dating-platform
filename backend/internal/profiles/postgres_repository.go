@@ -37,6 +37,18 @@ const allProfileCols = `
 // renumerarlos a mano cada vez que se añade un campo nuevo.
 const profileColCount = 44
 
+func prefixCols(tableAlias, cols string) string {
+	parts := strings.Split(cols, ",")
+	prefixed := make([]string, 0, len(parts))
+	for _, part := range parts {
+		col := strings.TrimSpace(part)
+		if col != "" {
+			prefixed = append(prefixed, fmt.Sprintf("%s.%s", tableAlias, col))
+		}
+	}
+	return strings.Join(prefixed, ", ")
+}
+
 type PostgresRepository struct {
 	db *pgxpool.Pool
 }
@@ -98,14 +110,10 @@ func (r *PostgresRepository) GetByUserID(ctx context.Context, userID uuid.UUID) 
 }
 
 func (r *PostgresRepository) GetPublicByID(ctx context.Context, id, viewerUserID uuid.UUID) (*Profile, error) {
-	// Para GetPublicByID usamos un alias "p." en todas las columnas para que funcione con el JOIN
-	aliasedCols := strings.ReplaceAll(allProfileCols, " ", " p.")
-	aliasedCols = strings.ReplaceAll(aliasedCols, "\t", "")
-	aliasedCols = strings.ReplaceAll(aliasedCols, "\n", "")
-	aliasedCols = strings.ReplaceAll(aliasedCols, ",", ", p.")
+	aliasedCols := prefixCols("p", allProfileCols)
 
 	query := fmt.Sprintf(`
-		SELECT p.id, p.%s, p.created_at, p.updated_at
+		SELECT p.id, %s, p.created_at, p.updated_at
 		FROM profiles p
 		JOIN users u ON u.id = p.user_id
 		WHERE p.id = $1
