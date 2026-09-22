@@ -86,13 +86,11 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("POST /api/v1/auth/email/resend", authRateLimit(requireAuth(http.HandlerFunc(deps.AuthHandler.ResendVerification))))
 	mux.Handle("DELETE /api/v1/auth/account", requireAuth(http.HandlerFunc(deps.AuthHandler.DeleteAccount)))
 
-	// --- Catálogos (Fase 2) -------------------------------------------
-	mux.Handle("GET /api/v1/catalog/hobbies", http.HandlerFunc(deps.ProfilesHandler.ListHobbyCatalog))
+	// --- Catálogos ---------------------------------------------------
+	mux.Handle("GET /api/v1/catalog/interests", http.HandlerFunc(deps.ProfilesHandler.ListInterestCatalog))
 	mux.Handle("GET /api/v1/catalog/personality-statements", http.HandlerFunc(deps.ProfilesHandler.ListPersonalityCatalog))
 
-	// --- Profiles (Fase 4) --------------------------------------------
-	// Todo bajo /profiles/me: en V1 solo se gestiona el propio perfil.
-	// Ver perfiles de otras personas es Fase 6 (Perfiles públicos).
+	// --- Profiles ----------------------------------------------------
 	mux.Handle("GET /api/v1/profiles/me", requireAuth(http.HandlerFunc(deps.ProfilesHandler.Get)))
 	mux.Handle("POST /api/v1/profiles/me", requireAuth(http.HandlerFunc(deps.ProfilesHandler.Create)))
 	mux.Handle("PATCH /api/v1/profiles/me", requireAuth(http.HandlerFunc(deps.ProfilesHandler.Update)))
@@ -102,37 +100,37 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/profiles/me/photos/{id}/file", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ServePhoto)))
 	mux.Handle("DELETE /api/v1/profiles/me/photos/{id}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.DeletePhoto)))
 
-	// --- Hobbies del usuario (Fase 2) ---------------------------------
-	mux.Handle("GET /api/v1/profiles/me/hobbies", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListMyHobbies)))
-	mux.Handle("PUT /api/v1/profiles/me/hobbies/{key}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.SetHobby)))
-	mux.Handle("DELETE /api/v1/profiles/me/hobbies/{key}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.DeleteHobby)))
+	// --- Idiomas del usuario ------------------------------------------
+	mux.Handle("GET /api/v1/profiles/me/languages", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListMyLanguages)))
+	mux.Handle("PUT /api/v1/profiles/me/languages/{code}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.SetLanguage)))
+	mux.Handle("DELETE /api/v1/profiles/me/languages/{code}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.DeleteLanguage)))
 
-	// --- Personalidad del usuario (Fase 2) ----------------------------
+	// --- Intereses del usuario ----------------------------------------
+	mux.Handle("GET /api/v1/profiles/me/interests", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListMyInterests)))
+	mux.Handle("PUT /api/v1/profiles/me/interests/{key}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.SetInterest)))
+	mux.Handle("DELETE /api/v1/profiles/me/interests/{key}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.DeleteInterest)))
+
+	// --- Personalidad del usuario ------------------------------------
 	mux.Handle("GET /api/v1/profiles/me/personality", requireAuth(http.HandlerFunc(deps.ProfilesHandler.GetMyPersonality)))
 	mux.Handle("PUT /api/v1/profiles/me/personality/{key}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.SetPersonalityAnswer)))
 
-	// --- Preferencias de pareja del usuario (Fase 2) ------------------
+	// --- Preferencias de pareja del usuario --------------------------
 	mux.Handle("GET /api/v1/profiles/me/partner-preferences", requireAuth(http.HandlerFunc(deps.ProfilesHandler.GetMyPartnerPreferences)))
 	mux.Handle("PATCH /api/v1/profiles/me/partner-preferences", requireAuth(http.HandlerFunc(deps.ProfilesHandler.UpdatePartnerPreferences)))
 
-	// --- Perfiles públicos (Fase 6) -------------------------------------
-	// Rutas de solo lectura sobre el perfil de OTRA persona. "me" es un
-	// segmento literal y siempre gana sobre {profileID} en las rutas de
-	// arriba, así que no hay ambigüedad entre ambos bloques.
+	// --- Perfiles públicos -------------------------------------------
 	mux.Handle("GET /api/v1/profiles/{profileID}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.GetPublic)))
 	mux.Handle("GET /api/v1/profiles/{profileID}/photos", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListPublicPhotos)))
 	mux.Handle("GET /api/v1/profiles/{profileID}/photos/{photoID}/file", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ServePublicPhoto)))
-	mux.Handle("GET /api/v1/profiles/{profileID}/hobbies", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListPublicHobbies)))
+	mux.Handle("GET /api/v1/profiles/{profileID}/languages", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListPublicLanguages)))
+	mux.Handle("GET /api/v1/profiles/{profileID}/interests", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListPublicInterests)))
 	mux.Handle("GET /api/v1/profiles/{profileID}/personality", requireAuth(http.HandlerFunc(deps.ProfilesHandler.GetPublicPersonality)))
 
 	// --- Search (Fase 5) ------------------------------------------------
-	// Devuelve fichas resumidas con el profile_id de cada resultado; la
-	// vista de perfil público detallada vive en las rutas de arriba.
 	mux.Handle("GET /api/v1/search/profiles", requireAuth(http.HandlerFunc(deps.SearchHandler.Search)))
 
 	// --- Favoritos (Fase 7) ---------------------------------------------
 	mux.Handle("GET /api/v1/favorites", requireAuth(http.HandlerFunc(deps.FavoritesHandler.List)))
-	// Alias explícito para clientes que distinguen favoritos enviados y recibidos.
 	mux.Handle("GET /api/v1/favorites/sent", requireAuth(http.HandlerFunc(deps.FavoritesHandler.List)))
 	mux.Handle("GET /api/v1/favorites/received", requireAuth(http.HandlerFunc(deps.FavoritesHandler.ListReceived)))
 	mux.Handle("POST /api/v1/favorites/{profileID}", requireAuth(http.HandlerFunc(deps.FavoritesHandler.Add)))
@@ -152,9 +150,6 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/activity", requireAuth(http.HandlerFunc(deps.ActivityHandler.List)))
 
 	// --- Mensajería (Fase 8) ---------------------------------------------
-	// "to/{profileID}" inicia o continúa la conversación con esa persona
-	// (find-or-create); una vez abierta, se puede seguir escribiendo y
-	// paginando por conversationID sin volver a pasar por el perfil.
 	mux.Handle("POST /api/v1/messages/to/{profileID}", requireAuth(http.HandlerFunc(deps.MessagingHandler.SendToProfile)))
 	mux.Handle("GET /api/v1/messages/conversations", requireAuth(http.HandlerFunc(deps.MessagingHandler.ListConversations)))
 	mux.Handle("GET /api/v1/messages/conversations/{conversationID}/messages", requireAuth(http.HandlerFunc(deps.MessagingHandler.ListMessages)))
@@ -167,13 +162,9 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/blocks/{profileID}", requireAuth(http.HandlerFunc(deps.BlockingHandler.Status)))
 
 	// --- Reportes (Fase 9) ------------------------------------------------
-	// Solo creación aquí; revisarlos es la Fase 10 (panel de moderación).
 	mux.Handle("POST /api/v1/reports/{profileID}", requireAuth(http.HandlerFunc(deps.ReportsHandler.Create)))
 
 	// --- Administración (Fase 10) ----------------------------------------
-	// Rutas distintas de todo lo anterior: exigen rol admin, no solo
-	// sesión, y trabajan con user_id (no profile_id) porque son
-	// herramientas internas, no cara al público.
 	requireAdmin := admin.RequireAdmin(deps.AuthService, deps.SessionCookie)
 
 	mux.Handle("GET /api/v1/admin/users", requireAdmin(http.HandlerFunc(deps.AdminHandler.ListUsers)))
@@ -183,13 +174,9 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("POST /api/v1/admin/reports/{reportID}/resolve", requireAdmin(http.HandlerFunc(deps.AdminHandler.ResolveReport)))
 
 	// --- Legal y privacidad (Fase 13) ------------------------------------
-	// El historial de consentimientos es propio, con sesión normal.
 	mux.Handle("GET /api/v1/consents/me", requireAuth(http.HandlerFunc(deps.ConsentHandler.ListMine)))
 
-	// El formulario de contacto es deliberadamente público (alguien sin
-	// cuenta también tiene que poder escribir), así que NO pasa por
-	// requireAuth — pero sí por el mismo rate limit estricto que auth,
-	// para no convertirse en un vector de spam/abuso sin control.
+	// Formulario de contacto
 	mux.Handle("POST /api/v1/contact", authRateLimit(http.HandlerFunc(deps.ContactHandler.Send)))
 
 	globalRateLimit := ratelimit.Middleware(deps.RateLimiter, "global", deps.Security.GlobalRateLimit, deps.Security.GlobalRateWindow)

@@ -28,7 +28,7 @@ export async function searchPlaces(query: string): Promise<PlaceSuggestion[]> {
   const trimmed = query.trim();
   if (trimmed.length < 2) return [];
 
-  const url = `${PHOTON_URL}?q=${encodeURIComponent(trimmed)}&limit=6&lang=es`;
+  const url = `${PHOTON_URL}?q=${encodeURIComponent(trimmed)}&limit=6&lang=en`;
 
   let res: Response;
   try {

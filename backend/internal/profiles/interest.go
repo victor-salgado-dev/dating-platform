@@ -6,6 +6,12 @@ import (
 	"github.com/google/uuid"
 )
 
+// Compatibilidad temporal con el paquete search hasta su migración
+const (
+	MinHobbyIntensity = 1
+	MaxHobbyIntensity = 5
+)
+
 // InterestDefinition es un ítem del catálogo de intereses (tabla
 // interests). Es dato semi-estático: se puebla por migración o por un
 // futuro panel de administración, nunca lo escribe el usuario final.
