@@ -32,6 +32,7 @@ const NAV_LINKS: NavLinkItem[] = [
   { href: '/discover', label: 'Descubrir' },
   { href: '/activity', label: 'Actividad' },
   { href: '/likes', label: 'Likes' },
+  { href: '/visits', label: 'Visitas' },
   { href: '/matches', label: 'Matches' },
   { href: '/messages', label: 'Mensajes' },
 ];

@@ -261,6 +261,23 @@ export type LikesResponse = {
   total_pages: number;
 };
 
+export interface VisitsResponse {
+  items: Array<{
+    profile_id: string;
+    display_name: string;
+    age: number;
+    gender: string;
+    country_code: string;
+    region: string | null;
+    relationship_goal: string | null;
+    has_photo: boolean;
+    visited_at: string;
+  }>;
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+}
 export type MatchItem = {
   profile_id: string;
   display_name: string;

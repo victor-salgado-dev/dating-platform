@@ -21,6 +21,7 @@ import (
 	"dating-platform/backend/internal/ratelimit"
 	"dating-platform/backend/internal/reports"
 	"dating-platform/backend/internal/search"
+	"dating-platform/backend/internal/visits"
 )
 
 // Dependencies agrupa todo lo que necesita el router para construir las
@@ -46,6 +47,7 @@ type Dependencies struct {
 	AdminHandler     *admin.Handler
 	ConsentHandler   *consent.Handler
 	ContactHandler   *contact.Handler
+	VisitsHandler    *visits.Handler
 
 	RateLimiter *ratelimit.Limiter
 	Security    config.SecurityConfig
@@ -145,6 +147,13 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/likes/received", requireAuth(http.HandlerFunc(deps.LikesHandler.ListReceived)))
 	mux.Handle("GET /api/v1/matches", requireAuth(http.HandlerFunc(deps.LikesHandler.ListMatches)))
 	mux.Handle("GET /api/v1/matches/{profileID}", requireAuth(http.HandlerFunc(deps.LikesHandler.MatchStatus)))
+
+	// --- Visitas --------------------------------------------------------
+  if deps.VisitsHandler != nil {
+  	mux.Handle("POST /api/v1/visits/{profileID}", requireAuth(http.HandlerFunc(deps.VisitsHandler.Record)))
+  	mux.Handle("GET /api/v1/visits/sent", requireAuth(http.HandlerFunc(deps.VisitsHandler.ListSent)))
+  	mux.Handle("GET /api/v1/visits/received", requireAuth(http.HandlerFunc(deps.VisitsHandler.ListReceived)))
+  }
 
 	// --- Actividad (Fase 16) --------------------------------------------
 	mux.Handle("GET /api/v1/activity", requireAuth(http.HandlerFunc(deps.ActivityHandler.List)))

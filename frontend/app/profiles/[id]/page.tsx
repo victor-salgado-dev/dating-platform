@@ -41,6 +41,8 @@ export default function ProfilePage() {
     apiFetch<PublicProfile>(`/profiles/${params.id}`)
       .then(async (p) => {
         setProfile(p);
+        // Registrar visita al perfil
+        apiFetch(`/visits/${params.id}`, { method: 'POST' }).catch(() => {});
         try {
           setPhotos(await apiFetch<ProfilePhoto[]>(`/profiles/${params.id}/photos`));
         } catch {
