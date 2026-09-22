@@ -57,7 +57,7 @@ func (r *PostgresRepository) List(ctx context.Context, userID uuid.UUID, page, p
 	const query = `
 		SELECT
 			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
-			p.relationship_goal, f.created_at,
+			p.relationship_goals[1], f.created_at,
 			EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
 			COUNT(*) OVER() AS total_count
 		FROM favorites f
@@ -131,7 +131,7 @@ func (r *PostgresRepository) ListReceived(ctx context.Context, profileID uuid.UU
 	const query = `
 		SELECT
 			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
-			p.relationship_goal, f.created_at,
+			p.relationship_goals[1], f.created_at,
 			EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id),
 			COUNT(*) OVER()
 		FROM favorites f

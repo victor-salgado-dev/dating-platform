@@ -133,7 +133,7 @@ func (r *PostgresRepository) listLikes(ctx context.Context, profileID uuid.UUID,
 	}
 	query := fmt.Sprintf(`
         SELECT p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
-               p.relationship_goal, l.created_at,
+               p.relationship_goals[1], l.created_at,
                EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id),
                COUNT(*) OVER()
         FROM likes l
