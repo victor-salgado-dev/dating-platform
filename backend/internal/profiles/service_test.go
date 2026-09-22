@@ -98,6 +98,30 @@ func TestIsValidGenderAndRelationshipGoal(t *testing.T) {
 	}
 }
 
+func TestIsValidPersonalityTrait(t *testing.T) {
+	if !IsValidPersonalityTrait(TraitExtraversion) || !IsValidPersonalityTrait(TraitOpenness) {
+		t.Error("rasgos de la lista permitida deberían ser válidos")
+	}
+	if IsValidPersonalityTrait(PersonalityTrait("charisma")) {
+		t.Error("un rasgo fuera de la lista no debería ser válido")
+	}
+}
+
+func TestValidateRelationshipGoals(t *testing.T) {
+	if err := validateRelationshipGoals(nil); err != nil {
+		t.Errorf("lista vacía no debería ser un error: %v", err)
+	}
+	if err := validateRelationshipGoals([]RelationshipGoal{RelationshipCasual}); err != nil {
+		t.Errorf("un único objetivo válido no debería rechazarse: %v", err)
+	}
+	if err := validateRelationshipGoals([]RelationshipGoal{RelationshipCasual, RelationshipLongTerm}); err != nil {
+		t.Errorf("varios objetivos válidos a la vez no deberían rechazarse: %v", err)
+	}
+	if err := validateRelationshipGoals([]RelationshipGoal{RelationshipCasual, "undecided"}); err == nil {
+		t.Error("un valor fuera de la lista permitida, aunque venga junto a uno válido, debería rechazarse")
+	}
+}
+
 func TestValidateBio(t *testing.T) {
 	if err := validateBio(nil); err != nil {
 		t.Errorf("bio ausente (nil) no debería ser un error: %v", err)
@@ -118,28 +142,30 @@ func TestValidateBio(t *testing.T) {
 	}
 }
 
-func TestValidateInterests(t *testing.T) {
-	if err := validateInterests([]string{"ajedrez", "senderismo"}); err != nil {
-		t.Errorf("intereses válidos rechazados: %v", err)
+func TestValidateProfileQuote(t *testing.T) {
+	if err := validateProfileQuote(nil); err != nil {
+		t.Errorf("profile_quote ausente (nil) no debería ser un error: %v", err)
 	}
-	if err := validateInterests([]string{"ajedrez", ""}); err == nil {
-		t.Error("un interés vacío debería rechazarse")
+	tooLongRunes := make([]rune, MaxProfileQuoteLen+1)
+	for i := range tooLongRunes {
+		tooLongRunes[i] = 'a'
 	}
-
-	tooMany := make([]string, MaxInterests+1)
-	for i := range tooMany {
-		tooMany[i] = "interes"
-	}
-	if err := validateInterests(tooMany); err == nil {
-		t.Error("demasiados intereses deberían rechazarse")
+	tooLong := string(tooLongRunes)
+	if err := validateProfileQuote(&tooLong); err == nil {
+		t.Error("profile_quote demasiado larga debería rechazarse")
 	}
 }
 
-func TestValidateLanguages(t *testing.T) {
-	if err := validateLanguages([]string{"es", "en"}); err != nil {
-		t.Errorf("idiomas válidos rechazados: %v", err)
+func TestValidateDreamWish(t *testing.T) {
+	if err := validateDreamWish(nil); err != nil {
+		t.Errorf("dream_wish ausente (nil) no debería ser un error: %v", err)
 	}
-	if err := validateLanguages([]string{"es", " "}); err == nil {
-		t.Error("un idioma vacío debería rechazarse")
+	tooLongRunes := make([]rune, MaxDreamWishLen+1)
+	for i := range tooLongRunes {
+		tooLongRunes[i] = 'a'
+	}
+	tooLong := string(tooLongRunes)
+	if err := validateDreamWish(&tooLong); err == nil {
+		t.Error("dream_wish demasiado largo debería rechazarse")
 	}
 }

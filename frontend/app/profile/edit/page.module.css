@@ -91,3 +91,55 @@
   font: inherit;
   font-size: 0.85rem;
 }
+
+/* --- Chips de intereses seleccionados (sin nivel) --- */
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin: 0.5rem 0;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.3rem 0.5rem;
+  border-radius: 999px;
+  background: #f2f2f2;
+  font-size: 0.85rem;
+}
+.chip button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+  color: #666;
+  padding: 0;
+}
+.chip button:hover { color: #b00020; }
+
+/* --- Lista de sugerencias (idiomas / intereses concretos) --- */
+.suggestionList {
+  list-style: none;
+  margin: 0.25rem 0 0.5rem;
+  padding: 0;
+  border: 1px solid #eee;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.suggestionList li { margin: 0; }
+.suggestionList button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.7rem;
+  border: 0;
+  border-bottom: 1px solid #f2f2f2;
+  background: white;
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+.suggestionList li:last-child button { border-bottom: 0; }
+.suggestionList button:hover { background: #f7f7f7; }

@@ -16,6 +16,10 @@ import "time"
 // Quien construye este struct a partir del JSON de la petición
 // (internal/profiles/handler.go) es responsable de fijar los flags
 // según qué claves vinieran realmente en el body.
+//
+// Languages e Interests ya no están aquí: se gestionan por separado
+// (Service.SetLanguage / Service.SetInterest, un ítem cada vez), igual
+// que ya pasaba con las fotos.
 type ProfilePatch struct {
 	DisplayName *string
 	BirthDate   *time.Time
@@ -25,11 +29,8 @@ type ProfilePatch struct {
 	RegionSet bool
 	Region    *string
 
-	LanguagesSet bool
-	Languages    []string
-
-	RelationshipGoalSet bool
-	RelationshipGoal    *RelationshipGoal
+	RelationshipGoalsSet bool
+	RelationshipGoals    []RelationshipGoal
 
 	// Cambiado de *bool a *string para soportar más opciones
 	HasChildrenSet bool
@@ -41,9 +42,6 @@ type ProfilePatch struct {
 
 	BioSet bool
 	Bio    *string
-
-	InterestsSet bool
-	Interests    []string
 
 	// --- Físico y Apariencia ---
 	HeightSet bool
@@ -123,7 +121,7 @@ type ProfilePatch struct {
 	StarSignSet bool
 	StarSign    *string
 
-	// --- NUEVOS CAMPOS (Über mich / estilo de vida) -----------------
+	// --- Über mich / estilo de vida ---
 	FutureVisionSet bool
 	FutureVision    []string
 

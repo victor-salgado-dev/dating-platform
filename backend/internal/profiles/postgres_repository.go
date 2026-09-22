@@ -21,7 +21,7 @@ const (
 // Listado de todas las columnas (excepto id, created_at, updated_at para inserts)
 const allProfileCols = `
 	user_id, display_name, birth_date, gender, country_code,
-	region, languages, relationship_goal, has_children, wants_children, bio, interests,
+	region, relationship_goals, has_children, wants_children, bio,
 	height, weight, body_type, ethnicity, appearance_rating, hair_color, eye_color, body_art,
 	smoking_habit, drinking_habit, relocation_willingness, marital_status,
 	children_count, youngest_child_age, oldest_child_age, occupation, employment_status,
@@ -35,7 +35,7 @@ const allProfileCols = `
 // columnas listadas en allProfileCols. Se usa solo para generar los
 // placeholders ($1, $2...) del INSERT sin tener que contarlos ni
 // renumerarlos a mano cada vez que se añade un campo nuevo.
-const profileColCount = 46
+const profileColCount = 44
 
 type PostgresRepository struct {
 	db *pgxpool.Pool
@@ -61,8 +61,7 @@ func (r *PostgresRepository) Create(ctx context.Context, p *Profile) error {
 
 	err := r.db.QueryRow(ctx, query,
 		p.UserID, p.DisplayName, p.BirthDate, string(p.Gender), p.CountryCode,
-		p.Region, p.Languages, relationshipGoalToDB(p.RelationshipGoal),
-		p.HasChildren, p.WantsChildren, p.Bio, p.Interests,
+		p.Region, relationshipGoalsToDB(p.RelationshipGoals), p.HasChildren, p.WantsChildren, p.Bio,
 		p.Height, p.Weight, p.BodyType, p.Ethnicity, p.AppearanceRating, p.HairColor, p.EyeColor, p.BodyArt,
 		p.SmokingHabit, p.DrinkingHabit, p.RelocationWillingness, p.MaritalStatus,
 		p.ChildrenCount, p.YoungestChildAge, p.OldestChildAge, p.Occupation, p.EmploymentStatus,
@@ -147,14 +146,11 @@ func (r *PostgresRepository) Update(ctx context.Context, userID uuid.UUID, patch
 	if patch.Gender != nil { add("gender", string(*patch.Gender)) }
 	if patch.CountryCode != nil { add("country_code", *patch.CountryCode) }
 	if patch.RegionSet { add("region", patch.Region) }
-	if patch.LanguagesSet { add("languages", patch.Languages) }
-	if patch.RelationshipGoalSet { add("relationship_goal", relationshipGoalToDB(patch.RelationshipGoal)) }
+	if patch.RelationshipGoalsSet { add("relationship_goals", relationshipGoalsToDB(patch.RelationshipGoals)) }
 	if patch.HasChildrenSet { add("has_children", patch.HasChildren) }
 	if patch.WantsChildrenSet { add("wants_children", patch.WantsChildren) }
 	if patch.BioSet { add("bio", patch.Bio) }
-	if patch.InterestsSet { add("interests", patch.Interests) }
 
-	// Nuevos campos (000012)
 	if patch.HeightSet { add("height", patch.Height) }
 	if patch.WeightSet { add("weight", patch.Weight) }
 	if patch.BodyTypeSet { add("body_type", patch.BodyType) }
@@ -181,7 +177,6 @@ func (r *PostgresRepository) Update(ctx context.Context, userID uuid.UUID, patch
 	if patch.ReligiousValuesSet { add("religious_values", patch.ReligiousValues) }
 	if patch.StarSignSet { add("star_sign", patch.StarSign) }
 
-	// Nuevos campos (000013 - Über mich)
 	if patch.FutureVisionSet { add("future_vision", patch.FutureVision) }
 	if patch.SportsSet { add("sports", patch.Sports) }
 	if patch.LikesPetsSet { add("likes_pets", patch.LikesPets) }
@@ -220,11 +215,11 @@ func (r *PostgresRepository) Update(ctx context.Context, userID uuid.UUID, patch
 func (r *PostgresRepository) scanOne(ctx context.Context, query string, args ...any) (*Profile, error) {
 	var p Profile
 	var genderStr string
-	var relGoalStr *string
+	var relGoalsStr []string
 
 	err := r.db.QueryRow(ctx, query, args...).Scan(
 		&p.ID, &p.UserID, &p.DisplayName, &p.BirthDate, &genderStr, &p.CountryCode,
-		&p.Region, &p.Languages, &relGoalStr, &p.HasChildren, &p.WantsChildren, &p.Bio, &p.Interests,
+		&p.Region, &relGoalsStr, &p.HasChildren, &p.WantsChildren, &p.Bio,
 		&p.Height, &p.Weight, &p.BodyType, &p.Ethnicity, &p.AppearanceRating, &p.HairColor, &p.EyeColor, &p.BodyArt,
 		&p.SmokingHabit, &p.DrinkingHabit, &p.RelocationWillingness, &p.MaritalStatus,
 		&p.ChildrenCount, &p.YoungestChildAge, &p.OldestChildAge, &p.Occupation, &p.EmploymentStatus,
@@ -242,24 +237,26 @@ func (r *PostgresRepository) scanOne(ctx context.Context, query string, args ...
 	}
 
 	p.Gender = Gender(genderStr)
-	if relGoalStr != nil {
-		g := RelationshipGoal(*relGoalStr)
-		p.RelationshipGoal = &g
+	p.RelationshipGoals = make([]RelationshipGoal, len(relGoalsStr))
+	for i, g := range relGoalsStr {
+		p.RelationshipGoals[i] = RelationshipGoal(g)
 	}
 
 	return &p, nil
 }
 
-func relationshipGoalToDB(g *RelationshipGoal) *string {
-	if g == nil {
+func relationshipGoalsToDB(goals []RelationshipGoal) []string {
+	if goals == nil {
 		return nil
 	}
-	v := string(*g)
-	return &v
+	out := make([]string, len(goals))
+	for i, g := range goals {
+		out[i] = string(g)
+	}
+	return out
 }
 
 // --- Fotos ------------------------------------------------------------
-// (El código de las fotos se queda idéntico porque no lo hemos tocado)
 
 func (r *PostgresRepository) AddPhoto(ctx context.Context, profileID uuid.UUID, photo *Photo) error {
 	const query = `
@@ -354,31 +351,168 @@ func (r *PostgresRepository) DeletePhoto(ctx context.Context, profileID, photoID
 	return nil
 }
 
-// --- Catálogos ----------------------------------------------------------
+// --- Idiomas del perfil ---------------------------------------------------
 
-func (r *PostgresRepository) ListHobbyDefinitions(ctx context.Context) ([]HobbyDefinition, error) {
+func (r *PostgresRepository) UpsertProfileLanguage(ctx context.Context, profileID uuid.UUID, languageCode string, level *int) (*ProfileLanguage, error) {
 	const query = `
-		SELECT key, category, label, sort_order
-		FROM hobby_definitions
+		INSERT INTO profile_languages (profile_id, language_code, level)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (profile_id, language_code)
+		DO UPDATE SET level = EXCLUDED.level, updated_at = now()
+		RETURNING profile_id, language_code, level, updated_at
+	`
+
+	var pl ProfileLanguage
+	err := r.db.QueryRow(ctx, query, profileID, languageCode, level).
+		Scan(&pl.ProfileID, &pl.LanguageCode, &pl.Level, &pl.UpdatedAt)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) && pgErr.Code == pgCheckViolation {
+			return nil, invalidField("language", "código de idioma o nivel no válidos")
+		}
+		return nil, fmt.Errorf("profiles: guardar idioma: %w", err)
+	}
+
+	return &pl, nil
+}
+
+func (r *PostgresRepository) ListProfileLanguages(ctx context.Context, profileID uuid.UUID) ([]ProfileLanguage, error) {
+	const query = `
+		SELECT profile_id, language_code, level, updated_at
+		FROM profile_languages
+		WHERE profile_id = $1
+	`
+
+	rows, err := r.db.Query(ctx, query, profileID)
+	if err != nil {
+		return nil, fmt.Errorf("profiles: listar idiomas: %w", err)
+	}
+	defer rows.Close()
+
+	var languages []ProfileLanguage
+	for rows.Next() {
+		var pl ProfileLanguage
+		if err := rows.Scan(&pl.ProfileID, &pl.LanguageCode, &pl.Level, &pl.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("profiles: leer idioma: %w", err)
+		}
+		languages = append(languages, pl)
+	}
+	return languages, rows.Err()
+}
+
+func (r *PostgresRepository) DeleteProfileLanguage(ctx context.Context, profileID uuid.UUID, languageCode string) error {
+	const query = `DELETE FROM profile_languages WHERE profile_id = $1 AND language_code = $2`
+
+	if _, err := r.db.Exec(ctx, query, profileID, languageCode); err != nil {
+		return fmt.Errorf("profiles: borrar idioma: %w", err)
+	}
+	return nil
+}
+
+// --- Catálogo de intereses --------------------------------------------------
+
+func (r *PostgresRepository) ListInterestDefinitions(ctx context.Context) ([]InterestDefinition, error) {
+	const query = `
+		SELECT key, category, label, has_level, sort_order
+		FROM interests
 		ORDER BY category, sort_order
 	`
 
 	rows, err := r.db.Query(ctx, query)
 	if err != nil {
-		return nil, fmt.Errorf("profiles: listar catálogo de hobbies: %w", err)
+		return nil, fmt.Errorf("profiles: listar catálogo de intereses: %w", err)
 	}
 	defer rows.Close()
 
-	var defs []HobbyDefinition
+	var defs []InterestDefinition
 	for rows.Next() {
-		var d HobbyDefinition
-		if err := rows.Scan(&d.Key, &d.Category, &d.Label, &d.SortOrder); err != nil {
-			return nil, fmt.Errorf("profiles: leer hobby del catálogo: %w", err)
+		var d InterestDefinition
+		if err := rows.Scan(&d.Key, &d.Category, &d.Label, &d.HasLevel, &d.SortOrder); err != nil {
+			return nil, fmt.Errorf("profiles: leer interés del catálogo: %w", err)
 		}
 		defs = append(defs, d)
 	}
 	return defs, rows.Err()
 }
+
+func (r *PostgresRepository) GetInterestDefinition(ctx context.Context, key string) (*InterestDefinition, error) {
+	const query = `SELECT key, category, label, has_level, sort_order FROM interests WHERE key = $1`
+
+	var d InterestDefinition
+	err := r.db.QueryRow(ctx, query, key).Scan(&d.Key, &d.Category, &d.Label, &d.HasLevel, &d.SortOrder)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrInterestNotFound
+		}
+		return nil, fmt.Errorf("profiles: consultar interés: %w", err)
+	}
+	return &d, nil
+}
+
+// --- Intereses del perfil ---------------------------------------------------
+
+func (r *PostgresRepository) UpsertProfileInterest(ctx context.Context, profileID uuid.UUID, interestKey string, level *int) (*ProfileInterest, error) {
+	const query = `
+		INSERT INTO profile_interests (profile_id, interest_key, level)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (profile_id, interest_key)
+		DO UPDATE SET level = EXCLUDED.level, updated_at = now()
+		RETURNING profile_id, interest_key, level, updated_at
+	`
+
+	var pi ProfileInterest
+	err := r.db.QueryRow(ctx, query, profileID, interestKey, level).
+		Scan(&pi.ProfileID, &pi.InterestKey, &pi.Level, &pi.UpdatedAt)
+	if err != nil {
+		var pgErr *pgconn.PgError
+		if errors.As(err, &pgErr) {
+			switch pgErr.Code {
+			case pgForeignKeyViolation:
+				return nil, invalidField("interest_key", "no existe ese interés en el catálogo")
+			case pgCheckViolation:
+				return nil, invalidField("level", "debe estar entre 1 y 5")
+			}
+		}
+		return nil, fmt.Errorf("profiles: guardar interés: %w", err)
+	}
+
+	return &pi, nil
+}
+
+func (r *PostgresRepository) ListProfileInterests(ctx context.Context, profileID uuid.UUID) ([]ProfileInterest, error) {
+	const query = `
+		SELECT profile_id, interest_key, level, updated_at
+		FROM profile_interests
+		WHERE profile_id = $1
+	`
+
+	rows, err := r.db.Query(ctx, query, profileID)
+	if err != nil {
+		return nil, fmt.Errorf("profiles: listar intereses del perfil: %w", err)
+	}
+	defer rows.Close()
+
+	var interests []ProfileInterest
+	for rows.Next() {
+		var pi ProfileInterest
+		if err := rows.Scan(&pi.ProfileID, &pi.InterestKey, &pi.Level, &pi.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("profiles: leer interés del perfil: %w", err)
+		}
+		interests = append(interests, pi)
+	}
+	return interests, rows.Err()
+}
+
+func (r *PostgresRepository) DeleteProfileInterest(ctx context.Context, profileID uuid.UUID, interestKey string) error {
+	const query = `DELETE FROM profile_interests WHERE profile_id = $1 AND interest_key = $2`
+
+	if _, err := r.db.Exec(ctx, query, profileID, interestKey); err != nil {
+		return fmt.Errorf("profiles: borrar interés: %w", err)
+	}
+	return nil
+}
+
+// --- Personalidad -----------------------------------------------------------
 
 func (r *PostgresRepository) ListPersonalityStatements(ctx context.Context) ([]PersonalityStatement, error) {
 	const query = `
@@ -405,71 +539,6 @@ func (r *PostgresRepository) ListPersonalityStatements(ctx context.Context) ([]P
 	}
 	return stmts, rows.Err()
 }
-
-// --- Hobbies del perfil ---------------------------------------------------
-
-func (r *PostgresRepository) UpsertProfileHobby(ctx context.Context, profileID uuid.UUID, hobbyKey string, liked bool, intensity *int) (*ProfileHobby, error) {
-	const query = `
-		INSERT INTO profile_hobbies (profile_id, hobby_key, liked, intensity)
-		VALUES ($1, $2, $3, $4)
-		ON CONFLICT (profile_id, hobby_key)
-		DO UPDATE SET liked = EXCLUDED.liked, intensity = EXCLUDED.intensity, updated_at = now()
-		RETURNING profile_id, hobby_key, liked, intensity, updated_at
-	`
-
-	var ph ProfileHobby
-	err := r.db.QueryRow(ctx, query, profileID, hobbyKey, liked, intensity).
-		Scan(&ph.ProfileID, &ph.HobbyKey, &ph.Liked, &ph.Intensity, &ph.UpdatedAt)
-	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) {
-			switch pgErr.Code {
-			case pgForeignKeyViolation:
-				return nil, invalidField("hobby_key", "no existe ese hobby en el catálogo")
-			case pgCheckViolation:
-				return nil, invalidField("intensity", "debe estar entre 1 y 5, y solo si liked=true")
-			}
-		}
-		return nil, fmt.Errorf("profiles: guardar hobby: %w", err)
-	}
-
-	return &ph, nil
-}
-
-func (r *PostgresRepository) ListProfileHobbies(ctx context.Context, profileID uuid.UUID) ([]ProfileHobby, error) {
-	const query = `
-		SELECT profile_id, hobby_key, liked, intensity, updated_at
-		FROM profile_hobbies
-		WHERE profile_id = $1
-	`
-
-	rows, err := r.db.Query(ctx, query, profileID)
-	if err != nil {
-		return nil, fmt.Errorf("profiles: listar hobbies del perfil: %w", err)
-	}
-	defer rows.Close()
-
-	var hobbies []ProfileHobby
-	for rows.Next() {
-		var ph ProfileHobby
-		if err := rows.Scan(&ph.ProfileID, &ph.HobbyKey, &ph.Liked, &ph.Intensity, &ph.UpdatedAt); err != nil {
-			return nil, fmt.Errorf("profiles: leer hobby del perfil: %w", err)
-		}
-		hobbies = append(hobbies, ph)
-	}
-	return hobbies, rows.Err()
-}
-
-func (r *PostgresRepository) DeleteProfileHobby(ctx context.Context, profileID uuid.UUID, hobbyKey string) error {
-	const query = `DELETE FROM profile_hobbies WHERE profile_id = $1 AND hobby_key = $2`
-
-	if _, err := r.db.Exec(ctx, query, profileID, hobbyKey); err != nil {
-		return fmt.Errorf("profiles: borrar hobby: %w", err)
-	}
-	return nil
-}
-
-// --- Personalidad del perfil -----------------------------------------------
 
 func (r *PostgresRepository) UpsertPersonalityAnswer(ctx context.Context, profileID uuid.UUID, statementKey string, score int) (*ProfilePersonalityAnswer, error) {
 	const query = `
@@ -576,8 +645,6 @@ func (r *PostgresRepository) GetPartnerPreferences(ctx context.Context, profileI
 	)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
-			// Todavía no las ha rellenado: no es un error, es el mismo
-			// "no contestado" que cualquier campo opcional en nil.
 			return &PartnerPreferences{ProfileID: profileID}, nil
 		}
 		return nil, fmt.Errorf("profiles: consultar preferencias de pareja: %w", err)
@@ -622,9 +689,6 @@ func (r *PostgresRepository) UpsertPartnerPreferences(ctx context.Context, profi
 	if patch.ImportancePersonalSpaceSet { addCol("importance_personal_space", patch.ImportancePersonalSpace) }
 	if patch.ImportanceIndependenceSet { addCol("importance_independence", patch.ImportanceIndependence) }
 
-	// Si no hay nada que cambiar, nos limitamos a garantizar que exista
-	// la fila (para que GetPartnerPreferences pueda seguir leyendo de
-	// una sola tabla sin casos especiales) sin tocar ningún valor.
 	setSQL := "updated_at = profile_partner_preferences.updated_at"
 	if len(setClauses) > 0 {
 		setSQL = strings.Join(setClauses, ", ")

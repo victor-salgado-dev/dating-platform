@@ -70,10 +70,12 @@ export type SearchResponse = {
 
 // PublicProfile refleja profileResponse del handler de profiles.
 //
-// OJO: has_children/wants_children son string (no boolean) desde la
-// migración 000012 del backend ('yes' | 'no' | 'prefer_not_to_say' /
-// 'not_sure'), no un booleano de tres estados. Si tenías código viejo
-// tratándolos como boolean | null, hay que actualizarlo también.
+// OJO con dos cambios de contrato respecto a versiones anteriores:
+//   - relationship_goal (string única) -> relationship_goals (array):
+//     ahora se puede buscar más de una cosa a la vez.
+//   - languages e interests YA NO están aquí: se gestionan aparte, con
+//     sus propios endpoints (ver ProfileLanguage / ProfileInterest más
+//     abajo), cada uno con nivel.
 export type PublicProfile = {
   id: string;
   display_name: string;
@@ -81,12 +83,10 @@ export type PublicProfile = {
   gender: string;
   country_code: string;
   region: string | null;
-  languages: string[] | null;
-  relationship_goal: string | null;
+  relationship_goals: string[] | null;
   has_children: string | null;
   wants_children: string | null;
   bio: string | null;
-  interests: string[] | null;
 
   // --- Físico y apariencia ---
   height: number | null;
@@ -119,7 +119,7 @@ export type PublicProfile = {
   religious_values: string | null;
   star_sign: string | null;
 
-  // --- Über mich / estilo de vida (Fase 1, migración 000013) ---
+  // --- Über mich / estilo de vida ---
   future_vision: string[] | null;
   sports: string[] | null;
   likes_pets: string | null;
@@ -141,19 +141,31 @@ export type ProfilePhoto = {
   created_at: string;
 };
 
-// --- Hobbies (Fase 2) ------------------------------------------------------
+// --- Idiomas ------------------------------------------------------------
+//
+// Sin catálogo propio: la lista de códigos permitidos es estática (ver
+// LANGUAGE_OPTIONS en profileOptions.ts), no hace falta pedirla al
+// backend.
 
-export type HobbyDefinition = {
+export type ProfileLanguage = {
+  language_code: string;
+  level: number | null;
+  updated_at: string;
+};
+
+// --- Intereses (sustituye a los hobbies de la Fase 2) -----------------------
+
+export type InterestDefinition = {
   key: string;
   category: string;
   label: string;
+  has_level: boolean;
   sort_order: number;
 };
 
-export type ProfileHobby = {
-  hobby_key: string;
-  liked: boolean;
-  intensity: number | null;
+export type ProfileInterest = {
+  interest_key: string;
+  level: number | null;
   updated_at: string;
 };
 

@@ -17,6 +17,11 @@ var (
 
 	// ErrTooManyPhotos: se alcanzó el límite de fotos por perfil.
 	ErrTooManyPhotos = errors.New("profiles: se alcanzó el número máximo de fotos")
+
+	// ErrInterestNotFound: no existe ese interés en el catálogo. Se usa
+	// para dar un mensaje claro en Service.SetInterest antes de escribir,
+	// en vez de esperar a que la FK de profile_interests falle.
+	ErrInterestNotFound = errors.New("profiles: interés no encontrado en el catálogo")
 )
 
 // ValidationError señala que un campo del perfil no cumple las reglas

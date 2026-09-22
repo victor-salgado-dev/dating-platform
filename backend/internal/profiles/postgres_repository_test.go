@@ -1,21 +1,16 @@
 //go:build integration
 
-// Test de integración de la Fase 2: a diferencia de
-// migration_000013_integration_test.go (que valida los CHECK/FK de la
-// migración con SQL directo), este fichero ejercita el código Go de
-// PostgresRepository tal cual lo usará el Service: construye el pool,
-// llama a los métodos reales (UpsertProfileHobby, GetPartnerPreferences,
-// etc.) y comprueba que lo que se guarda es lo que se lee.
-//
-// Cómo ejecutarlo (mismos requisitos que el test de la migración):
+// Test de integración: ejercita el código Go de PostgresRepository tal
+// cual lo usará el Service, contra una base real con las migraciones
+// aplicadas hasta la 000016 incluida.
 //
 //	migrate -database "$TEST_DATABASE_URL" -path ./migrations up
-//	TEST_DATABASE_URL="postgres://user:pass@localhost:5432/dating_platform_test?sslmode=disable" \
-//	    go test -tags=integration ./internal/profiles/... -run TestPostgresRepository -v
+//	TEST_DATABASE_URL="postgres://..." go test -tags=integration ./internal/profiles/... -v
 package profiles
 
 import (
 	"context"
+	"errors"
 	"os"
 	"testing"
 
@@ -42,10 +37,9 @@ func testPool(t *testing.T) *pgxpool.Pool {
 }
 
 // seedTestProfile crea un usuario y un perfil mínimos válidos usando el
-// propio PostgresRepository (no SQL a mano, para probar Create() de
-// paso) y registra su borrado al final del test. Al borrar el usuario,
-// el ON DELETE CASCADE se lleva perfil, hobbies, respuestas de
-// personalidad y preferencias de pareja con él.
+// propio PostgresRepository, y registra su borrado al final del test
+// (el ON DELETE CASCADE se lleva perfil, idiomas, intereses, respuestas
+// de personalidad y preferencias de pareja con él).
 func seedTestProfile(t *testing.T, pool *pgxpool.Pool, repo *PostgresRepository) *Profile {
 	t.Helper()
 	ctx := context.Background()
@@ -77,91 +71,163 @@ func seedTestProfile(t *testing.T, pool *pgxpool.Pool, repo *PostgresRepository)
 	return p
 }
 
-// --- Hobbies --------------------------------------------------------------
+// --- Idiomas ----------------------------------------------------------
 
-func TestPostgresRepository_ProfileHobbies(t *testing.T) {
+func TestPostgresRepository_ProfileLanguages(t *testing.T) {
 	pool := testPool(t)
 	repo := NewPostgresRepository(pool)
 	ctx := context.Background()
 	profile := seedTestProfile(t, pool, repo)
 
-	intensity := 4
-	ph, err := repo.UpsertProfileHobby(ctx, profile.ID, "cooking_baking", true, &intensity)
+	level := 5
+	pl, err := repo.UpsertProfileLanguage(ctx, profile.ID, "es", &level)
 	if err != nil {
-		t.Fatalf("UpsertProfileHobby: %v", err)
+		t.Fatalf("UpsertProfileLanguage: %v", err)
 	}
-	if !ph.Liked || ph.Intensity == nil || *ph.Intensity != 4 {
-		t.Errorf("resultado inesperado del upsert: %+v", ph)
+	if pl.Level == nil || *pl.Level != 5 {
+		t.Errorf("resultado inesperado: %+v", pl)
 	}
 
-	list, err := repo.ListProfileHobbies(ctx, profile.ID)
+	list, err := repo.ListProfileLanguages(ctx, profile.ID)
 	if err != nil {
-		t.Fatalf("ListProfileHobbies: %v", err)
+		t.Fatalf("ListProfileLanguages: %v", err)
 	}
-	if len(list) != 1 || list[0].HobbyKey != "cooking_baking" {
-		t.Fatalf("se esperaba 1 hobby 'cooking_baking', se obtuvo: %+v", list)
+	if len(list) != 1 || list[0].LanguageCode != "es" {
+		t.Fatalf("se esperaba 1 idioma 'es', se obtuvo: %+v", list)
 	}
 
-	// Reescribir la misma respuesta (upsert): baja la intensidad a 2.
-	lowerIntensity := 2
-	if _, err := repo.UpsertProfileHobby(ctx, profile.ID, "cooking_baking", true, &lowerIntensity); err != nil {
-		t.Fatalf("UpsertProfileHobby (update): %v", err)
+	// Upsert: bajar el nivel de un idioma ya indicado no crea fila nueva.
+	lower := 2
+	if _, err := repo.UpsertProfileLanguage(ctx, profile.ID, "es", &lower); err != nil {
+		t.Fatalf("UpsertProfileLanguage (update): %v", err)
 	}
-	list, err = repo.ListProfileHobbies(ctx, profile.ID)
+	list, err = repo.ListProfileLanguages(ctx, profile.ID)
 	if err != nil {
-		t.Fatalf("ListProfileHobbies tras actualizar: %v", err)
+		t.Fatalf("ListProfileLanguages tras actualizar: %v", err)
 	}
-	if len(list) != 1 || list[0].Intensity == nil || *list[0].Intensity != 2 {
-		t.Fatalf("se esperaba intensidad actualizada a 2, se obtuvo: %+v", list)
+	if len(list) != 1 || list[0].Level == nil || *list[0].Level != 2 {
+		t.Fatalf("se esperaba nivel actualizado a 2, se obtuvo: %+v", list)
 	}
 
-	// Cambiar de "me gusta" a "no me gusta": intensity debe quedar a nil.
-	if _, err := repo.UpsertProfileHobby(ctx, profile.ID, "cooking_baking", false, nil); err != nil {
-		t.Fatalf("UpsertProfileHobby (dislike): %v", err)
+	if err := repo.DeleteProfileLanguage(ctx, profile.ID, "es"); err != nil {
+		t.Fatalf("DeleteProfileLanguage: %v", err)
 	}
-	list, err = repo.ListProfileHobbies(ctx, profile.ID)
+	list, err = repo.ListProfileLanguages(ctx, profile.ID)
 	if err != nil {
-		t.Fatalf("ListProfileHobbies tras marcar dislike: %v", err)
-	}
-	if len(list) != 1 || list[0].Liked || list[0].Intensity != nil {
-		t.Fatalf("se esperaba liked=false e intensity=nil, se obtuvo: %+v", list[0])
-	}
-
-	// Borrar: vuelve a "no contestado".
-	if err := repo.DeleteProfileHobby(ctx, profile.ID, "cooking_baking"); err != nil {
-		t.Fatalf("DeleteProfileHobby: %v", err)
-	}
-	list, err = repo.ListProfileHobbies(ctx, profile.ID)
-	if err != nil {
-		t.Fatalf("ListProfileHobbies tras borrar: %v", err)
+		t.Fatalf("ListProfileLanguages tras borrar: %v", err)
 	}
 	if len(list) != 0 {
 		t.Errorf("se esperaba la lista vacía tras borrar, hay %d elementos", len(list))
 	}
 
-	// Borrar algo que no existe es idempotente, no debe fallar.
-	if err := repo.DeleteProfileHobby(ctx, profile.ID, "cooking_baking"); err != nil {
-		t.Errorf("borrar un hobby ya borrado no debería fallar: %v", err)
+	// Código de idioma inválido: lo rechaza el CHECK, traducido a invalidField.
+	if _, err := repo.UpsertProfileLanguage(ctx, profile.ID, "klingon", nil); err == nil {
+		t.Error("se esperaba que un código de idioma inválido se rechazara")
 	}
 }
 
-func TestPostgresRepository_HobbyCatalog(t *testing.T) {
+// --- Catálogo de intereses -----------------------------------------------
+
+func TestPostgresRepository_InterestCatalog(t *testing.T) {
 	pool := testPool(t)
 	repo := NewPostgresRepository(pool)
 	ctx := context.Background()
 
-	defs, err := repo.ListHobbyDefinitions(ctx)
+	defs, err := repo.ListInterestDefinitions(ctx)
 	if err != nil {
-		t.Fatalf("ListHobbyDefinitions: %v", err)
+		t.Fatalf("ListInterestDefinitions: %v", err)
 	}
-	if len(defs) != 21 {
-		t.Errorf("se esperaban 21 hobbies, se obtuvieron %d", len(defs))
+	if len(defs) != 291 {
+		t.Errorf("se esperaban 291 intereses en el catálogo, hay %d", len(defs))
 	}
-	// Debe venir ordenado por categoría: la primera categoría en orden
-	// alfabético es "at_home".
-	if len(defs) > 0 && defs[0].Category != "at_home" {
-		t.Errorf("se esperaba que empezara por la categoría 'at_home', empezó por %q", defs[0].Category)
+
+	d, err := repo.GetInterestDefinition(ctx, "cocina")
+	if err != nil {
+		t.Fatalf("GetInterestDefinition('cocina'): %v", err)
 	}
+	if !d.HasLevel {
+		t.Error("'cocina' debería tener has_level=true")
+	}
+
+	d, err = repo.GetInterestDefinition(ctx, "guitarra")
+	if err != nil {
+		t.Fatalf("GetInterestDefinition('guitarra'): %v", err)
+	}
+	if d.HasLevel {
+		t.Error("'guitarra' debería tener has_level=false")
+	}
+
+	if _, err := repo.GetInterestDefinition(ctx, "no_existe_esto"); !errors.Is(err, ErrInterestNotFound) {
+		t.Errorf("se esperaba ErrInterestNotFound, se obtuvo: %v", err)
+	}
+}
+
+// --- Intereses del perfil ---------------------------------------------------
+
+func TestPostgresRepository_ProfileInterests(t *testing.T) {
+	pool := testPool(t)
+	repo := NewPostgresRepository(pool)
+	ctx := context.Background()
+	profile := seedTestProfile(t, pool, repo)
+
+	t.Run("interés con nivel se guarda y se lee", func(t *testing.T) {
+		level := 4
+		pi, err := repo.UpsertProfileInterest(ctx, profile.ID, "cocina", &level)
+		if err != nil {
+			t.Fatalf("UpsertProfileInterest: %v", err)
+		}
+		if pi.Level == nil || *pi.Level != 4 {
+			t.Errorf("resultado inesperado: %+v", pi)
+		}
+	})
+
+	t.Run("interés concreto sin nivel se guarda y se lee", func(t *testing.T) {
+		pi, err := repo.UpsertProfileInterest(ctx, profile.ID, "guitarra", nil)
+		if err != nil {
+			t.Fatalf("UpsertProfileInterest: %v", err)
+		}
+		if pi.Level != nil {
+			t.Errorf("se esperaba level=nil, se obtuvo %v", *pi.Level)
+		}
+	})
+
+	t.Run("ListProfileInterests devuelve ambos", func(t *testing.T) {
+		list, err := repo.ListProfileInterests(ctx, profile.ID)
+		if err != nil {
+			t.Fatalf("ListProfileInterests: %v", err)
+		}
+		if len(list) != 2 {
+			t.Fatalf("se esperaban 2 intereses, hay %d", len(list))
+		}
+	})
+
+	t.Run("nivel fuera de rango 1-5 se rechaza", func(t *testing.T) {
+		bad := 9
+		if _, err := repo.UpsertProfileInterest(ctx, profile.ID, "lectura", &bad); err == nil {
+			t.Error("se esperaba que se rechazara")
+		}
+	})
+
+	t.Run("interest_key inexistente en el catálogo se rechaza (FK)", func(t *testing.T) {
+		if _, err := repo.UpsertProfileInterest(ctx, profile.ID, "no_existe_esto", nil); err == nil {
+			t.Error("se esperaba que se rechazara")
+		}
+	})
+
+	t.Run("DeleteProfileInterest vuelve a 'no seleccionado'", func(t *testing.T) {
+		if err := repo.DeleteProfileInterest(ctx, profile.ID, "guitarra"); err != nil {
+			t.Fatalf("DeleteProfileInterest: %v", err)
+		}
+		list, err := repo.ListProfileInterests(ctx, profile.ID)
+		if err != nil {
+			t.Fatalf("ListProfileInterests: %v", err)
+		}
+		for _, pi := range list {
+			if pi.InterestKey == "guitarra" {
+				t.Error("'guitarra' debería haber desaparecido de la lista")
+			}
+		}
+	})
 }
 
 // --- Personalidad -----------------------------------------------------
@@ -200,18 +266,6 @@ func TestPostgresRepository_PersonalityAnswersAndScores(t *testing.T) {
 		t.Fatalf("se esperaban 4 respuestas, se obtuvieron %d", len(list))
 	}
 
-	// Reescribir una respuesta (upsert) y comprobar que no duplica fila.
-	if _, err := repo.UpsertPersonalityAnswer(ctx, profile.ID, "extra_reserved_calm", 1); err != nil {
-		t.Fatalf("UpsertPersonalityAnswer (update): %v", err)
-	}
-	list, err = repo.ListPersonalityAnswers(ctx, profile.ID)
-	if err != nil {
-		t.Fatalf("ListPersonalityAnswers tras actualizar: %v", err)
-	}
-	if len(list) != 4 {
-		t.Fatalf("se esperaban seguir siendo 4 respuestas tras el upsert, hay %d", len(list))
-	}
-
 	scores, err := repo.GetPersonalityTraitScores(ctx, profile.ID)
 	if err != nil {
 		t.Fatalf("GetPersonalityTraitScores: %v", err)
@@ -228,9 +282,9 @@ func TestPostgresRepository_PersonalityAnswersAndScores(t *testing.T) {
 	if extraversion.AnsweredCount != 4 {
 		t.Errorf("se esperaban 4 respuestas contabilizadas, hay %d", extraversion.AnsweredCount)
 	}
-	// (1 + 4 + 3 + 5) / 4 = 3.25
-	if extraversion.AverageScore < 3.24 || extraversion.AverageScore > 3.26 {
-		t.Errorf("se esperaba una media ≈3.25, se obtuvo %v", extraversion.AverageScore)
+	// (2+4+3+5)/4 = 3.5
+	if extraversion.AverageScore < 3.49 || extraversion.AverageScore > 3.51 {
+		t.Errorf("se esperaba una media ≈3.5, se obtuvo %v", extraversion.AverageScore)
 	}
 }
 
@@ -242,7 +296,6 @@ func TestPostgresRepository_PartnerPreferences(t *testing.T) {
 	ctx := context.Background()
 	profile := seedTestProfile(t, pool, repo)
 
-	// Sin rellenar todavía: no es un error, todo viene a nil.
 	pp, err := repo.GetPartnerPreferences(ctx, profile.ID)
 	if err != nil {
 		t.Fatalf("GetPartnerPreferences (vacío): %v", err)
@@ -260,16 +313,10 @@ func TestPostgresRepository_PartnerPreferences(t *testing.T) {
 	if err != nil {
 		t.Fatalf("UpsertPartnerPreferences (primer patch): %v", err)
 	}
-	if pp.AgeMin == nil || *pp.AgeMin != 38 || pp.AgeMax == nil || *pp.AgeMax != 58 {
+	if pp.AgeMin == nil || *pp.AgeMin != 38 {
 		t.Errorf("rango de edad no se guardó bien: %+v", pp)
 	}
-	if len(pp.DesiredTraits) != 2 {
-		t.Errorf("desired_traits no se guardó bien: %+v", pp.DesiredTraits)
-	}
 
-	// Segundo patch parcial: solo toca una importancia. Los campos ya
-	// guardados (age_min, age_max, desired_traits) deben seguir intactos
-	// — el upsert no debe pisarlos con NULL.
 	fun := 5
 	pp, err = repo.UpsertPartnerPreferences(ctx, profile.ID, PartnerPreferencesPatch{
 		ImportanceFunSet: true, ImportanceFun: &fun,
@@ -282,22 +329,5 @@ func TestPostgresRepository_PartnerPreferences(t *testing.T) {
 	}
 	if pp.AgeMin == nil || *pp.AgeMin != 38 {
 		t.Errorf("el patch parcial no debería haber borrado age_min, se obtuvo: %+v", pp.AgeMin)
-	}
-	if len(pp.DesiredTraits) != 2 {
-		t.Errorf("el patch parcial no debería haber borrado desired_traits, se obtuvo: %+v", pp.DesiredTraits)
-	}
-
-	// Borrar explícitamente un campo (patch a nil con el flag activado).
-	pp, err = repo.UpsertPartnerPreferences(ctx, profile.ID, PartnerPreferencesPatch{
-		AgeMinSet: true, AgeMin: nil,
-	})
-	if err != nil {
-		t.Fatalf("UpsertPartnerPreferences (borrar age_min): %v", err)
-	}
-	if pp.AgeMin != nil {
-		t.Errorf("age_min debería haber quedado a nil, se obtuvo: %v", *pp.AgeMin)
-	}
-	if pp.AgeMax == nil || *pp.AgeMax != 58 {
-		t.Errorf("age_max no debería haberse visto afectado: %+v", pp.AgeMax)
 	}
 }

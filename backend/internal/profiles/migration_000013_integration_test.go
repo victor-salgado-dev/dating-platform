@@ -139,121 +139,7 @@ func TestMigration000013_LifestyleFields(t *testing.T) {
 	})
 }
 
-// --- 2. Hobbies --------------------------------------------------------
-
-func TestMigration000013_HobbyCatalog(t *testing.T) {
-	tx := testTx(t)
-	ctx := context.Background()
-
-	var count int
-	if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM hobby_definitions`).Scan(&count); err != nil {
-		t.Fatalf("no se pudo contar hobby_definitions: %v", err)
-	}
-	if count != 21 {
-		t.Errorf("se esperaban 21 hobbies en el catálogo, hay %d", count)
-	}
-
-	var categories int
-	if err := tx.QueryRow(ctx, `SELECT COUNT(DISTINCT category) FROM hobby_definitions`).Scan(&categories); err != nil {
-		t.Fatalf("no se pudo contar categorías: %v", err)
-	}
-	if categories != 7 {
-		t.Errorf("se esperaban 7 categorías de hobbies, hay %d", categories)
-	}
-}
-
-func TestMigration000013_ProfileHobbies(t *testing.T) {
-	ctx := context.Background()
-
-	t.Run("me gusta con intensidad se acepta", func(t *testing.T) {
-		tx := testTx(t)
-		profileID := seedProfile(t, tx)
-
-		_, err := tx.Exec(ctx, `
-			INSERT INTO profile_hobbies (profile_id, hobby_key, liked, intensity)
-			VALUES ($1, 'cooking_baking', true, 4)
-		`, profileID)
-		if err != nil {
-			t.Errorf("se esperaba que 'me gusta + intensidad' se aceptara: %v", err)
-		}
-	})
-
-	t.Run("no me gusta explícito, sin intensidad, se acepta", func(t *testing.T) {
-		tx := testTx(t)
-		profileID := seedProfile(t, tx)
-
-		// Usamos 'sport_fitness' que sí existe en hobby_definitions
-		_, err := tx.Exec(ctx, `
-			INSERT INTO profile_hobbies (profile_id, hobby_key, liked, intensity)
-			VALUES ($1, 'sport_fitness', false, NULL)
-		`, profileID)
-		if err != nil {
-			t.Errorf("se esperaba que 'no me gusta' sin intensidad se aceptara: %v", err)
-		}
-	})
-
-	t.Run("no me gusta pero con intensidad se rechaza", func(t *testing.T) {
-		tx := testTx(t)
-		profileID := seedProfile(t, tx)
-
-		_, err := tx.Exec(ctx, `
-			INSERT INTO profile_hobbies (profile_id, hobby_key, liked, intensity)
-			VALUES ($1, 'gardening', false, 3)
-		`, profileID)
-		if !isPgError(err, pgCheckViolationCode) {
-			t.Errorf("se esperaba una violación de CHECK (liked=false con intensity), se obtuvo: %v", err)
-		}
-	})
-
-	t.Run("intensidad fuera de rango 1-5 se rechaza", func(t *testing.T) {
-		tx := testTx(t)
-		profileID := seedProfile(t, tx)
-
-		_, err := tx.Exec(ctx, `
-			INSERT INTO profile_hobbies (profile_id, hobby_key, liked, intensity)
-			VALUES ($1, 'reading', true, 6)
-		`, profileID)
-		if !isPgError(err, pgCheckViolationCode) {
-			t.Errorf("se esperaba una violación de CHECK por rango, se obtuvo: %v", err)
-		}
-	})
-
-	t.Run("hobby_key inexistente en el catálogo se rechaza", func(t *testing.T) {
-		tx := testTx(t)
-		profileID := seedProfile(t, tx)
-
-		_, err := tx.Exec(ctx, `
-			INSERT INTO profile_hobbies (profile_id, hobby_key, liked, intensity)
-			VALUES ($1, 'underwater_basket_weaving', true, 3)
-		`, profileID)
-		if !isPgError(err, pgForeignKeyCode) {
-			t.Errorf("se esperaba una violación de FOREIGN KEY, se obtuvo: %v", err)
-		}
-	})
-
-	t.Run("el mismo hobby dos veces para el mismo perfil se rechaza", func(t *testing.T) {
-		tx := testTx(t)
-		profileID := seedProfile(t, tx)
-
-		_, err := tx.Exec(ctx, `
-			INSERT INTO profile_hobbies (profile_id, hobby_key, liked, intensity)
-			VALUES ($1, 'cooking_baking', true, 2)
-		`, profileID)
-		if err != nil {
-			t.Fatalf("fallo en el primer insert: %v", err)
-		}
-
-		_, err = tx.Exec(ctx, `
-			INSERT INTO profile_hobbies (profile_id, hobby_key, liked, intensity)
-			VALUES ($1, 'cooking_baking', true, 2)
-		`, profileID)
-		if !isPgError(err, pgUniqueViolationCode) {
-			t.Errorf("se esperaba una violación de clave primaria duplicada, se obtuvo: %v", err)
-		}
-	})
-}
-
-// --- 3. Personalidad ----------------------------------------------------
+// --- 2. Personalidad ----------------------------------------------------
 
 func TestMigration000013_PersonalityCatalog(t *testing.T) {
 	tx := testTx(t)
@@ -382,7 +268,7 @@ func TestMigration000013_ProfilePersonalityAnswers(t *testing.T) {
 	})
 }
 
-// --- 4. Preferencias de pareja -------------------------------------------
+// --- 3. Preferencias de pareja -------------------------------------------
 
 func TestMigration000013_PartnerPreferences(t *testing.T) {
 	ctx := context.Background()

@@ -1,6 +1,6 @@
 'use client';
 
-import { ChangeEvent, FormEvent, useEffect, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -9,8 +9,9 @@ import {
   ApiError,
   ProfilePhoto,
   PublicProfile,
-  HobbyDefinition,
-  ProfileHobby,
+  ProfileLanguage,
+  InterestDefinition,
+  ProfileInterest,
   PersonalityStatement,
   PersonalityResponse,
   PersonalityTraitScore,
@@ -54,8 +55,11 @@ import {
   DESIRED_LIVING_PLACE_OPTIONS,
   PARTNER_IMPORTANCE_FIELDS,
   PERSONALITY_TRAIT_LABELS,
-  HOBBY_CATEGORY_LABELS,
+  INTEREST_CATEGORY_LABELS,
+  LANGUAGE_OPTIONS,
 } from '@/lib/profileOptions';
+import LocationAutocomplete from '@/components/LocationAutocomplete';
+import { PlaceSuggestion } from '@/lib/geocoding';
 import styles from './page.module.css';
 
 // =====================================================================
@@ -69,12 +73,10 @@ type FormState = {
   gender: string;
   country_code: string;
   region: string;
-  languages: string;
-  relationship_goal: string;
+  relationship_goals: string[];
   has_children: string;
   wants_children: string;
   bio: string;
-  interests: string;
 
   // Físico y apariencia
   height: string;
@@ -126,8 +128,7 @@ type MultiSelectField = Extract<
 
 const emptyForm: FormState = {
   display_name: '', birth_date: '', gender: '', country_code: '', region: '',
-  languages: '', relationship_goal: '', has_children: '', wants_children: '',
-  bio: '', interests: '',
+  relationship_goals: [], has_children: '', wants_children: '', bio: '',
 
   height: '', weight: '', body_type: '', ethnicity: '', appearance_rating: '',
   hair_color: '', eye_color: '', body_art: [],
@@ -143,10 +144,6 @@ const emptyForm: FormState = {
   favorite_season: '', ideal_vacation_style: [], vacation_activities: [],
   profile_quote: '', dream_wish: '',
 };
-
-function listValue(value: string) {
-  return value.split(',').map((item) => item.trim()).filter(Boolean);
-}
 
 function nullableString(value: string) {
   return value.trim() || null;
@@ -166,12 +163,10 @@ function formFromProfile(profile: PublicProfile): FormState {
     gender: profile.gender,
     country_code: profile.country_code,
     region: profile.region ?? '',
-    languages: profile.languages?.join(', ') ?? '',
-    relationship_goal: profile.relationship_goal ?? '',
+    relationship_goals: profile.relationship_goals ?? [],
     has_children: profile.has_children ?? '',
     wants_children: profile.wants_children ?? '',
     bio: profile.bio ?? '',
-    interests: profile.interests?.join(', ') ?? '',
 
     height: profile.height?.toString() ?? '',
     weight: profile.weight?.toString() ?? '',
@@ -212,9 +207,6 @@ function formFromProfile(profile: PublicProfile): FormState {
     dream_wish: profile.dream_wish ?? '',
   };
 }
-
-// Estado local por hobby: null = no contestado todavía.
-type HobbyState = { liked: boolean; intensity: number | null } | null;
 
 type PartnerFormState = {
   age_min: string;
@@ -280,7 +272,8 @@ const TABS = [
   { id: 'lifestyle', label: 'Estilo de vida' },
   { id: 'background', label: 'Fondo y cultura' },
   { id: 'uber', label: 'Über mich' },
-  { id: 'hobbies', label: 'Hobbies' },
+  { id: 'languages', label: 'Idiomas' },
+  { id: 'interests', label: 'Intereses' },
   { id: 'personality', label: 'Personalidad' },
   { id: 'partner', label: 'Pareja' },
 ] as const;
@@ -304,9 +297,14 @@ export default function EditProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  // Hobbies
-  const [hobbyCatalog, setHobbyCatalog] = useState<HobbyDefinition[]>([]);
-  const [hobbyStates, setHobbyStates] = useState<Record<string, HobbyState>>({});
+  // Idiomas
+  const [myLanguages, setMyLanguages] = useState<ProfileLanguage[]>([]);
+  const [languageQuery, setLanguageQuery] = useState('');
+
+  // Intereses
+  const [interestCatalog, setInterestCatalog] = useState<InterestDefinition[]>([]);
+  const [myInterests, setMyInterests] = useState<ProfileInterest[]>([]);
+  const [interestQuery, setInterestQuery] = useState('');
 
   // Personalidad
   const [personalityCatalog, setPersonalityCatalog] = useState<PersonalityStatement[]>([]);
@@ -320,7 +318,7 @@ export default function EditProfilePage() {
 
   useEffect(() => {
     // Los catálogos son públicos y no dependen de tener perfil creado.
-    apiFetch<HobbyDefinition[]>('/catalog/hobbies').then(setHobbyCatalog).catch(() => setHobbyCatalog([]));
+    apiFetch<InterestDefinition[]>('/catalog/interests').then(setInterestCatalog).catch(() => setInterestCatalog([]));
     apiFetch<PersonalityStatement[]>('/catalog/personality-statements')
       .then(setPersonalityCatalog)
       .catch(() => setPersonalityCatalog([]));
@@ -336,12 +334,15 @@ export default function EditProfilePage() {
         }
 
         try {
-          const hobbies = await apiFetch<ProfileHobby[]>('/profiles/me/hobbies');
-          const states: Record<string, HobbyState> = {};
-          for (const h of hobbies) states[h.hobby_key] = { liked: h.liked, intensity: h.intensity };
-          setHobbyStates(states);
+          setMyLanguages(await apiFetch<ProfileLanguage[]>('/profiles/me/languages'));
         } catch {
-          setHobbyStates({});
+          setMyLanguages([]);
+        }
+
+        try {
+          setMyInterests(await apiFetch<ProfileInterest[]>('/profiles/me/interests'));
+        } catch {
+          setMyInterests([]);
         }
 
         try {
@@ -386,7 +387,21 @@ export default function EditProfilePage() {
     });
   }
 
-  // --- Guardar el perfil (todas las pestañas salvo hobbies/personalidad/pareja) ---
+  function toggleRelationshipGoal(value: string) {
+    setForm((current) => {
+      const next = current.relationship_goals.includes(value)
+        ? current.relationship_goals.filter((v) => v !== value)
+        : [...current.relationship_goals, value];
+      return { ...current, relationship_goals: next };
+    });
+  }
+
+  function handleLocationSelect(place: PlaceSuggestion) {
+    updateField('region', [place.city, place.state].filter(Boolean).join(', '));
+    updateField('country_code', place.countryCode);
+  }
+
+  // --- Guardar el perfil ---
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -399,12 +414,10 @@ export default function EditProfilePage() {
       gender: form.gender,
       country_code: form.country_code,
       region: nullableString(form.region),
-      languages: listValue(form.languages),
-      relationship_goal: nullableString(form.relationship_goal),
+      relationship_goals: form.relationship_goals,
       has_children: nullableString(form.has_children),
       wants_children: nullableString(form.wants_children),
       bio: nullableString(form.bio),
-      interests: listValue(form.interests),
 
       height: nullableNumber(form.height),
       weight: nullableNumber(form.weight),
@@ -462,7 +475,7 @@ export default function EditProfilePage() {
     }
   }
 
-  // --- Fotos (sin cambios) ---
+  // --- Fotos ---
 
   async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -496,39 +509,96 @@ export default function EditProfilePage() {
     }
   }
 
-  // --- Hobbies: cada cambio se guarda al momento (PUT/DELETE por hobby) ---
+  // --- Idiomas: cada cambio se guarda al momento ---
 
-  async function handleHobbyStatusChange(key: string, status: 'unanswered' | 'disliked' | 'liked') {
+  async function handleAddLanguage(code: string) {
     setError(null);
     try {
-      if (status === 'unanswered') {
-        await apiFetch<void>(`/profiles/me/hobbies/${key}`, { method: 'DELETE' });
-        setHobbyStates((current) => ({ ...current, [key]: null }));
-        return;
-      }
-      const liked = status === 'liked';
-      const saved = await apiFetch<ProfileHobby>(`/profiles/me/hobbies/${key}`, {
+      const saved = await apiFetch<ProfileLanguage>(`/profiles/me/languages/${code}`, {
         method: 'PUT',
-        body: JSON.stringify({ liked, intensity: liked ? hobbyStates[key]?.intensity ?? null : null }),
+        body: JSON.stringify({ level: null }),
       });
-      setHobbyStates((current) => ({ ...current, [key]: { liked: saved.liked, intensity: saved.intensity } }));
+      setMyLanguages((current) => [...current.filter((l) => l.language_code !== code), saved]);
+      setLanguageQuery('');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo guardar el hobby.');
+      setError(err instanceof ApiError ? err.message : 'No se pudo añadir el idioma.');
     }
   }
 
-  async function handleHobbyIntensity(key: string, intensity: number) {
+  async function handleLanguageLevelChange(code: string, level: number | null) {
     setError(null);
     try {
-      const saved = await apiFetch<ProfileHobby>(`/profiles/me/hobbies/${key}`, {
+      const saved = await apiFetch<ProfileLanguage>(`/profiles/me/languages/${code}`, {
         method: 'PUT',
-        body: JSON.stringify({ liked: true, intensity }),
+        body: JSON.stringify({ level }),
       });
-      setHobbyStates((current) => ({ ...current, [key]: { liked: saved.liked, intensity: saved.intensity } }));
+      setMyLanguages((current) => current.map((l) => (l.language_code === code ? saved : l)));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo guardar la intensidad.');
+      setError(err instanceof ApiError ? err.message : 'No se pudo guardar el nivel.');
     }
   }
+
+  async function handleRemoveLanguage(code: string) {
+    setError(null);
+    try {
+      await apiFetch<void>(`/profiles/me/languages/${code}`, { method: 'DELETE' });
+      setMyLanguages((current) => current.filter((l) => l.language_code !== code));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo quitar el idioma.');
+    }
+  }
+
+  const languageSuggestions = useMemo(() => {
+    const q = languageQuery.trim().toLowerCase();
+    if (q === '') return [];
+    const selected = new Set(myLanguages.map((l) => l.language_code));
+    return LANGUAGE_OPTIONS.filter((o) => !selected.has(o.value) && o.label.toLowerCase().includes(q)).slice(0, 8);
+  }, [languageQuery, myLanguages]);
+
+  // --- Intereses: cada cambio se guarda al momento ---
+
+  async function handleSetInterest(key: string, level: number | null) {
+    setError(null);
+    try {
+      const saved = await apiFetch<ProfileInterest>(`/profiles/me/interests/${key}`, {
+        method: 'PUT',
+        body: JSON.stringify({ level }),
+      });
+      setMyInterests((current) => [...current.filter((i) => i.interest_key !== key), saved]);
+      setInterestQuery('');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo guardar el interés.');
+    }
+  }
+
+  async function handleRemoveInterest(key: string) {
+    setError(null);
+    try {
+      await apiFetch<void>(`/profiles/me/interests/${key}`, { method: 'DELETE' });
+      setMyInterests((current) => current.filter((i) => i.interest_key !== key));
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'No se pudo quitar el interés.');
+    }
+  }
+
+  const leveledInterests = useMemo(() => interestCatalog.filter((d) => d.has_level), [interestCatalog]);
+  const concreteInterests = useMemo(() => interestCatalog.filter((d) => !d.has_level), [interestCatalog]);
+  const myInterestByKey = useMemo(() => {
+    const map: Record<string, ProfileInterest> = {};
+    for (const i of myInterests) map[i.interest_key] = i;
+    return map;
+  }, [myInterests]);
+
+  const selectedConcreteInterests = useMemo(
+    () => concreteInterests.filter((d) => myInterestByKey[d.key]),
+    [concreteInterests, myInterestByKey]
+  );
+
+  const concreteSuggestions = useMemo(() => {
+    const q = interestQuery.trim().toLowerCase();
+    if (q === '') return [];
+    return concreteInterests.filter((d) => !myInterestByKey[d.key] && d.label.toLowerCase().includes(q)).slice(0, 8);
+  }, [interestQuery, concreteInterests, myInterestByKey]);
 
   // --- Personalidad: cada respuesta se guarda al momento ---
 
@@ -604,7 +674,7 @@ export default function EditProfilePage() {
     }
   }
 
-  // --- Pequeños helpers de render, para no repetir <select>/checkboxes ---
+  // --- Helpers de render ---
 
   function renderSelect(field: keyof FormState, label: string, options: Option[]) {
     return (
@@ -667,7 +737,7 @@ export default function EditProfilePage() {
       {error && <p className={styles.error}>{error}</p>}
 
       {/* --- Básico / Físico / Estilo de vida / Fondo / Über mich: un único form --- */}
-      {tab !== 'hobbies' && tab !== 'personality' && tab !== 'partner' && (
+      {tab !== 'languages' && tab !== 'interests' && tab !== 'personality' && tab !== 'partner' && (
         <form onSubmit={handleSubmit} className={styles.form}>
           {tab === 'basic' && (
             <>
@@ -680,14 +750,36 @@ export default function EditProfilePage() {
                   <option value="non_binary">No binario</option><option value="other">Otro</option>
                 </select>
               </label>
-              <label>País (código de dos letras)<input value={form.country_code} onChange={(e) => updateField('country_code', e.target.value.toUpperCase())} maxLength={2} required /></label>
-              <label>Región<input value={form.region} onChange={(e) => updateField('region', e.target.value)} /></label>
-              <label>Idiomas <span className={styles.hint}>separados por comas (códigos ISO, ej: es, en)</span><input value={form.languages} onChange={(e) => updateField('languages', e.target.value)} /></label>
-              {renderSelect('relationship_goal', 'Objetivo de relación', RELATIONSHIP_GOAL_OPTIONS)}
+
+              <label>Ubicación
+                <LocationAutocomplete
+                  initialValue={form.region && form.country_code ? `${form.region}, ${form.country_code}` : ''}
+                  onSelect={handleLocationSelect}
+                />
+              </label>
+              {form.country_code && (
+                <p className={styles.hint}>Guardado: {form.region ? `${form.region}, ` : ''}{form.country_code}</p>
+              )}
+
+              <fieldset className={styles.checkboxFieldset}>
+                <legend>¿Qué buscas? (puedes elegir varias)</legend>
+                <div className={styles.checkboxGrid}>
+                  {RELATIONSHIP_GOAL_OPTIONS.map((opt) => (
+                    <label key={opt.value} className={styles.checkboxLabel}>
+                      <input
+                        type="checkbox"
+                        checked={form.relationship_goals.includes(opt.value)}
+                        onChange={() => toggleRelationshipGoal(opt.value)}
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
               {renderSelect('has_children', '¿Tienes hijos?', HAS_CHILDREN_OPTIONS)}
               {renderSelect('wants_children', '¿Quieres tener hijos?', WANTS_CHILDREN_OPTIONS)}
               <label>Biografía<textarea value={form.bio} onChange={(e) => updateField('bio', e.target.value)} maxLength={1000} rows={5} /></label>
-              <label>Intereses <span className={styles.hint}>separados por comas</span><input value={form.interests} onChange={(e) => updateField('interests', e.target.value)} /></label>
             </>
           )}
 
@@ -750,45 +842,115 @@ export default function EditProfilePage() {
         </form>
       )}
 
-      {/* --- Hobbies --- */}
-      {tab === 'hobbies' && (
+      {/* --- Idiomas --- */}
+      {tab === 'languages' && (
         disabledUntilCreated ? (
-          <p className={styles.hint}>Guarda el perfil antes de indicar tus hobbies.</p>
+          <p className={styles.hint}>Guarda el perfil antes de indicar tus idiomas.</p>
         ) : (
           <div className={styles.hobbyList}>
-            {Object.entries(
-              hobbyCatalog.reduce<Record<string, HobbyDefinition[]>>((acc, h) => {
-                (acc[h.category] ??= []).push(h);
-                return acc;
-              }, {})
-            ).map(([category, hobbies]) => (
-              <fieldset key={category} className={styles.checkboxFieldset}>
-                <legend>{HOBBY_CATEGORY_LABELS[category] ?? category}</legend>
-                {hobbies.map((h) => {
-                  const current = hobbyStates[h.key] ?? null;
-                  const status = current === null ? 'unanswered' : current.liked ? 'liked' : 'disliked';
+            {myLanguages.length > 0 && (
+              <fieldset className={styles.checkboxFieldset}>
+                <legend>Tus idiomas</legend>
+                {myLanguages.map((l) => {
+                  const opt = LANGUAGE_OPTIONS.find((o) => o.value === l.language_code);
                   return (
-                    <div key={h.key} className={styles.hobbyRow}>
-                      <span className={styles.hobbyLabel}>{h.label}</span>
-                      <select value={status} onChange={(e) => handleHobbyStatusChange(h.key, e.target.value as 'unanswered' | 'disliked' | 'liked')}>
-                        <option value="unanswered">No contestado</option>
-                        <option value="disliked">No me gusta</option>
-                        <option value="liked">Me gusta</option>
+                    <div key={l.language_code} className={styles.hobbyRow}>
+                      <span className={styles.hobbyLabel}>{opt?.label ?? l.language_code}</span>
+                      <select
+                        value={l.level ?? ''}
+                        onChange={(e) => handleLanguageLevelChange(l.language_code, e.target.value ? Number(e.target.value) : null)}
+                      >
+                        <option value="">Sin nivel</option>
+                        {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
                       </select>
-                      {status === 'liked' && (
-                        <select
-                          value={current?.intensity ?? ''}
-                          onChange={(e) => handleHobbyIntensity(h.key, Number(e.target.value))}
-                        >
-                          <option value="">Intensidad</option>
-                          {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-                        </select>
-                      )}
+                      <button type="button" onClick={() => handleRemoveLanguage(l.language_code)}>Quitar</button>
                     </div>
                   );
                 })}
               </fieldset>
+            )}
+
+            <label>Añadir idioma
+              <input
+                value={languageQuery}
+                onChange={(e) => setLanguageQuery(e.target.value)}
+                placeholder="Buscar idioma..."
+              />
+            </label>
+            {languageSuggestions.length > 0 && (
+              <ul className={styles.suggestionList}>
+                {languageSuggestions.map((opt) => (
+                  <li key={opt.value}>
+                    <button type="button" onClick={() => handleAddLanguage(opt.value)}>{opt.label}</button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )
+      )}
+
+      {/* --- Intereses --- */}
+      {tab === 'interests' && (
+        disabledUntilCreated ? (
+          <p className={styles.hint}>Guarda el perfil antes de indicar tus intereses.</p>
+        ) : (
+          <div className={styles.hobbyList}>
+            <h2>Intereses principales</h2>
+            <p className={styles.hint}>Indica cuánto te gusta cada uno (1 a 5). Los que dejes sin marcar no aparecerán en tu perfil.</p>
+            {Object.entries(
+              leveledInterests.reduce<Record<string, InterestDefinition[]>>((acc, d) => {
+                (acc[d.category] ??= []).push(d);
+                return acc;
+              }, {})
+            ).map(([category, defs]) => (
+              <fieldset key={category} className={styles.checkboxFieldset}>
+                <legend>{INTEREST_CATEGORY_LABELS[category] ?? category}</legend>
+                {defs.map((d) => (
+                  <div key={d.key} className={styles.hobbyRow}>
+                    <span className={styles.hobbyLabel}>{d.label}</span>
+                    <select
+                      value={myInterestByKey[d.key]?.level ?? ''}
+                      onChange={(e) => (e.target.value ? handleSetInterest(d.key, Number(e.target.value)) : handleRemoveInterest(d.key))}
+                    >
+                      <option value="">Sin marcar</option>
+                      {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                  </div>
+                ))}
+              </fieldset>
             ))}
+
+            <h2>Otros intereses</h2>
+            <p className={styles.hint}>Cosas más concretas, sin nivel — solo se muestran las que marques.</p>
+
+            {selectedConcreteInterests.length > 0 && (
+              <div className={styles.chipRow}>
+                {selectedConcreteInterests.map((d) => (
+                  <span key={d.key} className={styles.chip}>
+                    {d.label}
+                    <button type="button" onClick={() => handleRemoveInterest(d.key)} aria-label={`Quitar ${d.label}`}>×</button>
+                  </span>
+                ))}
+              </div>
+            )}
+
+            <label>Buscar interés
+              <input
+                value={interestQuery}
+                onChange={(e) => setInterestQuery(e.target.value)}
+                placeholder="Ej: guitarra, anime, sushi..."
+              />
+            </label>
+            {concreteSuggestions.length > 0 && (
+              <ul className={styles.suggestionList}>
+                {concreteSuggestions.map((d) => (
+                  <li key={d.key}>
+                    <button type="button" onClick={() => handleSetInterest(d.key, null)}>{d.label}</button>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
         )
       )}

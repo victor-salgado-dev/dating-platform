@@ -3,6 +3,7 @@ package profiles
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
@@ -20,21 +21,24 @@ const (
 	MinAge              = 18 // V1 es solo para mayores de edad (sección 1).
 	MaxDisplayNameLen   = 100
 	MaxBioLen           = 1000
-	MaxInterests        = 20
-	MaxInterestLen      = 40
-	MaxLanguages        = 10
 	MaxPhotosPerProfile = 6
 	MaxPhotoSizeBytes   = 5 * 1024 * 1024 // 5 MB
 
-	MaxProfileQuoteLen      = 500
-	MaxDreamWishLen         = 500
-	MaxAboutPartnerTextLen  = 1000
-	MinPersonalityScore     = 1
-	MaxPersonalityScore     = 5
-	MinHobbyIntensity       = 1
-	MaxHobbyIntensity       = 5
-	MinPartnerImportance    = 1
-	MaxPartnerImportance    = 5
+	MaxProfileQuoteLen     = 500
+	MaxDreamWishLen        = 500
+	MaxAboutPartnerTextLen = 1000
+
+	MinPersonalityScore = 1
+	MaxPersonalityScore = 5
+
+	MinInterestLevel = 1
+	MaxInterestLevel = 5
+
+	MinLanguageLevel = 1
+	MaxLanguageLevel = 5
+
+	MinPartnerImportance = 1
+	MaxPartnerImportance = 5
 )
 
 var countryCodePattern = regexp.MustCompile(`^[A-Z]{2}$`)
@@ -62,8 +66,8 @@ var allowedPersonalityTraits = map[PersonalityTrait]bool{
 }
 
 // IsValidPersonalityTrait existe por el mismo motivo que IsValidGender:
-// el paquete search (Fase 5) necesita validar un trait_key recibido por
-// query string antes de usarlo en una consulta, y los 5 rasgos son un
+// el paquete search necesita validar un trait_key recibido por query
+// string antes de usarlo en una consulta, y los 5 rasgos son un
 // catálogo cerrado (a diferencia de las afirmaciones dentro de cada
 // rasgo, que sí viven en una tabla porque esas sí crecen).
 func IsValidPersonalityTrait(t PersonalityTrait) bool {
@@ -77,20 +81,21 @@ var allowedPhotoTypes = map[string]string{
 }
 
 // CreateProfileInput son los datos necesarios para crear un perfil.
+//
+// Ya no incluye Languages ni Interests: se gestionan aparte, un ítem
+// cada vez, con Service.SetLanguage / Service.SetInterest — igual que
+// las fotos no se suben como parte de este struct.
 type CreateProfileInput struct {
-	DisplayName      string
-	BirthDate        time.Time
-	Gender           Gender
-	CountryCode      string
-	Region           *string
-	Languages        []string
-	RelationshipGoal *RelationshipGoal
-	HasChildren      *string
-	WantsChildren    *string
-	Bio              *string
-	Interests        []string
+	DisplayName       string
+	BirthDate         time.Time
+	Gender            Gender
+	CountryCode       string
+	Region            *string
+	RelationshipGoals []RelationshipGoal
+	HasChildren       *string
+	WantsChildren     *string
+	Bio               *string
 
-	// --- Nuevos campos ---
 	Height                *int
 	Weight                *int
 	BodyType              *string
@@ -117,7 +122,6 @@ type CreateProfileInput struct {
 	ReligiousValues       *string
 	StarSign              *string
 
-	// --- NUEVOS CAMPOS (Über mich / estilo de vida) ---
 	FutureVision       []string
 	Sports             []string
 	LikesPets          *string
@@ -185,16 +189,10 @@ func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, in Create
 	if err := validateCountryCode(countryCode); err != nil {
 		return nil, err
 	}
-	if err := validateOptionalRelationshipGoal(in.RelationshipGoal); err != nil {
+	if err := validateRelationshipGoals(in.RelationshipGoals); err != nil {
 		return nil, err
 	}
 	if err := validateBio(in.Bio); err != nil {
-		return nil, err
-	}
-	if err := validateInterests(in.Interests); err != nil {
-		return nil, err
-	}
-	if err := validateLanguages(in.Languages); err != nil {
 		return nil, err
 	}
 	if err := validateProfileQuote(in.ProfileQuote); err != nil {
@@ -211,20 +209,17 @@ func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, in Create
 	}
 
 	p := &Profile{
-		UserID:           userID,
-		DisplayName:      strings.TrimSpace(in.DisplayName),
-		BirthDate:        in.BirthDate,
-		Gender:           in.Gender,
-		CountryCode:      countryCode,
-		Region:           in.Region,
-		Languages:        in.Languages,
-		RelationshipGoal: in.RelationshipGoal,
-		HasChildren:      in.HasChildren,
-		WantsChildren:    in.WantsChildren,
-		Bio:              in.Bio,
-		Interests:        in.Interests,
+		UserID:            userID,
+		DisplayName:       strings.TrimSpace(in.DisplayName),
+		BirthDate:         in.BirthDate,
+		Gender:            in.Gender,
+		CountryCode:       countryCode,
+		Region:            in.Region,
+		RelationshipGoals: in.RelationshipGoals,
+		HasChildren:       in.HasChildren,
+		WantsChildren:     in.WantsChildren,
+		Bio:               in.Bio,
 
-		// Asignación de los nuevos campos
 		Height:                in.Height,
 		Weight:                in.Weight,
 		BodyType:              in.BodyType,
@@ -251,7 +246,6 @@ func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, in Create
 		ReligiousValues:       in.ReligiousValues,
 		StarSign:              in.StarSign,
 
-		// Über mich / estilo de vida
 		FutureVision:       in.FutureVision,
 		Sports:             in.Sports,
 		LikesPets:          in.LikesPets,
@@ -299,23 +293,13 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, patch Pro
 		nat := strings.ToUpper(strings.TrimSpace(*patch.Nationality))
 		patch.Nationality = &nat
 	}
-	if patch.RelationshipGoalSet {
-		if err := validateOptionalRelationshipGoal(patch.RelationshipGoal); err != nil {
+	if patch.RelationshipGoalsSet {
+		if err := validateRelationshipGoals(patch.RelationshipGoals); err != nil {
 			return nil, err
 		}
 	}
 	if patch.BioSet {
 		if err := validateBio(patch.Bio); err != nil {
-			return nil, err
-		}
-	}
-	if patch.InterestsSet {
-		if err := validateInterests(patch.Interests); err != nil {
-			return nil, err
-		}
-	}
-	if patch.LanguagesSet {
-		if err := validateLanguages(patch.Languages); err != nil {
 			return nil, err
 		}
 	}
@@ -435,67 +419,115 @@ func (s *Service) DeletePhoto(ctx context.Context, userID, photoID uuid.UUID) er
 	return nil
 }
 
-// --- Catálogos --------------------------------------------------------
-//
-// Son de solo lectura para el usuario final: no hay validación de
-// negocio que hacer aquí, el Service simplemente delega en el
-// Repository. Existen como métodos propios (en vez de exponer el
-// Repository directamente al Handler) para no filtrar el detalle de
-// implementación de que el catálogo vive en Postgres.
+// --- Idiomas del usuario -------------------------------------------------
 
-func (s *Service) ListHobbyCatalog(ctx context.Context) ([]HobbyDefinition, error) {
-	return s.repo.ListHobbyDefinitions(ctx)
-}
-
-func (s *Service) ListPersonalityCatalog(ctx context.Context) ([]PersonalityStatement, error) {
-	return s.repo.ListPersonalityStatements(ctx)
-}
-
-// --- Hobbies del usuario -------------------------------------------------
-
-// SetHobby crea o actualiza la respuesta del usuario a un hobby del
-// catálogo. hobbyKey inexistente en el catálogo se traduce en un
-// ValidationError por parte del Repository (violación de FK).
-func (s *Service) SetHobby(ctx context.Context, userID uuid.UUID, hobbyKey string, liked bool, intensity *int) (*ProfileHobby, error) {
-	if !liked && intensity != nil {
-		return nil, invalidField("intensity", "no tiene sentido indicar una intensidad si no te gusta ese hobby")
-	}
-	if intensity != nil && (*intensity < MinHobbyIntensity || *intensity > MaxHobbyIntensity) {
-		return nil, invalidField("intensity", fmt.Sprintf("debe estar entre %d y %d", MinHobbyIntensity, MaxHobbyIntensity))
+// SetLanguage crea o actualiza el nivel de un idioma. languageCode
+// inválido se traduce en un ValidationError por parte del Repository
+// (violación del CHECK de profile_languages).
+func (s *Service) SetLanguage(ctx context.Context, userID uuid.UUID, languageCode string, level *int) (*ProfileLanguage, error) {
+	if level != nil && (*level < MinLanguageLevel || *level > MaxLanguageLevel) {
+		return nil, invalidField("level", fmt.Sprintf("debe estar entre %d y %d", MinLanguageLevel, MaxLanguageLevel))
 	}
 
 	profile, err := s.repo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.UpsertProfileHobby(ctx, profile.ID, hobbyKey, liked, intensity)
+	return s.repo.UpsertProfileLanguage(ctx, profile.ID, languageCode, level)
 }
 
-func (s *Service) ListMyHobbies(ctx context.Context, userID uuid.UUID) ([]ProfileHobby, error) {
+func (s *Service) ListMyLanguages(ctx context.Context, userID uuid.UUID) ([]ProfileLanguage, error) {
 	profile, err := s.repo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.ListProfileHobbies(ctx, profile.ID)
+	return s.repo.ListProfileLanguages(ctx, profile.ID)
 }
 
-func (s *Service) ListPublicHobbies(ctx context.Context, viewerUserID, profileID uuid.UUID) ([]ProfileHobby, error) {
+func (s *Service) ListPublicLanguages(ctx context.Context, viewerUserID, profileID uuid.UUID) ([]ProfileLanguage, error) {
 	if _, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID); err != nil {
 		return nil, err
 	}
-	return s.repo.ListProfileHobbies(ctx, profileID)
+	return s.repo.ListProfileLanguages(ctx, profileID)
 }
 
-// DeleteHobby vuelve un hobby a "no contestado". Operación idempotente.
-func (s *Service) DeleteHobby(ctx context.Context, userID uuid.UUID, hobbyKey string) error {
+func (s *Service) DeleteLanguage(ctx context.Context, userID uuid.UUID, languageCode string) error {
 	profile, err := s.repo.GetByUserID(ctx, userID)
 	if err != nil {
 		return err
 	}
-	return s.repo.DeleteProfileHobby(ctx, profile.ID, hobbyKey)
+	return s.repo.DeleteProfileLanguage(ctx, profile.ID, languageCode)
 }
 
-// --- Personalidad del usuario ---------------------------------------------
+// --- Catálogo de intereses -----------------------------------------------
+
+func (s *Service) ListInterestCatalog(ctx context.Context) ([]InterestDefinition, error) {
+	return s.repo.ListInterestDefinitions(ctx)
+}
+
+// --- Intereses del usuario -------------------------------------------------
+
+// SetInterest crea o actualiza la respuesta del usuario a un interés
+// del catálogo. Aquí se aplica la única regla de integridad que la BD
+// no puede expresar porque cruza dos tablas: si el interés es de los
+// que se puntúan (HasLevel=true), level es obligatorio y debe estar en
+// 1-5; si no (HasLevel=false), level tiene que venir vacío — es una
+// simple etiqueta presente/ausente, puntuarla no significaría nada.
+func (s *Service) SetInterest(ctx context.Context, userID uuid.UUID, interestKey string, level *int) (*ProfileInterest, error) {
+	def, err := s.repo.GetInterestDefinition(ctx, interestKey)
+	if err != nil {
+		if errors.Is(err, ErrInterestNotFound) {
+			return nil, invalidField("interest_key", "no existe ese interés en el catálogo")
+		}
+		return nil, err
+	}
+
+	if def.HasLevel && level == nil {
+		return nil, invalidField("level", "este interés requiere indicar un nivel de 1 a 5")
+	}
+	if !def.HasLevel && level != nil {
+		return nil, invalidField("level", "este interés no admite nivel, solo puede marcarse")
+	}
+	if level != nil && (*level < MinInterestLevel || *level > MaxInterestLevel) {
+		return nil, invalidField("level", fmt.Sprintf("debe estar entre %d y %d", MinInterestLevel, MaxInterestLevel))
+	}
+
+	profile, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.UpsertProfileInterest(ctx, profile.ID, interestKey, level)
+}
+
+func (s *Service) ListMyInterests(ctx context.Context, userID uuid.UUID) ([]ProfileInterest, error) {
+	profile, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	return s.repo.ListProfileInterests(ctx, profile.ID)
+}
+
+func (s *Service) ListPublicInterests(ctx context.Context, viewerUserID, profileID uuid.UUID) ([]ProfileInterest, error) {
+	if _, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID); err != nil {
+		return nil, err
+	}
+	return s.repo.ListProfileInterests(ctx, profileID)
+}
+
+// DeleteInterest vuelve un interés a "no seleccionado". Operación idempotente.
+func (s *Service) DeleteInterest(ctx context.Context, userID uuid.UUID, interestKey string) error {
+	profile, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	return s.repo.DeleteProfileInterest(ctx, profile.ID, interestKey)
+}
+
+// --- Personalidad ---------------------------------------------------------
+
+func (s *Service) ListPersonalityCatalog(ctx context.Context) ([]PersonalityStatement, error) {
+	return s.repo.ListPersonalityStatements(ctx)
+}
 
 func (s *Service) SetPersonalityAnswer(ctx context.Context, userID uuid.UUID, statementKey string, score int) (*ProfilePersonalityAnswer, error) {
 	if score < MinPersonalityScore || score > MaxPersonalityScore {
@@ -509,8 +541,6 @@ func (s *Service) SetPersonalityAnswer(ctx context.Context, userID uuid.UUID, st
 	return s.repo.UpsertPersonalityAnswer(ctx, profile.ID, statementKey, score)
 }
 
-// GetMyPersonality devuelve tanto las respuestas individuales como el
-// agregado ("Gesamt") por rasgo, calculado por la BD.
 func (s *Service) GetMyPersonality(ctx context.Context, userID uuid.UUID) ([]ProfilePersonalityAnswer, []PersonalityTraitScore, error) {
 	profile, err := s.repo.GetByUserID(ctx, userID)
 	if err != nil {
@@ -613,12 +643,14 @@ func validateCountryCode(v string) error {
 	return nil
 }
 
-func validateOptionalRelationshipGoal(g *RelationshipGoal) error {
-	if g == nil {
-		return nil
-	}
-	if !allowedRelationshipGoals[*g] {
-		return invalidField("relationship_goal", "valor no permitido")
+// validateRelationshipGoals reemplaza a la antigua validateOptionalRelationshipGoal
+// (single-select): ahora se puede marcar más de un objetivo a la vez,
+// así que se valida cada uno de la lista por separado.
+func validateRelationshipGoals(goals []RelationshipGoal) error {
+	for _, g := range goals {
+		if !allowedRelationshipGoals[g] {
+			return invalidField("relationship_goals", "valor no permitido: "+string(g))
+		}
 	}
 	return nil
 }
@@ -629,33 +661,6 @@ func validateBio(v *string) error {
 	}
 	if len([]rune(*v)) > MaxBioLen {
 		return invalidField("bio", fmt.Sprintf("no puede superar %d caracteres", MaxBioLen))
-	}
-	return nil
-}
-
-func validateInterests(v []string) error {
-	if len(v) > MaxInterests {
-		return invalidField("interests", fmt.Sprintf("no puedes indicar más de %d intereses", MaxInterests))
-	}
-	for _, i := range v {
-		if strings.TrimSpace(i) == "" {
-			return invalidField("interests", "no puede contener valores vacíos")
-		}
-		if len([]rune(i)) > MaxInterestLen {
-			return invalidField("interests", fmt.Sprintf("cada interés debe tener menos de %d caracteres", MaxInterestLen))
-		}
-	}
-	return nil
-}
-
-func validateLanguages(v []string) error {
-	if len(v) > MaxLanguages {
-		return invalidField("languages", fmt.Sprintf("no puedes indicar más de %d idiomas", MaxLanguages))
-	}
-	for _, l := range v {
-		if strings.TrimSpace(l) == "" {
-			return invalidField("languages", "no puede contener valores vacíos")
-		}
 	}
 	return nil
 }

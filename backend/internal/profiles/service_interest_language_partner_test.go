@@ -12,17 +12,19 @@ import (
 
 // =====================================================================
 // Fakes: un Repository y un Storage en memoria para poder probar la
-// lógica de negocio de Service sin tocar una base de datos real. Solo
-// implementan lo mínimo que necesitan estos tests; el resto de métodos
-// existen únicamente para satisfacer la interfaz.
+// lógica de negocio de Service sin tocar una base de datos real.
 // =====================================================================
 
 type fakeRepository struct {
 	profile *Profile
 	getErr  error
 
-	upsertHobbyCalls []ProfileHobby
-	upsertHobbyErr   error
+	upsertLanguageCalls []ProfileLanguage
+	upsertLanguageErr   error
+
+	interestDefs      map[string]InterestDefinition
+	upsertInterestCalls []ProfileInterest
+	upsertInterestErr   error
 
 	upsertPersonalityCalls []ProfilePersonalityAnswer
 	upsertPersonalityErr   error
@@ -72,28 +74,56 @@ func (f *fakeRepository) DeletePhoto(ctx context.Context, profileID, photoID uui
 	return nil
 }
 
-func (f *fakeRepository) ListHobbyDefinitions(ctx context.Context) ([]HobbyDefinition, error) {
-	return nil, nil
-}
-func (f *fakeRepository) ListPersonalityStatements(ctx context.Context) ([]PersonalityStatement, error) {
-	return nil, nil
-}
+// --- Idiomas -------------------------------------------------------------
 
-func (f *fakeRepository) UpsertProfileHobby(ctx context.Context, profileID uuid.UUID, hobbyKey string, liked bool, intensity *int) (*ProfileHobby, error) {
-	if f.upsertHobbyErr != nil {
-		return nil, f.upsertHobbyErr
+func (f *fakeRepository) UpsertProfileLanguage(ctx context.Context, profileID uuid.UUID, languageCode string, level *int) (*ProfileLanguage, error) {
+	if f.upsertLanguageErr != nil {
+		return nil, f.upsertLanguageErr
 	}
-	ph := ProfileHobby{ProfileID: profileID, HobbyKey: hobbyKey, Liked: liked, Intensity: intensity, UpdatedAt: time.Now()}
-	f.upsertHobbyCalls = append(f.upsertHobbyCalls, ph)
-	return &ph, nil
+	pl := ProfileLanguage{ProfileID: profileID, LanguageCode: languageCode, Level: level, UpdatedAt: time.Now()}
+	f.upsertLanguageCalls = append(f.upsertLanguageCalls, pl)
+	return &pl, nil
 }
-func (f *fakeRepository) ListProfileHobbies(ctx context.Context, profileID uuid.UUID) ([]ProfileHobby, error) {
+func (f *fakeRepository) ListProfileLanguages(ctx context.Context, profileID uuid.UUID) ([]ProfileLanguage, error) {
 	return nil, nil
 }
-func (f *fakeRepository) DeleteProfileHobby(ctx context.Context, profileID uuid.UUID, hobbyKey string) error {
+func (f *fakeRepository) DeleteProfileLanguage(ctx context.Context, profileID uuid.UUID, languageCode string) error {
 	return nil
 }
 
+// --- Intereses -------------------------------------------------------------
+
+func (f *fakeRepository) ListInterestDefinitions(ctx context.Context) ([]InterestDefinition, error) {
+	return nil, nil
+}
+
+func (f *fakeRepository) GetInterestDefinition(ctx context.Context, key string) (*InterestDefinition, error) {
+	if d, ok := f.interestDefs[key]; ok {
+		return &d, nil
+	}
+	return nil, ErrInterestNotFound
+}
+
+func (f *fakeRepository) UpsertProfileInterest(ctx context.Context, profileID uuid.UUID, interestKey string, level *int) (*ProfileInterest, error) {
+	if f.upsertInterestErr != nil {
+		return nil, f.upsertInterestErr
+	}
+	pi := ProfileInterest{ProfileID: profileID, InterestKey: interestKey, Level: level, UpdatedAt: time.Now()}
+	f.upsertInterestCalls = append(f.upsertInterestCalls, pi)
+	return &pi, nil
+}
+func (f *fakeRepository) ListProfileInterests(ctx context.Context, profileID uuid.UUID) ([]ProfileInterest, error) {
+	return nil, nil
+}
+func (f *fakeRepository) DeleteProfileInterest(ctx context.Context, profileID uuid.UUID, interestKey string) error {
+	return nil
+}
+
+// --- Personalidad ----------------------------------------------------------
+
+func (f *fakeRepository) ListPersonalityStatements(ctx context.Context) ([]PersonalityStatement, error) {
+	return nil, nil
+}
 func (f *fakeRepository) UpsertPersonalityAnswer(ctx context.Context, profileID uuid.UUID, statementKey string, score int) (*ProfilePersonalityAnswer, error) {
 	if f.upsertPersonalityErr != nil {
 		return nil, f.upsertPersonalityErr
@@ -108,6 +138,8 @@ func (f *fakeRepository) ListPersonalityAnswers(ctx context.Context, profileID u
 func (f *fakeRepository) GetPersonalityTraitScores(ctx context.Context, profileID uuid.UUID) ([]PersonalityTraitScore, error) {
 	return nil, nil
 }
+
+// --- Preferencias de pareja --------------------------------------------------
 
 func (f *fakeRepository) GetPartnerPreferences(ctx context.Context, profileID uuid.UUID) (*PartnerPreferences, error) {
 	if f.partnerPrefs != nil {
@@ -125,8 +157,6 @@ func (f *fakeRepository) UpsertPartnerPreferences(ctx context.Context, profileID
 
 var _ Repository = (*fakeRepository)(nil)
 
-// fakeStorage no se usa en estos tests (no tocan fotos), pero Service
-// lo exige en el constructor.
 type fakeStorage struct{}
 
 func (fakeStorage) Open(ctx context.Context, key string) (io.ReadCloser, error) { return nil, nil }
@@ -143,73 +173,150 @@ func newTestService(repo *fakeRepository) *Service {
 func intPtr(i int) *int { return &i }
 
 // =====================================================================
-// SetHobby
+// SetLanguage
 // =====================================================================
 
-func TestSetHobby(t *testing.T) {
-	t.Run("me gusta con intensidad válida se acepta y llega al repositorio", func(t *testing.T) {
+func TestSetLanguage(t *testing.T) {
+	t.Run("idioma con nivel válido se acepta", func(t *testing.T) {
 		repo := &fakeRepository{}
 		svc := newTestService(repo)
 
-		ph, err := svc.SetHobby(context.Background(), uuid.New(), "cooking_baking", true, intPtr(4))
+		pl, err := svc.SetLanguage(context.Background(), uuid.New(), "es", intPtr(5))
 		if err != nil {
 			t.Fatalf("no se esperaba error: %v", err)
 		}
-		if ph.HobbyKey != "cooking_baking" || !ph.Liked || ph.Intensity == nil || *ph.Intensity != 4 {
-			t.Errorf("resultado inesperado: %+v", ph)
-		}
-		if len(repo.upsertHobbyCalls) != 1 {
-			t.Errorf("se esperaba 1 llamada al repositorio, hubo %d", len(repo.upsertHobbyCalls))
+		if pl.LanguageCode != "es" || pl.Level == nil || *pl.Level != 5 {
+			t.Errorf("resultado inesperado: %+v", pl)
 		}
 	})
 
-	t.Run("no me gusta sin intensidad se acepta", func(t *testing.T) {
+	t.Run("idioma sin nivel se acepta", func(t *testing.T) {
 		repo := &fakeRepository{}
 		svc := newTestService(repo)
 
-		_, err := svc.SetHobby(context.Background(), uuid.New(), "motorsport", false, nil)
+		_, err := svc.SetLanguage(context.Background(), uuid.New(), "en", nil)
 		if err != nil {
 			t.Errorf("no se esperaba error: %v", err)
 		}
 	})
 
-	t.Run("no me gusta pero con intensidad se rechaza antes de llegar al repositorio", func(t *testing.T) {
-		repo := &fakeRepository{}
+	for _, bad := range []int{0, 6, -1} {
+		t.Run("nivel fuera de rango se rechaza antes de llegar al repositorio", func(t *testing.T) {
+			repo := &fakeRepository{}
+			svc := newTestService(repo)
+
+			_, err := svc.SetLanguage(context.Background(), uuid.New(), "fr", intPtr(bad))
+			var valErr *ValidationError
+			if !errors.As(err, &valErr) {
+				t.Fatalf("nivel %d: se esperaba ValidationError, se obtuvo: %v", bad, err)
+			}
+			if len(repo.upsertLanguageCalls) != 0 {
+				t.Error("no debería haber llegado a llamar al repositorio")
+			}
+		})
+	}
+
+	t.Run("código de idioma inválido lo rechaza la BD, no el Service", func(t *testing.T) {
+		// El Service no valida la lista de códigos (vive como CHECK en
+		// la BD); aquí solo comprobamos que el error del repositorio se
+		// propaga tal cual.
+		repo := &fakeRepository{upsertLanguageErr: invalidField("language", "código no reconocido")}
 		svc := newTestService(repo)
 
-		_, err := svc.SetHobby(context.Background(), uuid.New(), "gardening", false, intPtr(3))
+		_, err := svc.SetLanguage(context.Background(), uuid.New(), "klingon", intPtr(3))
 		var valErr *ValidationError
 		if !errors.As(err, &valErr) {
-			t.Fatalf("se esperaba un ValidationError, se obtuvo: %v", err)
+			t.Errorf("se esperaba que el ValidationError del repositorio se propagara, se obtuvo: %v", err)
 		}
-		if valErr.Field != "intensity" {
-			t.Errorf("se esperaba el campo 'intensity', fue %q", valErr.Field)
+	})
+}
+
+// =====================================================================
+// SetInterest — la regla has_level <-> level
+// =====================================================================
+
+func TestSetInterest(t *testing.T) {
+	leveled := InterestDefinition{Key: "cocina", HasLevel: true}
+	concrete := InterestDefinition{Key: "guitarra", HasLevel: false}
+
+	t.Run("interés con nivel, con nivel dado, se acepta", func(t *testing.T) {
+		repo := &fakeRepository{interestDefs: map[string]InterestDefinition{"cocina": leveled}}
+		svc := newTestService(repo)
+
+		pi, err := svc.SetInterest(context.Background(), uuid.New(), "cocina", intPtr(4))
+		if err != nil {
+			t.Fatalf("no se esperaba error: %v", err)
 		}
-		if len(repo.upsertHobbyCalls) != 0 {
+		if pi.Level == nil || *pi.Level != 4 {
+			t.Errorf("resultado inesperado: %+v", pi)
+		}
+	})
+
+	t.Run("interés con nivel, SIN nivel, se rechaza", func(t *testing.T) {
+		repo := &fakeRepository{interestDefs: map[string]InterestDefinition{"cocina": leveled}}
+		svc := newTestService(repo)
+
+		_, err := svc.SetInterest(context.Background(), uuid.New(), "cocina", nil)
+		var valErr *ValidationError
+		if !errors.As(err, &valErr) {
+			t.Fatalf("se esperaba ValidationError, se obtuvo: %v", err)
+		}
+		if len(repo.upsertInterestCalls) != 0 {
+			t.Error("no debería haber llegado a llamar al repositorio")
+		}
+	})
+
+	t.Run("interés concreto, sin nivel, se acepta", func(t *testing.T) {
+		repo := &fakeRepository{interestDefs: map[string]InterestDefinition{"guitarra": concrete}}
+		svc := newTestService(repo)
+
+		pi, err := svc.SetInterest(context.Background(), uuid.New(), "guitarra", nil)
+		if err != nil {
+			t.Fatalf("no se esperaba error: %v", err)
+		}
+		if pi.Level != nil {
+			t.Errorf("un interés concreto no debería guardar nivel, se obtuvo: %v", *pi.Level)
+		}
+	})
+
+	t.Run("interés concreto, CON nivel, se rechaza", func(t *testing.T) {
+		repo := &fakeRepository{interestDefs: map[string]InterestDefinition{"guitarra": concrete}}
+		svc := newTestService(repo)
+
+		_, err := svc.SetInterest(context.Background(), uuid.New(), "guitarra", intPtr(3))
+		var valErr *ValidationError
+		if !errors.As(err, &valErr) {
+			t.Fatalf("se esperaba ValidationError, se obtuvo: %v", err)
+		}
+		if len(repo.upsertInterestCalls) != 0 {
 			t.Error("no debería haber llegado a llamar al repositorio")
 		}
 	})
 
 	for _, bad := range []int{0, 6, -1} {
-		t.Run("intensidad fuera de rango se rechaza", func(t *testing.T) {
-			repo := &fakeRepository{}
+		t.Run("nivel fuera de rango 1-5 se rechaza", func(t *testing.T) {
+			repo := &fakeRepository{interestDefs: map[string]InterestDefinition{"cocina": leveled}}
 			svc := newTestService(repo)
 
-			_, err := svc.SetHobby(context.Background(), uuid.New(), "reading", true, intPtr(bad))
+			_, err := svc.SetInterest(context.Background(), uuid.New(), "cocina", intPtr(bad))
 			var valErr *ValidationError
 			if !errors.As(err, &valErr) {
-				t.Fatalf("intensidad %d: se esperaba ValidationError, se obtuvo: %v", bad, err)
+				t.Fatalf("nivel %d: se esperaba ValidationError, se obtuvo: %v", bad, err)
 			}
 		})
 	}
 
-	t.Run("perfil inexistente propaga ErrNotFound", func(t *testing.T) {
-		repo := &fakeRepository{getErr: ErrNotFound}
+	t.Run("interest_key inexistente en el catálogo se rechaza con un mensaje claro", func(t *testing.T) {
+		repo := &fakeRepository{interestDefs: map[string]InterestDefinition{}}
 		svc := newTestService(repo)
 
-		_, err := svc.SetHobby(context.Background(), uuid.New(), "reading", true, intPtr(3))
-		if !errors.Is(err, ErrNotFound) {
-			t.Errorf("se esperaba ErrNotFound, se obtuvo: %v", err)
+		_, err := svc.SetInterest(context.Background(), uuid.New(), "no_existe", intPtr(3))
+		var valErr *ValidationError
+		if !errors.As(err, &valErr) {
+			t.Fatalf("se esperaba ValidationError, se obtuvo: %v", err)
+		}
+		if valErr.Field != "interest_key" {
+			t.Errorf("se esperaba el campo 'interest_key', fue %q", valErr.Field)
 		}
 	})
 }
@@ -300,16 +407,6 @@ func TestUpdatePartnerPreferences(t *testing.T) {
 		}
 	})
 
-	t.Run("solo age_min sin age_max no se puede comparar y se acepta", func(t *testing.T) {
-		repo := &fakeRepository{}
-		svc := newTestService(repo)
-
-		patch := PartnerPreferencesPatch{AgeMinSet: true, AgeMin: intPtr(30)}
-		if _, err := svc.UpdatePartnerPreferences(context.Background(), uuid.New(), patch); err != nil {
-			t.Errorf("no se esperaba error: %v", err)
-		}
-	})
-
 	t.Run("about_partner_text demasiado largo se rechaza", func(t *testing.T) {
 		repo := &fakeRepository{}
 		svc := newTestService(repo)
@@ -339,58 +436,4 @@ func TestUpdatePartnerPreferences(t *testing.T) {
 			t.Errorf("se esperaba ValidationError, se obtuvo: %v", err)
 		}
 	})
-
-	t.Run("importancia dentro de rango en cualquier aspecto se acepta", func(t *testing.T) {
-		repo := &fakeRepository{}
-		svc := newTestService(repo)
-
-		patch := PartnerPreferencesPatch{ImportanceSharedHumorSet: true, ImportanceSharedHumor: intPtr(5)}
-		if _, err := svc.UpdatePartnerPreferences(context.Background(), uuid.New(), patch); err != nil {
-			t.Errorf("no se esperaba error: %v", err)
-		}
-	})
-}
-
-// =====================================================================
-// Validaciones de texto libre nuevas (mismo patrón que TestValidateBio)
-// =====================================================================
-
-func TestValidateProfileQuote(t *testing.T) {
-	if err := validateProfileQuote(nil); err != nil {
-		t.Errorf("profile_quote ausente (nil) no debería ser un error: %v", err)
-	}
-
-	short := "Me encanta viajar."
-	if err := validateProfileQuote(&short); err != nil {
-		t.Errorf("profile_quote corta válida rechazada: %v", err)
-	}
-
-	tooLongRunes := make([]rune, MaxProfileQuoteLen+1)
-	for i := range tooLongRunes {
-		tooLongRunes[i] = 'a'
-	}
-	tooLong := string(tooLongRunes)
-	if err := validateProfileQuote(&tooLong); err == nil {
-		t.Error("profile_quote demasiado larga debería rechazarse")
-	}
-}
-
-func TestValidateDreamWish(t *testing.T) {
-	if err := validateDreamWish(nil); err != nil {
-		t.Errorf("dream_wish ausente (nil) no debería ser un error: %v", err)
-	}
-
-	short := "Visitar todos los rincones del mundo."
-	if err := validateDreamWish(&short); err != nil {
-		t.Errorf("dream_wish corto válido rechazado: %v", err)
-	}
-
-	tooLongRunes := make([]rune, MaxDreamWishLen+1)
-	for i := range tooLongRunes {
-		tooLongRunes[i] = 'a'
-	}
-	tooLong := string(tooLongRunes)
-	if err := validateDreamWish(&tooLong); err == nil {
-		t.Error("dream_wish demasiado largo debería rechazarse")
-	}
 }

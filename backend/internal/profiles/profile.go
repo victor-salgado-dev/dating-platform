@@ -38,6 +38,12 @@ const (
 // o slices nil. nil significa literalmente "el usuario no lo ha dicho":
 // nunca se debe tratar como false, como vacío-que-cuenta, ni inventarse
 // un valor. La Fase 5 (búsqueda) debe respetar esto al filtrar.
+//
+// Languages e Interests ya NO viven aquí (antes eran TEXT[] libres):
+// pasaron a profile_languages y profile_interests respectivamente, cada
+// uno con su propio nivel/intensidad. Consultarlos es responsabilidad
+// de Service.ListMyLanguages / Service.ListMyInterests, no de este
+// struct — igual que ya pasaba con las fotos.
 type Profile struct {
 	ID     uuid.UUID
 	UserID uuid.UUID
@@ -47,15 +53,16 @@ type Profile struct {
 	Gender      Gender
 	CountryCode string
 
-	Region           *string
-	Languages        []string
-	RelationshipGoal *RelationshipGoal
+	Region *string
+
+	// Antes era un único valor (*RelationshipGoal); ahora se puede
+	// buscar más de una cosa a la vez (ej. casual y long_term).
+	RelationshipGoals []RelationshipGoal
 
 	// Han pasado a string para soportar opciones extra (ej: "not_sure", "prefer_not_to_say")
 	HasChildren   *string
 	WantsChildren *string
 	Bio           *string
-	Interests     []string
 
 	// --- Físico y Apariencia ---
 	Height           *int
@@ -88,18 +95,16 @@ type Profile struct {
 	ReligiousValues *string
 	StarSign        *string
 
-	// --- NUEVOS CAMPOS (Über mich / estilo de vida) -----------------
-	// smoking_habit y drinking_habit ya cubren "¿Fumo? / ¿Bebo?" desde
-	// la 000012, se reutilizan tal cual.
-	FutureVision       []string // "Meine ideale Zukunftsvorstellung?"
-	Sports             []string // "Welchen Sport treibe ich?"
-	LikesPets          *string  // "Mag ich Haustiere?" (yes/neutral/no)
-	PetsOwned          []string // "Welche Haustiere besitze ich?"
-	FavoriteSeason     *string  // "Was ist meine Lieblingsjahreszeit?"
-	IdealVacationStyle []string // "Wie sieht mein Idealurlaub aus?"
-	VacationActivities []string // "Meine liebsten Aktivitäten im Urlaub?"
-	ProfileQuote       *string  // frase/cita corta de presentación
-	DreamWish          *string  // "¿Cuál es mi sueño más loco?"
+	// --- Über mich / estilo de vida ---
+	FutureVision       []string
+	Sports             []string
+	LikesPets          *string
+	PetsOwned          []string
+	FavoriteSeason     *string
+	IdealVacationStyle []string
+	VacationActivities []string
+	ProfileQuote       *string
+	DreamWish          *string
 
 	CreatedAt time.Time
 	UpdatedAt time.Time

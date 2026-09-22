@@ -24,23 +24,20 @@ func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
 
-// --- DTOs -----------------------------------------------------------------
+// --- DTOs: perfil -----------------------------------------------------------
 
 type profileResponse struct {
-	ID               string   `json:"id"`
-	DisplayName      string   `json:"display_name"`
-	Age              int      `json:"age"`
-	Gender           string   `json:"gender"`
-	CountryCode      string   `json:"country_code"`
-	Region           *string  `json:"region"`
-	Languages        []string `json:"languages"`
-	RelationshipGoal *string  `json:"relationship_goal"`
-	HasChildren      *string  `json:"has_children"`
-	WantsChildren    *string  `json:"wants_children"`
-	Bio              *string  `json:"bio"`
-	Interests        []string `json:"interests"`
+	ID                string   `json:"id"`
+	DisplayName       string   `json:"display_name"`
+	Age               int      `json:"age"`
+	Gender            string   `json:"gender"`
+	CountryCode       string   `json:"country_code"`
+	Region            *string  `json:"region"`
+	RelationshipGoals []string `json:"relationship_goals"`
+	HasChildren       *string  `json:"has_children"`
+	WantsChildren     *string  `json:"wants_children"`
+	Bio               *string  `json:"bio"`
 
-	// --- Nuevos campos ---
 	Height                *int     `json:"height"`
 	Weight                *int     `json:"weight"`
 	BodyType              *string  `json:"body_type"`
@@ -67,7 +64,6 @@ type profileResponse struct {
 	ReligiousValues       *string  `json:"religious_values"`
 	StarSign              *string  `json:"star_sign"`
 
-	// --- NUEVOS CAMPOS (Über mich / estilo de vida) ---
 	FutureVision       []string `json:"future_vision"`
 	Sports             []string `json:"sports"`
 	LikesPets          *string  `json:"likes_pets"`
@@ -83,26 +79,23 @@ type profileResponse struct {
 }
 
 func toProfileResponse(p *Profile) profileResponse {
-	var relGoal *string
-	if p.RelationshipGoal != nil {
-		v := string(*p.RelationshipGoal)
-		relGoal = &v
+	goals := make([]string, len(p.RelationshipGoals))
+	for i, g := range p.RelationshipGoals {
+		goals[i] = string(g)
 	}
-	return profileResponse{
-		ID:               p.ID.String(),
-		DisplayName:      p.DisplayName,
-		Age:              p.Age(),
-		Gender:           string(p.Gender),
-		CountryCode:      p.CountryCode,
-		Region:           p.Region,
-		Languages:        p.Languages,
-		RelationshipGoal: relGoal,
-		HasChildren:      p.HasChildren,
-		WantsChildren:    p.WantsChildren,
-		Bio:              p.Bio,
-		Interests:        p.Interests,
 
-		// Mapeo de campos nuevos
+	return profileResponse{
+		ID:                p.ID.String(),
+		DisplayName:       p.DisplayName,
+		Age:               p.Age(),
+		Gender:            string(p.Gender),
+		CountryCode:       p.CountryCode,
+		Region:            p.Region,
+		RelationshipGoals: goals,
+		HasChildren:       p.HasChildren,
+		WantsChildren:     p.WantsChildren,
+		Bio:               p.Bio,
+
 		Height:                p.Height,
 		Weight:                p.Weight,
 		BodyType:              p.BodyType,
@@ -170,17 +163,15 @@ func toPhotoResponsePublic(ph *Photo, profileID uuid.UUID) photoResponse {
 }
 
 type createProfileRequest struct {
-	DisplayName      string   `json:"display_name"`
-	BirthDate        string   `json:"birth_date"`
-	Gender           string   `json:"gender"`
-	CountryCode      string   `json:"country_code"`
-	Region           *string  `json:"region"`
-	Languages        []string `json:"languages"`
-	RelationshipGoal *string  `json:"relationship_goal"`
-	HasChildren      *string  `json:"has_children"`
-	WantsChildren    *string  `json:"wants_children"`
-	Bio              *string  `json:"bio"`
-	Interests        []string `json:"interests"`
+	DisplayName       string   `json:"display_name"`
+	BirthDate         string   `json:"birth_date"`
+	Gender            string   `json:"gender"`
+	CountryCode       string   `json:"country_code"`
+	Region            *string  `json:"region"`
+	RelationshipGoals []string `json:"relationship_goals"`
+	HasChildren       *string  `json:"has_children"`
+	WantsChildren     *string  `json:"wants_children"`
+	Bio               *string  `json:"bio"`
 
 	Height                *int     `json:"height"`
 	Weight                *int     `json:"weight"`
@@ -208,7 +199,6 @@ type createProfileRequest struct {
 	ReligiousValues       *string  `json:"religious_values"`
 	StarSign              *string  `json:"star_sign"`
 
-	// --- NUEVOS CAMPOS (Über mich / estilo de vida) ---
 	FutureVision       []string `json:"future_vision"`
 	Sports             []string `json:"sports"`
 	LikesPets          *string  `json:"likes_pets"`
@@ -220,40 +210,59 @@ type createProfileRequest struct {
 	DreamWish          *string  `json:"dream_wish"`
 }
 
-// --- DTOs: hobbies ----------------------------------------------------
+// --- DTOs: idiomas ----------------------------------------------------
 
-type hobbyDefinitionResponse struct {
-	Key       string `json:"key"`
-	Category  string `json:"category"`
-	Label     string `json:"label"`
-	SortOrder int    `json:"sort_order"`
+type profileLanguageResponse struct {
+	LanguageCode string `json:"language_code"`
+	Level        *int   `json:"level"`
+	UpdatedAt    string `json:"updated_at"`
 }
 
-func toHobbyDefinitionResponse(d HobbyDefinition) hobbyDefinitionResponse {
-	return hobbyDefinitionResponse{Key: d.Key, Category: d.Category, Label: d.Label, SortOrder: d.SortOrder}
-}
-
-type profileHobbyResponse struct {
-	HobbyKey  string `json:"hobby_key"`
-	Liked     bool   `json:"liked"`
-	Intensity *int   `json:"intensity"`
-	UpdatedAt string `json:"updated_at"`
-}
-
-func toProfileHobbyResponse(ph ProfileHobby) profileHobbyResponse {
-	return profileHobbyResponse{
-		HobbyKey:  ph.HobbyKey,
-		Liked:     ph.Liked,
-		Intensity: ph.Intensity,
-		UpdatedAt: ph.UpdatedAt.Format(time.RFC3339),
+func toProfileLanguageResponse(pl ProfileLanguage) profileLanguageResponse {
+	return profileLanguageResponse{
+		LanguageCode: pl.LanguageCode,
+		Level:        pl.Level,
+		UpdatedAt:    pl.UpdatedAt.Format(time.RFC3339),
 	}
 }
 
-// setHobbyRequest: liked es obligatorio; intensity solo tiene sentido si
-// liked=true (si no, el Service lo rechaza con un invalidField).
-type setHobbyRequest struct {
-	Liked     bool `json:"liked"`
-	Intensity *int `json:"intensity"`
+type setLanguageRequest struct {
+	Level *int `json:"level"`
+}
+
+// --- DTOs: intereses --------------------------------------------------
+
+type interestDefinitionResponse struct {
+	Key       string `json:"key"`
+	Category  string `json:"category"`
+	Label     string `json:"label"`
+	HasLevel  bool   `json:"has_level"`
+	SortOrder int    `json:"sort_order"`
+}
+
+func toInterestDefinitionResponse(d InterestDefinition) interestDefinitionResponse {
+	return interestDefinitionResponse{Key: d.Key, Category: d.Category, Label: d.Label, HasLevel: d.HasLevel, SortOrder: d.SortOrder}
+}
+
+type profileInterestResponse struct {
+	InterestKey string `json:"interest_key"`
+	Level       *int   `json:"level"`
+	UpdatedAt   string `json:"updated_at"`
+}
+
+func toProfileInterestResponse(pi ProfileInterest) profileInterestResponse {
+	return profileInterestResponse{
+		InterestKey: pi.InterestKey,
+		Level:       pi.Level,
+		UpdatedAt:   pi.UpdatedAt.Format(time.RFC3339),
+	}
+}
+
+// setInterestRequest: level va vacío/null para los intereses concretos
+// (has_level=false) y es obligatorio para los que se puntúan — el
+// Service es quien conoce esa regla y la aplica, aquí solo se parsea.
+type setInterestRequest struct {
+	Level *int `json:"level"`
 }
 
 // --- DTOs: personalidad -------------------------------------------------
@@ -297,11 +306,8 @@ func toPersonalityTraitScoreResponse(s PersonalityTraitScore) personalityTraitSc
 	}
 }
 
-// personalityResponse agrupa las respuestas individuales y el agregado
-// por rasgo (el "Gesamt"), para que el cliente no tenga que hacer dos
-// peticiones ni recalcular la media él mismo.
 type personalityResponse struct {
-	Answers     []personalityAnswerResponse    `json:"answers"`
+	Answers     []personalityAnswerResponse     `json:"answers"`
 	TraitScores []personalityTraitScoreResponse `json:"trait_scores"`
 }
 
@@ -423,24 +429,21 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var relGoal *RelationshipGoal
-	if req.RelationshipGoal != nil {
-		g := RelationshipGoal(*req.RelationshipGoal)
-		relGoal = &g
+	goals := make([]RelationshipGoal, len(req.RelationshipGoals))
+	for i, g := range req.RelationshipGoals {
+		goals[i] = RelationshipGoal(g)
 	}
 
 	p, err := h.svc.CreateProfile(r.Context(), userID, CreateProfileInput{
-		DisplayName:      req.DisplayName,
-		BirthDate:        birthDate,
-		Gender:           Gender(req.Gender),
-		CountryCode:      req.CountryCode,
-		Region:           req.Region,
-		Languages:        req.Languages,
-		RelationshipGoal: relGoal,
-		HasChildren:      req.HasChildren,
-		WantsChildren:    req.WantsChildren,
-		Bio:              req.Bio,
-		Interests:        req.Interests,
+		DisplayName:       req.DisplayName,
+		BirthDate:         birthDate,
+		Gender:            Gender(req.Gender),
+		CountryCode:       req.CountryCode,
+		Region:            req.Region,
+		RelationshipGoals: goals,
+		HasChildren:       req.HasChildren,
+		WantsChildren:     req.WantsChildren,
+		Bio:               req.Bio,
 
 		Height:                req.Height,
 		Weight:                req.Weight,
@@ -597,27 +600,26 @@ func buildProfilePatch(raw map[string]json.RawMessage) (ProfilePatch, error) {
 		patch.CountryCode = &s
 	}
 
-	if v, ok := raw["relationship_goal"]; ok {
-		patch.RelationshipGoalSet = true
+	if v, ok := raw["relationship_goals"]; ok {
+		patch.RelationshipGoalsSet = true
 		if !isJSONNull(v) {
-			var s string
-			if err := json.Unmarshal(v, &s); err != nil {
-				return patch, invalidField("relationship_goal", "debe ser texto o null")
+			var ss []string
+			if err := json.Unmarshal(v, &ss); err != nil {
+				return patch, invalidField("relationship_goals", "debe ser una lista de textos o null")
 			}
-			g := RelationshipGoal(s)
-			patch.RelationshipGoal = &g
+			goals := make([]RelationshipGoal, len(ss))
+			for i, s := range ss {
+				goals[i] = RelationshipGoal(s)
+			}
+			patch.RelationshipGoals = goals
 		}
 	}
 
-	// Parsing de los campos opcionales mediante helpers
 	if err := parseString("region", &patch.Region, &patch.RegionSet); err != nil { return patch, err }
-	if err := parseSlice("languages", &patch.Languages, &patch.LanguagesSet); err != nil { return patch, err }
 	if err := parseString("has_children", &patch.HasChildren, &patch.HasChildrenSet); err != nil { return patch, err }
 	if err := parseString("wants_children", &patch.WantsChildren, &patch.WantsChildrenSet); err != nil { return patch, err }
 	if err := parseString("bio", &patch.Bio, &patch.BioSet); err != nil { return patch, err }
-	if err := parseSlice("interests", &patch.Interests, &patch.InterestsSet); err != nil { return patch, err }
 
-	// Nuevos campos
 	if err := parseInt("height", &patch.Height, &patch.HeightSet); err != nil { return patch, err }
 	if err := parseInt("weight", &patch.Weight, &patch.WeightSet); err != nil { return patch, err }
 	if err := parseString("body_type", &patch.BodyType, &patch.BodyTypeSet); err != nil { return patch, err }
@@ -646,7 +648,6 @@ func buildProfilePatch(raw map[string]json.RawMessage) (ProfilePatch, error) {
 	if err := parseString("religious_values", &patch.ReligiousValues, &patch.ReligiousValuesSet); err != nil { return patch, err }
 	if err := parseString("star_sign", &patch.StarSign, &patch.StarSignSet); err != nil { return patch, err }
 
-	// Nuevos campos (Über mich / estilo de vida)
 	if err := parseSlice("future_vision", &patch.FutureVision, &patch.FutureVisionSet); err != nil { return patch, err }
 	if err := parseSlice("sports", &patch.Sports, &patch.SportsSet); err != nil { return patch, err }
 	if err := parseString("likes_pets", &patch.LikesPets, &patch.LikesPetsSet); err != nil { return patch, err }
@@ -664,7 +665,7 @@ func isJSONNull(raw json.RawMessage) bool {
 	return string(raw) == "null"
 }
 
-// --- Fotos y perfiles públicos se mantienen idénticos ---
+// --- Fotos -------------------------------------------------------------
 
 func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())
@@ -843,25 +844,206 @@ func (h *Handler) ServePublicPhoto(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.Copy(w, rc)
 }
 
-// --- Handlers: catálogos ---------------------------------------------
-//
-// De solo lectura, iguales para cualquier usuario autenticado: el
-// frontend los usa para renderizar los checkboxes/afirmaciones sin
-// tener que hardcodear las listas.
+// --- Handlers: idiomas del usuario -------------------------------------
 
-func (h *Handler) ListHobbyCatalog(w http.ResponseWriter, r *http.Request) {
-	defs, err := h.svc.ListHobbyCatalog(r.Context())
+func (h *Handler) ListMyLanguages(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	languages, err := h.svc.ListMyLanguages(r.Context(), userID)
 	if err != nil {
 		writeProfileError(w, err)
 		return
 	}
 
-	resp := make([]hobbyDefinitionResponse, 0, len(defs))
-	for _, d := range defs {
-		resp = append(resp, toHobbyDefinitionResponse(d))
+	resp := make([]profileLanguageResponse, 0, len(languages))
+	for _, l := range languages {
+		resp = append(resp, toProfileLanguageResponse(l))
 	}
 	httpx.WriteJSON(w, http.StatusOK, resp)
 }
+
+// SetLanguage espera el código de idioma en el path (ej. PUT
+// /profiles/me/languages/{code}).
+func (h *Handler) SetLanguage(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	code := r.PathValue("code")
+
+	var req setLanguageRequest
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_body", "El cuerpo de la petición no es válido.")
+		return
+	}
+
+	pl, err := h.svc.SetLanguage(r.Context(), userID, code, req.Level)
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, toProfileLanguageResponse(*pl))
+}
+
+func (h *Handler) DeleteLanguage(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	code := r.PathValue("code")
+
+	if err := h.svc.DeleteLanguage(r.Context(), userID, code); err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) ListPublicLanguages(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	profileID, err := uuid.Parse(r.PathValue("profileID"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+		return
+	}
+
+	languages, err := h.svc.ListPublicLanguages(r.Context(), viewerID, profileID)
+	if err != nil {
+		writePublicProfileError(w, err)
+		return
+	}
+
+	resp := make([]profileLanguageResponse, 0, len(languages))
+	for _, l := range languages {
+		resp = append(resp, toProfileLanguageResponse(l))
+	}
+	httpx.WriteJSON(w, http.StatusOK, resp)
+}
+
+// --- Handlers: catálogo de intereses ------------------------------------
+
+func (h *Handler) ListInterestCatalog(w http.ResponseWriter, r *http.Request) {
+	defs, err := h.svc.ListInterestCatalog(r.Context())
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	resp := make([]interestDefinitionResponse, 0, len(defs))
+	for _, d := range defs {
+		resp = append(resp, toInterestDefinitionResponse(d))
+	}
+	httpx.WriteJSON(w, http.StatusOK, resp)
+}
+
+// --- Handlers: intereses del usuario -------------------------------------
+
+func (h *Handler) ListMyInterests(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	interests, err := h.svc.ListMyInterests(r.Context(), userID)
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	resp := make([]profileInterestResponse, 0, len(interests))
+	for _, pi := range interests {
+		resp = append(resp, toProfileInterestResponse(pi))
+	}
+	httpx.WriteJSON(w, http.StatusOK, resp)
+}
+
+// SetInterest espera interest_key en el path (ej. PUT
+// /profiles/me/interests/{key}).
+func (h *Handler) SetInterest(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	interestKey := r.PathValue("key")
+
+	var req setInterestRequest
+	if err := httpx.DecodeJSON(r, &req); err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_body", "El cuerpo de la petición no es válido.")
+		return
+	}
+
+	pi, err := h.svc.SetInterest(r.Context(), userID, interestKey, req.Level)
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, toProfileInterestResponse(*pi))
+}
+
+// DeleteInterest vuelve un interés a "no seleccionado" (idempotente).
+func (h *Handler) DeleteInterest(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	interestKey := r.PathValue("key")
+
+	if err := h.svc.DeleteInterest(r.Context(), userID, interestKey); err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (h *Handler) ListPublicInterests(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	profileID, err := uuid.Parse(r.PathValue("profileID"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+		return
+	}
+
+	interests, err := h.svc.ListPublicInterests(r.Context(), viewerID, profileID)
+	if err != nil {
+		writePublicProfileError(w, err)
+		return
+	}
+
+	resp := make([]profileInterestResponse, 0, len(interests))
+	for _, pi := range interests {
+		resp = append(resp, toProfileInterestResponse(pi))
+	}
+	httpx.WriteJSON(w, http.StatusOK, resp)
+}
+
+// --- Handlers: catálogo y respuestas de personalidad ----------------------
 
 func (h *Handler) ListPersonalityCatalog(w http.ResponseWriter, r *http.Request) {
 	stmts, err := h.svc.ListPersonalityCatalog(r.Context())
@@ -876,99 +1058,6 @@ func (h *Handler) ListPersonalityCatalog(w http.ResponseWriter, r *http.Request)
 	}
 	httpx.WriteJSON(w, http.StatusOK, resp)
 }
-
-// --- Handlers: hobbies del usuario -------------------------------------
-
-func (h *Handler) ListMyHobbies(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
-	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
-		return
-	}
-
-	hobbies, err := h.svc.ListMyHobbies(r.Context(), userID)
-	if err != nil {
-		writeProfileError(w, err)
-		return
-	}
-
-	resp := make([]profileHobbyResponse, 0, len(hobbies))
-	for _, ph := range hobbies {
-		resp = append(resp, toProfileHobbyResponse(ph))
-	}
-	httpx.WriteJSON(w, http.StatusOK, resp)
-}
-
-// SetHobby espera el hobby_key en el path (ej. PUT /profiles/me/hobbies/{key}).
-func (h *Handler) SetHobby(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
-	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
-		return
-	}
-
-	hobbyKey := r.PathValue("key")
-
-	var req setHobbyRequest
-	if err := httpx.DecodeJSON(r, &req); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_body", "El cuerpo de la petición no es válido.")
-		return
-	}
-
-	ph, err := h.svc.SetHobby(r.Context(), userID, hobbyKey, req.Liked, req.Intensity)
-	if err != nil {
-		writeProfileError(w, err)
-		return
-	}
-
-	httpx.WriteJSON(w, http.StatusOK, toProfileHobbyResponse(*ph))
-}
-
-// DeleteHobby vuelve un hobby a "no contestado" (idempotente).
-func (h *Handler) DeleteHobby(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
-	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
-		return
-	}
-
-	hobbyKey := r.PathValue("key")
-
-	if err := h.svc.DeleteHobby(r.Context(), userID, hobbyKey); err != nil {
-		writeProfileError(w, err)
-		return
-	}
-
-	w.WriteHeader(http.StatusNoContent)
-}
-
-func (h *Handler) ListPublicHobbies(w http.ResponseWriter, r *http.Request) {
-	viewerID, ok := auth.UserIDFromContext(r.Context())
-	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
-		return
-	}
-
-	profileID, err := uuid.Parse(r.PathValue("profileID"))
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
-		return
-	}
-
-	hobbies, err := h.svc.ListPublicHobbies(r.Context(), viewerID, profileID)
-	if err != nil {
-		writePublicProfileError(w, err)
-		return
-	}
-
-	resp := make([]profileHobbyResponse, 0, len(hobbies))
-	for _, ph := range hobbies {
-		resp = append(resp, toProfileHobbyResponse(ph))
-	}
-	httpx.WriteJSON(w, http.StatusOK, resp)
-}
-
-// --- Handlers: personalidad del usuario ----------------------------------
 
 func (h *Handler) GetMyPersonality(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())
@@ -986,8 +1075,6 @@ func (h *Handler) GetMyPersonality(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, toPersonalityResponse(answers, scores))
 }
 
-// SetPersonalityAnswer espera statement_key en el path (ej. PUT
-// /profiles/me/personality/{key}).
 func (h *Handler) SetPersonalityAnswer(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
@@ -1080,9 +1167,6 @@ func (h *Handler) UpdatePartnerPreferences(w http.ResponseWriter, r *http.Reques
 	httpx.WriteJSON(w, http.StatusOK, toPartnerPreferencesResponse(pp))
 }
 
-// buildPartnerPreferencesPatch sigue el mismo patrón que buildProfilePatch:
-// helpers locales que distinguen "clave ausente" (no tocar) de "clave a
-// null" (borrar), a partir de un mapa de json.RawMessage.
 func buildPartnerPreferencesPatch(raw map[string]json.RawMessage) (PartnerPreferencesPatch, error) {
 	var patch PartnerPreferencesPatch
 
@@ -1179,6 +1263,8 @@ func writeProfileError(w http.ResponseWriter, err error) {
 		httpx.WriteError(w, http.StatusNotFound, "photo_not_found", "Foto no encontrada.")
 	case errors.Is(err, ErrTooManyPhotos):
 		httpx.WriteError(w, http.StatusConflict, "too_many_photos", fmt.Sprintf("Máximo %d fotos por perfil.", MaxPhotosPerProfile))
+	case errors.Is(err, ErrInterestNotFound):
+		httpx.WriteError(w, http.StatusNotFound, "interest_not_found", "Ese interés no existe en el catálogo.")
 	default:
 		httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo completar la operación.")
 	}

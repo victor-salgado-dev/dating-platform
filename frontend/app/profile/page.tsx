@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 
 import {
@@ -8,8 +8,9 @@ import {
   ApiError,
   ProfilePhoto,
   PublicProfile,
-  HobbyDefinition,
-  ProfileHobby,
+  ProfileLanguage,
+  InterestDefinition,
+  ProfileInterest,
   PersonalityResponse,
   PartnerPreferences,
 } from '@/lib/api';
@@ -45,14 +46,11 @@ import {
   VACATION_ACTIVITIES_OPTIONS,
   PARTNER_IMPORTANCE_FIELDS,
   PERSONALITY_TRAIT_LABELS,
+  LANGUAGE_OPTIONS,
   Option,
 } from '@/lib/profileOptions';
 import styles from '../profiles/[id]/page.module.css';
 
-// label(s) busca la etiqueta legible de un valor (o lista de valores)
-// dentro de una lista de opciones; si no la encuentra, muestra el valor
-// en crudo en vez de nada, para no ocultar datos por un desajuste de
-// catálogo.
 function label(value: string | null, options: Option[]): string | null {
   if (!value) return null;
   return options.find((o) => o.value === value)?.label ?? value;
@@ -66,15 +64,16 @@ function labelList(values: string[] | null, options: Option[]): string | null {
 export default function MyProfilePage() {
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [photos, setPhotos] = useState<ProfilePhoto[]>([]);
-  const [hobbyCatalog, setHobbyCatalog] = useState<HobbyDefinition[]>([]);
-  const [myHobbies, setMyHobbies] = useState<ProfileHobby[]>([]);
+  const [languages, setLanguages] = useState<ProfileLanguage[]>([]);
+  const [interestCatalog, setInterestCatalog] = useState<InterestDefinition[]>([]);
+  const [myInterests, setMyInterests] = useState<ProfileInterest[]>([]);
   const [personality, setPersonality] = useState<PersonalityResponse | null>(null);
   const [partnerPrefs, setPartnerPrefs] = useState<PartnerPreferences | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch<HobbyDefinition[]>('/catalog/hobbies').then(setHobbyCatalog).catch(() => setHobbyCatalog([]));
+    apiFetch<InterestDefinition[]>('/catalog/interests').then(setInterestCatalog).catch(() => setInterestCatalog([]));
 
     apiFetch<PublicProfile>('/profiles/me')
       .then(async (data) => {
@@ -85,9 +84,14 @@ export default function MyProfilePage() {
           setPhotos([]);
         }
         try {
-          setMyHobbies(await apiFetch<ProfileHobby[]>('/profiles/me/hobbies'));
+          setLanguages(await apiFetch<ProfileLanguage[]>('/profiles/me/languages'));
         } catch {
-          setMyHobbies([]);
+          setLanguages([]);
+        }
+        try {
+          setMyInterests(await apiFetch<ProfileInterest[]>('/profiles/me/interests'));
+        } catch {
+          setMyInterests([]);
         }
         try {
           setPersonality(await apiFetch<PersonalityResponse>('/profiles/me/personality'));
@@ -110,9 +114,32 @@ export default function MyProfilePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  const hobbyLabel = (key: string) => hobbyCatalog.find((h) => h.key === key)?.label ?? key;
-  const likedHobbies = myHobbies.filter((h) => h.liked);
-  const dislikedHobbies = myHobbies.filter((h) => !h.liked);
+  const interestByKey = useMemo(() => {
+    const map: Record<string, InterestDefinition> = {};
+    for (const d of interestCatalog) map[d.key] = d;
+    return map;
+  }, [interestCatalog]);
+
+  // "Mis intereses": los que tienen nivel, ordenados de mayor a menor.
+  const leveledInterests = useMemo(
+    () =>
+      myInterests
+        .filter((i) => i.level != null)
+        .map((i) => ({ ...i, def: interestByKey[i.interest_key] }))
+        .filter((i) => i.def)
+        .sort((a, b) => (b.level ?? 0) - (a.level ?? 0)),
+    [myInterests, interestByKey]
+  );
+
+  // "También me gusta": los que no tienen nivel (concretos).
+  const concreteInterests = useMemo(
+    () =>
+      myInterests
+        .filter((i) => i.level == null)
+        .map((i) => interestByKey[i.interest_key])
+        .filter((d): d is InterestDefinition => Boolean(d)),
+    [myInterests, interestByKey]
+  );
 
   return (
     <main className={styles.main}>
@@ -160,10 +187,28 @@ export default function MyProfilePage() {
             <dt>Género</dt><dd>{profile.gender}</dd>
             <dt>¿Tiene hijos?</dt><dd>{label(profile.has_children, HAS_CHILDREN_OPTIONS) ?? 'No indicado'}</dd>
             <dt>¿Quiere tener hijos?</dt><dd>{label(profile.wants_children, WANTS_CHILDREN_OPTIONS) ?? 'No indicado'}</dd>
-            {profile.relationship_goal && (<><dt>Busca</dt><dd>{label(profile.relationship_goal, RELATIONSHIP_GOAL_OPTIONS)}</dd></>)}
-            {profile.languages && profile.languages.length > 0 && (<><dt>Idiomas</dt><dd>{profile.languages.join(', ')}</dd></>)}
-            {profile.interests && profile.interests.length > 0 && (<><dt>Intereses</dt><dd>{profile.interests.join(', ')}</dd></>)}
+            {profile.relationship_goals && profile.relationship_goals.length > 0 && (
+              <><dt>Busca</dt><dd>{labelList(profile.relationship_goals, RELATIONSHIP_GOAL_OPTIONS)}</dd></>
+            )}
           </dl>
+
+          {/* --- Idiomas --- */}
+          {languages.length > 0 && (
+            <>
+              <h2>Idiomas</h2>
+              <ul>
+                {languages.map((l) => {
+                  const opt = LANGUAGE_OPTIONS.find((o) => o.value === l.language_code);
+                  return (
+                    <li key={l.language_code}>
+                      {opt?.label ?? l.language_code}
+                      {l.level != null ? ` — ${l.level}/5` : ''}
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
 
           {/* --- Físico y apariencia --- */}
           <h2>Físico y apariencia</h2>
@@ -216,19 +261,27 @@ export default function MyProfilePage() {
           </dl>
           {profile.dream_wish && <p className={styles.bio}>&ldquo;{profile.dream_wish}&rdquo;</p>}
 
-          {/* --- Hobbies --- */}
-          {(likedHobbies.length > 0 || dislikedHobbies.length > 0) && (
+          {/* --- Intereses: exactamente el formato pedido --- */}
+          {leveledInterests.length > 0 && (
             <>
-              <h2>Hobbies</h2>
-              {likedHobbies.length > 0 && (
-                <ul>
-                  {likedHobbies.map((h) => (
-                    <li key={h.hobby_key}>
-                      {hobbyLabel(h.hobby_key)}{h.intensity != null ? ` — intensidad ${h.intensity}/5` : ''}
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <h2>Mis intereses</h2>
+              <ul>
+                {leveledInterests.map((i) => (
+                  <li key={i.interest_key}>
+                    {i.def.label} — {i.level}/5
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
+          {concreteInterests.length > 0 && (
+            <>
+              <h2>También me gusta</h2>
+              <ul>
+                {concreteInterests.map((d) => (
+                  <li key={d.key}>{d.label}</li>
+                ))}
+              </ul>
             </>
           )}
 
@@ -238,10 +291,10 @@ export default function MyProfilePage() {
               <h2>Personalidad</h2>
               <dl className={styles.details}>
                 {personality.trait_scores.map((score) => (
-                  <>
-                    <dt key={`${score.trait_key}-dt`}>{PERSONALITY_TRAIT_LABELS[score.trait_key] ?? score.trait_key}</dt>
-                    <dd key={`${score.trait_key}-dd`}>{score.average_score.toFixed(2)} / 5 ({score.answered_count} respuestas)</dd>
-                  </>
+                  <Fragment key={score.trait_key}>
+                    <dt>{PERSONALITY_TRAIT_LABELS[score.trait_key] ?? score.trait_key}</dt>
+                    <dd>{score.average_score.toFixed(2)} / 5 ({score.answered_count} respuestas)</dd>
+                  </Fragment>
                 ))}
               </dl>
             </>
@@ -262,10 +315,10 @@ export default function MyProfilePage() {
                   <><dt>Rasgos que busco</dt><dd>{partnerPrefs.desired_traits.join(', ')}</dd></>
                 )}
                 {PARTNER_IMPORTANCE_FIELDS.filter((f) => (partnerPrefs as unknown as Record<string, number | null>)[f.key] != null).map((f) => (
-                  <>
-                    <dt key={`${f.key}-dt`}>{f.label}</dt>
-                    <dd key={`${f.key}-dd`}>{(partnerPrefs as unknown as Record<string, number | null>)[f.key]}/5</dd>
-                  </>
+                  <Fragment key={f.key}>
+                    <dt>{f.label}</dt>
+                    <dd>{(partnerPrefs as unknown as Record<string, number | null>)[f.key]}/5</dd>
+                  </Fragment>
                 ))}
               </dl>
               {partnerPrefs.about_partner_text && <p className={styles.bio}>{partnerPrefs.about_partner_text}</p>}

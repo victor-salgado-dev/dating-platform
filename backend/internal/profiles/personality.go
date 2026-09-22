@@ -21,7 +21,7 @@ const (
 
 // PersonalityStatement es una afirmación del catálogo (tabla
 // personality_statements), agrupada bajo un rasgo. Dato semi-estático,
-// igual que HobbyDefinition.
+// igual que InterestDefinition.
 type PersonalityStatement struct {
 	Key       string
 	TraitKey  PersonalityTrait
