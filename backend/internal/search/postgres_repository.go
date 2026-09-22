@@ -62,15 +62,29 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		add("p.country_code = $%d", *f.CountryCode)
 	}
 
+	// Idiomas: no viven en profiles p.languages, sino en la tabla profile_languages
 	if len(f.Languages) > 0 {
-		add("p.languages && $%d", f.Languages)
-	}
-	if len(f.Interests) > 0 {
-		add("p.interests && $%d", f.Interests)
+		add(`EXISTS (
+			SELECT 1 FROM profile_languages pl
+			WHERE pl.profile_id = p.id AND pl.language_code = ANY($%d)
+		)`, f.Languages)
 	}
 
-	if f.RelationshipGoal != nil {
-		add("p.relationship_goal = $%d", string(*f.RelationshipGoal))
+	// Intereses: viven en la tabla profile_interests
+	if len(f.Interests) > 0 {
+		add(`EXISTS (
+			SELECT 1 FROM profile_interests pi
+			WHERE pi.profile_id = p.id AND pi.interest_key = ANY($%d)
+		)`, f.Interests)
+	}
+
+	// RelationshipGoals: ahora es una columna text[] llamada relationship_goals
+	if len(f.RelationshipGoals) > 0 {
+		goals := make([]string, len(f.RelationshipGoals))
+		for i, g := range f.RelationshipGoals {
+			goals[i] = string(g)
+		}
+		add("p.relationship_goals && $%d", goals)
 	}
 
 	// Cambiado de booleano a string
@@ -162,24 +176,35 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		add("p.star_sign = $%d", *f.StarSign)
 	}
 
+	// --- NUEVOS FILTROS: Estilo de vida adicional ---
+	if len(f.FutureVision) > 0 {
+		add("p.future_vision && $%d", f.FutureVision)
+	}
+	if len(f.Sports) > 0 {
+		add("p.sports && $%d", f.Sports)
+	}
+	if f.LikesPets != nil {
+		add("p.likes_pets = $%d", *f.LikesPets)
+	}
+	if len(f.PetsOwned) > 0 {
+		add("p.pets_owned && $%d", f.PetsOwned)
+	}
+	if f.FavoriteSeason != nil {
+		add("p.favorite_season = $%d", *f.FavoriteSeason)
+	}
+	if len(f.IdealVacationStyle) > 0 {
+		add("p.ideal_vacation_style && $%d", f.IdealVacationStyle)
+	}
+	if len(f.VacationActivities) > 0 {
+		add("p.vacation_activities && $%d", f.VacationActivities)
+	}
+
 	// --- NUEVOS FILTROS: Hobbies (Fase 2) -------------------------------
-	//
-	// A diferencia de todos los filtros anteriores, un hobby no es una
-	// columna de `profiles`: vive en profile_hobbies, una fila por
-	// (perfil, hobby) que solo existe si el usuario contestó. Por eso
-	// no puede ser un simple "p.columna = $N": necesita un EXISTS contra
-	// esa tabla. Que la fila no exista (no contestado) o exista con
-	// liked=false (no le gusta) hace que el EXISTS sea falso en ambos
-	// casos — la regla de datos faltantes sale gratis de esto.
 	for _, hf := range f.Hobbies {
 		where = append(where, hobbyExistsClause(hf, &args))
 	}
 
 	// --- NUEVOS FILTROS: Personalidad (Fase 2) ---------------------------
-	//
-	// Mismo razonamiento que los hobbies, pero contra la vista agregada
-	// profile_personality_trait_scores (que ya solo tiene fila para los
-	// rasgos con al menos una respuesta).
 	for _, pf := range f.PersonalityTraits {
 		where = append(where, personalityExistsClause(pf, &args))
 	}
@@ -193,7 +218,7 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 	query := fmt.Sprintf(`
 		SELECT
 			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
-			p.relationship_goal, p.created_at,
+			COALESCE(p.relationship_goals, '{}') AS relationship_goals, p.created_at,
 			EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
 			COUNT(*) OVER() AS total_count
 		FROM profiles p
@@ -214,25 +239,27 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 
 	for rows.Next() {
 		var (
-			item       ResultItem
-			genderStr  string
-			relGoalStr *string
-			birthDate  time.Time
-			totalCount int
+			item         ResultItem
+			genderStr    string
+			relGoalsList []string
+			birthDate    time.Time
+			totalCount   int
 		)
 
 		if err := rows.Scan(
 			&item.ProfileID, &item.DisplayName, &birthDate, &genderStr, &item.CountryCode,
-			&item.Region, &relGoalStr, &item.CreatedAt, &item.HasPhoto, &totalCount,
+			&item.Region, &relGoalsList, &item.CreatedAt, &item.HasPhoto, &totalCount,
 		); err != nil {
 			return nil, fmt.Errorf("search: leer resultado: %w", err)
 		}
 
 		item.Age = profiles.AgeAt(birthDate, now)
 		item.Gender = profiles.Gender(genderStr)
-		if relGoalStr != nil {
-			g := profiles.RelationshipGoal(*relGoalStr)
-			item.RelationshipGoal = &g
+		if len(relGoalsList) > 0 {
+			item.RelationshipGoals = make([]profiles.RelationshipGoal, len(relGoalsList))
+			for i, rg := range relGoalsList {
+				item.RelationshipGoals[i] = profiles.RelationshipGoal(rg)
+			}
 		}
 
 		total = totalCount
@@ -256,11 +283,6 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 	}, nil
 }
 
-// hobbyExistsClause construye el EXISTS para un HobbyFilter y añade sus
-// argumentos a *args, devolviendo la cláusula ya con los $N correctos.
-// Recibe *args (no lo devuelve) para poder usarse en un simple bucle
-// "for _, hf := range f.Hobbies" sin tener que reasignar args a mano en
-// cada vuelta.
 func hobbyExistsClause(hf HobbyFilter, args *[]any) string {
 	*args = append(*args, hf.Key)
 	keyArg := len(*args)
@@ -283,8 +305,6 @@ func hobbyExistsClause(hf HobbyFilter, args *[]any) string {
 	return b.String()
 }
 
-// personalityExistsClause es el equivalente de hobbyExistsClause para
-// un PersonalityFilter, contra la vista agregada por rasgo.
 func personalityExistsClause(pf PersonalityFilter, args *[]any) string {
 	*args = append(*args, pf.TraitKey)
 	keyArg := len(*args)

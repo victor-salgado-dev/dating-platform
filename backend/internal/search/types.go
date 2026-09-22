@@ -73,12 +73,12 @@ type RawBounds struct {
 // campo vacío/nil significa "no filtrar por esto", no "buscar valores
 // vacíos". Ver REGLA DE LOS DATOS FALTANTES en Repository.Search.
 type Filters struct {
-	Genders          []profiles.Gender
-	MinAge           *int
-	MaxAge           *int
-	CountryCode      *string
-	Languages        []string
-	RelationshipGoal *profiles.RelationshipGoal
+	Genders           []profiles.Gender
+	MinAge            *int
+	MaxAge            *int
+	CountryCode       *string
+	Languages         []string
+	RelationshipGoals []profiles.RelationshipGoal
 
 	// Cambiados de *bool a *string
 	HasChildren   *string
@@ -116,6 +116,15 @@ type Filters struct {
 	ReligiousValues *string
 	StarSign        *string
 
+	// --- Estilo de vida adicional ---
+	FutureVision       []string
+	Sports             []string
+	LikesPets          *string
+	PetsOwned          []string
+	FavoriteSeason     *string
+	IdealVacationStyle []string
+	VacationActivities []string
+
 	// --- NUEVOS: Hobbies y personalidad (Fase 2) -------------------
 	// Varios filtros se combinan con AND: el perfil tiene que cumplir
 	// TODOS los que se pidan (ej: jardinería<4 Y viajar>3 a la vez).
@@ -137,15 +146,15 @@ type Params struct {
 // resultados. Deliberadamente no incluye bio/intereses/idiomas
 // completos: eso pertenece a la vista de perfil público (Fase 6).
 type ResultItem struct {
-	ProfileID        uuid.UUID
-	DisplayName      string
-	Age              int
-	Gender           profiles.Gender
-	CountryCode      string
-	Region           *string
-	RelationshipGoal *profiles.RelationshipGoal
-	HasPhoto         bool
-	CreatedAt        time.Time
+	ProfileID         uuid.UUID
+	DisplayName       string
+	Age               int
+	Gender            profiles.Gender
+	CountryCode       string
+	Region            *string
+	RelationshipGoals []profiles.RelationshipGoal
+	HasPhoto          bool
+	CreatedAt         time.Time
 }
 
 // Result es una página de resultados de búsqueda.
