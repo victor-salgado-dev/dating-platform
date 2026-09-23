@@ -5,11 +5,27 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 
 import { apiFetch, ApiError, PublicProfile, ProfilePhoto, MessageItem, REPORT_REASONS } from '@/lib/api';
+import { useI18n } from '@/lib/i18n/context';
 import styles from './page.module.css';
+
+// Mapea el value técnico de REPORT_REASONS a su clave de traducción.
+// El value sigue viajando al backend tal cual; solo traducimos el texto.
+const REPORT_REASON_KEY: Record<
+  string,
+  'spam' | 'fakeProfile' | 'harassment' | 'inappropriateContent' | 'underage' | 'other'
+> = {
+  spam: 'spam',
+  fake_profile: 'fakeProfile',
+  harassment: 'harassment',
+  inappropriate_content: 'inappropriateContent',
+  underage: 'underage',
+  other: 'other',
+};
 
 export default function ProfilePage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
+  const { dictionary } = useI18n();
   const [profile, setProfile] = useState<PublicProfile | null>(null);
   const [photos, setPhotos] = useState<ProfilePhoto[]>([]);
   const [favorited, setFavorited] = useState<boolean | null>(null);
@@ -72,14 +88,15 @@ export default function ProfilePage() {
       })
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 404) {
-          setError('Este perfil no existe o ya no está disponible.');
+          setError(dictionary.profilePublic.notFound);
         } else if (err instanceof ApiError && err.status === 401) {
-          setError('Inicia sesión para ver este perfil.');
+          setError(dictionary.profilePublic.unauthorized);
         } else {
-          setError('No se pudo cargar el perfil.');
+          setError(dictionary.profilePublic.loadError);
         }
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params?.id]);
 
   async function toggleFavorite() {
@@ -133,9 +150,9 @@ export default function ProfilePage() {
       router.push(`/messages/${sent.conversation_id}`);
     } catch (err) {
       if (err instanceof ApiError && err.status === 400 && err.code === 'cannot_message_self') {
-        setMessageError('No puedes enviarte un mensaje a ti mismo.');
+        setMessageError(dictionary.profilePublic.messageCannotSelf);
       } else {
-        setMessageError('No se pudo enviar el mensaje.');
+        setMessageError(dictionary.profilePublic.messageError);
       }
     } finally {
       setSendingMessage(false);
@@ -181,9 +198,9 @@ export default function ProfilePage() {
       setShowReportForm(false);
     } catch (err) {
       if (err instanceof ApiError && err.status === 400 && err.code === 'cannot_report_self') {
-        setReportError('No puedes reportarte a ti mismo.');
+        setReportError(dictionary.profilePublic.reportCannotSelf);
       } else {
-        setReportError('No se pudo enviar el reporte.');
+        setReportError(dictionary.profilePublic.reportError);
       }
     } finally {
       setReportSending(false);
@@ -193,10 +210,10 @@ export default function ProfilePage() {
   return (
     <main className={styles.main}>
       <Link href="/discover" className={styles.back}>
-        &larr; Volver a resultados
+        {dictionary.common.backToResults}
       </Link>
 
-      {loading && <p>Cargando…</p>}
+      {loading && <p>{dictionary.common.loading}</p>}
       {error && <p className={styles.error}>{error}</p>}
 
       {profile && (
@@ -212,7 +229,7 @@ export default function ProfilePage() {
               disabled={favoriteBusy}
               className={favorited ? styles.favoriteActive : styles.favoriteButton}
             >
-              {favorited ? '★ En favoritos' : '☆ Añadir a favoritos'}
+              {favorited ? dictionary.profilePublic.favoriteActive : dictionary.profilePublic.favoriteInactive}
             </button>
           )}
 
@@ -223,14 +240,16 @@ export default function ProfilePage() {
               disabled={likeBusy}
               className={liked ? styles.likeActive : styles.likeButton}
             >
-              {liked ? '♥ Te gusta' : '♡ Me gusta'}
+              {liked ? dictionary.profilePublic.likeActive : dictionary.profilePublic.likeInactive}
             </button>
           )}
 
           {showMatchNotice && (
             <div className={styles.matchNotice} role="status">
-              ¡Es un match! También le gustas a {profile.display_name}.
-              <button type="button" onClick={() => setShowMatchNotice(false)}>Cerrar</button>
+              {dictionary.profilePublic.matchNotice.replace('{name}', profile.display_name)}
+              <button type="button" onClick={() => setShowMatchNotice(false)}>
+                {dictionary.common.close}
+              </button>
             </div>
           )}
 
@@ -239,12 +258,12 @@ export default function ProfilePage() {
               type="text"
               value={messageDraft}
               onChange={(e) => setMessageDraft(e.target.value)}
-              placeholder={`Envía un mensaje a ${profile.display_name}…`}
+              placeholder={dictionary.profilePublic.messagePlaceholder.replace('{name}', profile.display_name)}
               maxLength={2000}
               disabled={sendingMessage}
             />
             <button type="submit" disabled={sendingMessage || !messageDraft.trim()}>
-              Enviar
+              {dictionary.common.send}
             </button>
           </form>
           {messageError && <p className={styles.error}>{messageError}</p>}
@@ -254,12 +273,24 @@ export default function ProfilePage() {
           </p>
 
           <dl className={styles.details}>
-            <dt>Género</dt>
+            <dt>{dictionary.profilePublic.fieldGender}</dt>
             <dd>{profile.gender}</dd>
-            <dt>¿Tiene hijos?</dt>
-            <dd>{profile.has_children === null ? 'No indicado' : profile.has_children ? 'Sí' : 'No'}</dd>
-            <dt>¿Quiere tener hijos?</dt>
-            <dd>{profile.wants_children === null ? 'No indicado' : profile.wants_children ? 'Sí' : 'No'}</dd>
+            <dt>{dictionary.profilePublic.fieldHasChildren}</dt>
+            <dd>
+              {profile.has_children === null
+                ? dictionary.common.notProvided
+                : profile.has_children
+                ? dictionary.common.yes
+                : dictionary.common.no}
+            </dd>
+            <dt>{dictionary.profilePublic.fieldWantsChildren}</dt>
+            <dd>
+              {profile.wants_children === null
+                ? dictionary.common.notProvided
+                : profile.wants_children
+                ? dictionary.common.yes
+                : dictionary.common.no}
+            </dd>
           </dl>
 
           {photos.length > 0 && (
@@ -277,7 +308,7 @@ export default function ProfilePage() {
           <dl className={styles.details}>
             {profile.relationship_goals && profile.relationship_goals.length > 0 && (
               <>
-                <dt>Busca</dt>
+                <dt>{dictionary.profilePublic.fieldLookingFor}</dt>
                 <dd>{profile.relationship_goals.join(', ')}</dd>
               </>
             )}
@@ -286,31 +317,31 @@ export default function ProfilePage() {
           <div className={styles.safetyActions}>
             {blocked !== null && (
               <button type="button" onClick={toggleBlock} disabled={blockBusy}>
-                {blocked ? 'Desbloquear' : 'Bloquear'}
+                {blocked ? dictionary.common.unblock : dictionary.common.block}
               </button>
             )}
             {!reportSent && (
               <button type="button" onClick={() => setShowReportForm((v) => !v)}>
-                Reportar
+                {dictionary.profilePublic.report}
               </button>
             )}
-            {reportSent && <span>Reporte enviado. Gracias.</span>}
+            {reportSent && <span>{dictionary.profilePublic.reportSent}</span>}
           </div>
 
           {showReportForm && (
             <form onSubmit={handleSendReport} className={styles.reportForm}>
               <label>
-                Motivo
+                {dictionary.profilePublic.reportReason}
                 <select value={reportReason} onChange={(e) => setReportReason(e.target.value)}>
                   {REPORT_REASONS.map((r) => (
                     <option key={r.value} value={r.value}>
-                      {r.label}
+                      {dictionary.reports.reasons[REPORT_REASON_KEY[r.value] ?? 'other']}
                     </option>
                   ))}
                 </select>
               </label>
               <label>
-                Detalles (opcional)
+                {dictionary.profilePublic.reportDetails}
                 <textarea
                   value={reportDescription}
                   onChange={(e) => setReportDescription(e.target.value)}
@@ -319,7 +350,7 @@ export default function ProfilePage() {
                 />
               </label>
               <button type="submit" disabled={reportSending}>
-                Enviar reporte
+                {dictionary.profilePublic.reportSubmit}
               </button>
             </form>
           )}

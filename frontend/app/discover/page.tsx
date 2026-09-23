@@ -11,6 +11,7 @@ import {
   LikesResponse,
   FavoritesResponse,
 } from '@/lib/api';
+import { useI18n } from '@/lib/i18n/context';
 import styles from './page.module.css';
 
 interface ProfileItem {
@@ -43,6 +44,7 @@ function PhotoGalleryModal({
   name: string;
   onClose: () => void;
 }) {
+  const { dictionary } = useI18n();
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -106,9 +108,9 @@ function PhotoGalleryModal({
         }}
       >
         {loading ? (
-          <p style={{ color: 'white', fontSize: '1.2rem' }}>Cargando fotos...</p>
+          <p style={{ color: 'white', fontSize: '1.2rem' }}>{dictionary.common.photoGalleryLoading}</p>
         ) : photos.length === 0 ? (
-          <p style={{ color: 'white', fontSize: '1.2rem' }}>Este perfil no tiene fotos.</p>
+          <p style={{ color: 'white', fontSize: '1.2rem' }}>{dictionary.common.photoGalleryEmpty}</p>
         ) : (
           <div
             style={{
@@ -145,7 +147,7 @@ function PhotoGalleryModal({
 
             <img
               src={currentPhotoUrl!}
-              alt={`Foto de ${name}`}
+              alt={dictionary.common.photoGalleryAlt.replace('{name}', name)}
               style={{
                 maxHeight: '80vh',
                 maxWidth: '90vw',
@@ -190,7 +192,10 @@ function PhotoGalleryModal({
               fontWeight: '500',
             }}
           >
-            {name} — {currentIndex + 1} de {photos.length}
+            {dictionary.common.photoGalleryCounter
+              .replace('{name}', name)
+              .replace('{current}', String(currentIndex + 1))
+              .replace('{total}', String(photos.length))}
           </p>
         )}
       </div>
@@ -216,6 +221,7 @@ function ProfileCard({
   receivedLike: boolean;
   receivedFavorite: boolean;
 }) {
+  const { dictionary } = useI18n();
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [liked, setLiked] = useState(initialLiked);
@@ -300,7 +306,7 @@ function ProfileCard({
           {photoUrl ? (
             <img src={photoUrl} alt={profile.display_name} className={styles.photoImg} />
           ) : (
-            <div className={styles.photoPlaceholder}>Sin Foto</div>
+            <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>
           )}
           {(receivedLike || receivedFavorite) && (
             <div className={styles.receivedBadges}>
@@ -359,7 +365,7 @@ function ProfileCard({
                     fontSize: '1rem',
                     transition: 'all 0.2s',
                   }}
-                  title="Ver fotos"
+                  title={dictionary.common.viewPhotos}
                 >
                   📸
                 </button>
@@ -382,7 +388,7 @@ function ProfileCard({
                   fontSize: '1rem',
                   transition: 'all 0.2s',
                 }}
-                title={liked ? 'Quitar Like' : 'Dar Like'}
+                title={liked ? dictionary.common.unlike : dictionary.common.like}
               >
                 {liked ? '❤️' : '🤍'}
               </button>
@@ -404,7 +410,7 @@ function ProfileCard({
                   fontSize: '1.1rem',
                   transition: 'all 0.2s',
                 }}
-                title={favorited ? 'Quitar Favorito' : 'Añadir a Favoritos'}
+                title={favorited ? dictionary.common.unfavorite : dictionary.common.favorite}
               >
                 <span style={{ filter: favorited ? 'none' : 'grayscale(100%) opacity(0.6)' }}>⭐</span>
               </button>
@@ -430,6 +436,7 @@ function ProfileCard({
 function DiscoverContent() {
   const searchParams = useSearchParams();
   const searchString = searchParams.toString();
+  const { dictionary } = useI18n();
 
   const [data, setData] = useState<SearchResponse | null>(null);
   const [page, setPage] = useState(1);
@@ -487,11 +494,11 @@ function DiscoverContent() {
       .catch((err: unknown) => {
         if (!isMounted) return;
         if (err instanceof ApiError && err.status === 401) {
-          setError('Inicia sesión para ver perfiles.');
+          setError(dictionary.discover.errorUnauthorized);
         } else if (err instanceof ApiError && err.status === 429) {
-          setError('Demasiadas peticiones. Espera un minuto e inténtalo de nuevo.');
+          setError(dictionary.errors.rateLimited);
         } else {
-          setError('No se pudieron cargar los resultados.');
+          setError(dictionary.discover.loadError);
         }
       })
       .finally(() => {
@@ -501,6 +508,7 @@ function DiscoverContent() {
     return () => {
       isMounted = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [page, searchString]);
 
   const profiles = data?.items ?? [];
@@ -510,7 +518,7 @@ function DiscoverContent() {
     <>
       {loading && (
         <p style={{ textAlign: 'center', padding: '2rem', fontSize: '1.2rem', color: '#666' }}>
-          Cargando perfiles…
+          {dictionary.discover.loading}
         </p>
       )}
 
@@ -521,7 +529,7 @@ function DiscoverContent() {
           {profiles.length === 0 ? (
             <div className={styles.emptyState}>
               <p style={{ fontSize: '1.2rem', marginBottom: '1rem' }}>
-                No hay resultados que coincidan con tu búsqueda.
+                {dictionary.discover.empty}
               </p>
               <Link
                 href="/search"
@@ -534,7 +542,7 @@ function DiscoverContent() {
                   borderRadius: '4px',
                 }}
               >
-                Cambiar filtros
+                {dictionary.discover.changeFilters}
               </Link>
             </div>
           ) : (
@@ -552,10 +560,10 @@ function DiscoverContent() {
                 return (
                   <React.Fragment key={profile.profile_id}>
                     {showAdSquare && (
-                      <div className={styles.adSquare}>[ANUNCIO PATROCINADO - ALEATORIO]</div>
+                      <div className={styles.adSquare}>{dictionary.discover.sponsoredRandom}</div>
                     )}
                     {showBannerHorizontal && (
-                      <div className={styles.adBanner}>[ESPACIO PUBLICITARIO - INTERMEDIO]</div>
+                      <div className={styles.adBanner}>{dictionary.discover.bannerMid}</div>
                     )}
 
                     <ProfileCard
@@ -595,10 +603,12 @@ function DiscoverContent() {
                   fontWeight: 'bold',
                 }}
               >
-                ← Anterior
+                {dictionary.common.paginationPrev}
               </button>
               <span style={{ fontWeight: 600, color: '#444' }}>
-                Página {data?.page} de {totalPages}
+                {dictionary.common.paginationPage
+                  .replace('{page}', String(data?.page ?? page))
+                  .replace('{totalPages}', String(totalPages))}
               </span>
               <button
                 type="button"
@@ -613,7 +623,7 @@ function DiscoverContent() {
                   fontWeight: 'bold',
                 }}
               >
-                Siguiente →
+                {dictionary.common.paginationNext}
               </button>
             </div>
           )}
@@ -627,6 +637,7 @@ function DiscoverContent() {
 // Export principal de la página Discover
 // -----------------------------------------------------------------------------
 export default function DiscoverPage() {
+  const { dictionary } = useI18n();
   return (
     <main className={styles.main}>
       <div
@@ -637,7 +648,7 @@ export default function DiscoverPage() {
           marginBottom: '2rem',
         }}
       >
-        <h1 style={{ fontSize: '1.8rem', margin: 0, color: '#111827' }}>Descubrir</h1>
+        <h1 style={{ fontSize: '1.8rem', margin: 0, color: '#111827' }}>{dictionary.discover.title}</h1>
         <Link
           href="/search"
           style={{
@@ -650,11 +661,11 @@ export default function DiscoverPage() {
             boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
           }}
         >
-          🔍 Filtros de Búsqueda
+          {dictionary.discover.filtersLink}
         </Link>
       </div>
 
-      <Suspense fallback={<p style={{ textAlign: 'center' }}>Cargando...</p>}>
+      <Suspense fallback={<p style={{ textAlign: 'center' }}>{dictionary.common.loading}</p>}>
         <DiscoverContent />
       </Suspense>
     </main>
