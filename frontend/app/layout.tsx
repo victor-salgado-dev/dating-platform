@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
 import { Fraunces, Public_Sans } from 'next/font/google';
 import Link from 'next/link';
 import HeaderChrome, { type NavLinkItem, type FilterLinkItem } from './header-chrome';
+import { DEFAULT_LOCALE, LOCALE_COOKIE_NAME, isValidLocale, type Locale } from '@/lib/i18n/config';
+import { getDictionary } from '@/lib/i18n/get-dictionary';
+import { I18nProvider } from '@/lib/i18n/context';
 import './globals.css';
 import styles from './layout.module.css';
 
@@ -50,19 +54,26 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = cookies();
+  const cookieLocale = cookieStore.get(LOCALE_COOKIE_NAME)?.value ?? '';
+  const locale: Locale = isValidLocale(cookieLocale) ? cookieLocale : DEFAULT_LOCALE;
+  const dictionary = getDictionary(locale);
+
   return (
-    <html lang="es" className={`${fraunces.variable} ${publicSans.variable}`}>
+    <html lang={locale} className={`${fraunces.variable} ${publicSans.variable}`}>
       <body>
-        <HeaderChrome navLinks={NAV_LINKS} filterLinks={FILTER_LINKS} />
+        <I18nProvider locale={locale} dictionary={dictionary}>
+          <HeaderChrome navLinks={NAV_LINKS} filterLinks={FILTER_LINKS} />
 
-        {children}
+          {children}
 
-        <footer className={styles.footer}>
-          <Link href="/legal/terms">Términos</Link>
-          <Link href="/legal/privacy">Privacidad</Link>
-          <Link href="/legal/impressum">Aviso legal</Link>
-          <Link href="/legal/contact">Contacto</Link>
-        </footer>
+          <footer className={styles.footer}>
+            <Link href="/legal/terms">Términos</Link>
+            <Link href="/legal/privacy">Privacidad</Link>
+            <Link href="/legal/impressum">Aviso legal</Link>
+            <Link href="/legal/contact">Contacto</Link>
+          </footer>
+        </I18nProvider>
       </body>
     </html>
   );
