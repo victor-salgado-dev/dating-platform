@@ -1,20 +1,20 @@
 'use client';
 
-import { useRouter } from 'next/navigation';
-
 import { useI18n } from './context';
 import { LOCALES, LOCALE_COOKIE_NAME, type Locale } from './config';
 
 const ONE_YEAR_SECONDS = 60 * 60 * 24 * 365;
 
 export default function LanguageSwitcher() {
-  const router = useRouter();
   const { locale, dictionary } = useI18n();
 
   function handleChange(next: Locale) {
     if (next === locale) return;
     document.cookie = `${LOCALE_COOKIE_NAME}=${next}; Path=/; Max-Age=${ONE_YEAR_SECONDS}; SameSite=Lax`;
-    router.refresh();
+    // Recarga completa: router.refresh() solo invalida el RSC de la ruta
+    // actual, así que cualquier ruta visitada antes del cambio seguía
+    // sirviéndose desde el Client Router Cache en el idioma anterior.
+    window.location.reload();
   }
 
   return (
