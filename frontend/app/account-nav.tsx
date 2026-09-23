@@ -49,20 +49,19 @@ export function useAccountData(): AccountData {
           }
 
           let score = 0;
-          let maxScore = 10; // Criterios totales
+          const maxScore = 12; // Criterios totales
 
           if (profile) {
             score += 4; // Datos base (nombre, genero, fecha nac, pais) siempre existen si hay perfil
             if (profile.region) score++;
-            if (profile.languages && profile.languages.length > 0) score++;
-            if (profile.relationship_goal) score++;
+            if (profile.relationship_goals && profile.relationship_goals.length > 0) score++;
             if (profile.has_children !== null) score++;
             if (profile.bio) score++;
-            if (profile.interests && profile.interests.length > 0) score++;
+            if (profile.wants_children !== null) score++;
+            if (profile.nationality) score++;
           }
           if (photos && photos.length > 0) score += 2; // Extra por foto
 
-          maxScore += 2; // total 12
           const percent = Math.round((score / maxScore) * 100);
 
           let color = '#ef4444'; // Rojo por defecto

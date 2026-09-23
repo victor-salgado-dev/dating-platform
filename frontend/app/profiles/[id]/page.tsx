@@ -275,22 +275,10 @@ export default function ProfilePage() {
           {profile.bio && <p className={styles.bio}>{profile.bio}</p>}
 
           <dl className={styles.details}>
-            {profile.relationship_goal && (
+            {profile.relationship_goals && profile.relationship_goals.length > 0 && (
               <>
                 <dt>Busca</dt>
-                <dd>{profile.relationship_goal}</dd>
-              </>
-            )}
-            {profile.languages && profile.languages.length > 0 && (
-              <>
-                <dt>Idiomas</dt>
-                <dd>{profile.languages.join(', ')}</dd>
-              </>
-            )}
-            {profile.interests && profile.interests.length > 0 && (
-              <>
-                <dt>Intereses</dt>
-                <dd>{profile.interests.join(', ')}</dd>
+                <dd>{profile.relationship_goals.join(', ')}</dd>
               </>
             )}
           </dl>

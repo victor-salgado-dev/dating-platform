@@ -20,8 +20,8 @@ interface ProfileItem {
   gender: string;
   country_code: string;
   region: string | null;
-  relationship_goal?: string;
-  relationship_goals?: string[];
+  relationship_goal?: string | null;
+  relationship_goals?: string[] | null;
   has_photo: boolean;
 }
 
