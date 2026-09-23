@@ -3,6 +3,7 @@ import { cookies } from 'next/headers';
 import { Fraunces, Public_Sans } from 'next/font/google';
 import Link from 'next/link';
 import HeaderChrome, { type NavLinkItem, type FilterLinkItem } from './header-chrome';
+import LanguageSwitcher from '@/lib/i18n/LanguageSwitcher';
 import { DEFAULT_LOCALE, LOCALE_COOKIE_NAME, isValidLocale, type Locale } from '@/lib/i18n/config';
 import { getDictionary } from '@/lib/i18n/get-dictionary';
 import { I18nProvider } from '@/lib/i18n/context';
@@ -31,24 +32,6 @@ export const metadata: Metadata = {
   description: 'Plataforma internacional de dating/relaciones',
 };
 
-const NAV_LINKS: NavLinkItem[] = [
-  { href: '/', label: 'Inicio' },
-  { href: '/discover', label: 'Descubrir' },
-  { href: '/activity', label: 'Actividad' },
-  { href: '/likes', label: 'Likes' },
-  { href: '/visits', label: 'Visitas' },
-  { href: '/matches', label: 'Matches' },
-  { href: '/messages', label: 'Mensajes' },
-];
-
-const FILTER_LINKS: FilterLinkItem[] = [
-  { href: '/', label: 'Populares', active: true },
-  { href: '/online', label: 'En línea', online: true },
-  { href: '/new', label: 'Nuevos miembros' },
-  { href: '/favorites', label: 'Favoritos' },
-  { href: '/search', label: 'Búsqueda avanzada' },
-];
-
 export default function RootLayout({
   children,
 }: {
@@ -59,19 +42,38 @@ export default function RootLayout({
   const locale: Locale = isValidLocale(cookieLocale) ? cookieLocale : DEFAULT_LOCALE;
   const dictionary = getDictionary(locale);
 
+  const navLinks: NavLinkItem[] = [
+    { href: '/', label: dictionary.nav.home },
+    { href: '/discover', label: dictionary.nav.discover },
+    { href: '/activity', label: dictionary.nav.activity },
+    { href: '/likes', label: dictionary.nav.likes },
+    { href: '/visits', label: dictionary.nav.visits },
+    { href: '/matches', label: dictionary.nav.matches },
+    { href: '/messages', label: dictionary.nav.messages },
+  ];
+
+  const filterLinks: FilterLinkItem[] = [
+    { href: '/', label: dictionary.filters.popular, active: true },
+    { href: '/online', label: dictionary.filters.online, online: true },
+    { href: '/new', label: dictionary.filters.newMembers },
+    { href: '/favorites', label: dictionary.filters.favorites },
+    { href: '/search', label: dictionary.filters.advancedSearch },
+  ];
+
   return (
     <html lang={locale} className={`${fraunces.variable} ${publicSans.variable}`}>
       <body>
         <I18nProvider locale={locale} dictionary={dictionary}>
-          <HeaderChrome navLinks={NAV_LINKS} filterLinks={FILTER_LINKS} />
+          <HeaderChrome navLinks={navLinks} filterLinks={filterLinks} />
 
           {children}
 
           <footer className={styles.footer}>
-            <Link href="/legal/terms">Términos</Link>
-            <Link href="/legal/privacy">Privacidad</Link>
-            <Link href="/legal/impressum">Aviso legal</Link>
-            <Link href="/legal/contact">Contacto</Link>
+            <Link href="/legal/terms">{dictionary.footer.terms}</Link>
+            <Link href="/legal/privacy">{dictionary.footer.privacy}</Link>
+            <Link href="/legal/impressum">{dictionary.footer.imprint}</Link>
+            <Link href="/legal/contact">{dictionary.footer.contact}</Link>
+            <LanguageSwitcher />
           </footer>
         </I18nProvider>
       </body>

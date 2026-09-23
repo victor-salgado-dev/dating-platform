@@ -4,6 +4,7 @@ import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAccountData, logoutAndRedirect } from './account-nav';
+import { useI18n } from '@/lib/i18n/context';
 import styles from './layout.module.css';
 
 // Geometría del bulto (ver también /mnt/user-data/outputs/dating-redesign-mockup.html,
@@ -35,6 +36,7 @@ export default function HeaderChrome({
   const pathname = usePathname();
   const router = useRouter();
   const account = useAccountData();
+  const { dictionary } = useI18n();
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
@@ -159,7 +161,7 @@ export default function HeaderChrome({
               setMobileAccOpen(false);
               setMobileNavOpen((o) => !o);
             }}
-            aria-label="Abrir menú"
+            aria-label={dictionary.header.openMenu}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round">
               <line x1="3" y1="6" x2="21" y2="6" />
@@ -170,7 +172,7 @@ export default function HeaderChrome({
 
           <Link href="/" className={styles.mobileBrand}>
             <span className={styles.mark} />
-            Cercanía
+            {dictionary.common.appName}
           </Link>
 
           {account.authenticated && (
@@ -183,18 +185,18 @@ export default function HeaderChrome({
                 setMobileNavOpen(false);
                 setMobileAccOpen((o) => !o);
               }}
-              aria-label="Mi cuenta"
+              aria-label={dictionary.header.myAccount}
             >
               {account.photo ? (
-                <img src={account.photo} alt="Mi avatar" className={styles.mobileAvatarImg} />
+                <img src={account.photo} alt={dictionary.header.avatarAlt} className={styles.mobileAvatarImg} />
               ) : (
-                <span className={styles.inner}>Tú</span>
+                <span className={styles.inner}>{dictionary.header.youFallback}</span>
               )}
             </button>
           )}
           {account.authenticated === false && (
             <Link href="/login" className={styles.mobileLoginBtn}>
-              Entrar
+              {dictionary.header.loginShort}
             </Link>
           )}
         </div>
@@ -228,13 +230,13 @@ export default function HeaderChrome({
         {account.authenticated && (
           <div className={`${styles.mobileDropdown} ${mobileAccOpen ? styles.open : ''}`} style={{ top: 58, right: 14 }}>
             <Link href="/profile" onClick={() => setMobileAccOpen(false)}>
-              Mi perfil
+              {dictionary.header.myProfile}
             </Link>
             <Link href="/settings" onClick={() => setMobileAccOpen(false)}>
-              Ajustes
+              {dictionary.header.settings}
             </Link>
             <button className={styles.item} style={{ color: '#a33' }} onClick={handleLogout}>
-              Cerrar sesión
+              {dictionary.header.logout}
             </button>
           </div>
         )}
@@ -248,11 +250,11 @@ export default function HeaderChrome({
           <div className={styles.headerContent} ref={contentRef}>
             <Link href="/" className={styles.brand}>
               <span className={styles.mark} />
-              Cercanía
+              {dictionary.common.appName}
             </Link>
 
             <div className={styles.navScroller} ref={topScrollerRef}>
-              <button className={styles.scrollArrow} onClick={() => scrollTrackBy(topTrackRef, -160)} aria-label="Anterior">
+              <button className={styles.scrollArrow} onClick={() => scrollTrackBy(topTrackRef, -160)} aria-label={dictionary.header.prev}>
                 ‹
               </button>
               <nav className={`${styles.topNav} ${styles.navTrack}`} ref={topTrackRef}>
@@ -265,7 +267,7 @@ export default function HeaderChrome({
               <button
                 className={`${styles.scrollArrow} ${styles.right}`}
                 onClick={() => scrollTrackBy(topTrackRef, 160)}
-                aria-label="Siguiente"
+                aria-label={dictionary.header.next}
               >
                 ›
               </button>
@@ -278,7 +280,7 @@ export default function HeaderChrome({
               <div className={styles.accountHighlightCircle} ref={highlightCircleRef} />
 
               <button className={styles.accountPill} ref={pillRef} onClick={() => setDropdownOpen((o) => !o)}>
-                <span>Mi cuenta</span>
+                <span>{dictionary.header.myAccount}</span>
               </button>
 
               <div className={styles.avatarAssembly} ref={avatarRef} onClick={() => setDropdownOpen((o) => !o)}>
@@ -289,9 +291,9 @@ export default function HeaderChrome({
                   }}
                 >
                   {account.photo ? (
-                    <img src={account.photo} alt="Mi avatar" className={styles.avatarInnerImg} />
+                    <img src={account.photo} alt={dictionary.header.avatarAlt} className={styles.avatarInnerImg} />
                   ) : (
-                    <span className={styles.avatarInner}>Tú</span>
+                    <span className={styles.avatarInner}>{dictionary.header.youFallback}</span>
                   )}
                 </span>
                 <span className={styles.bumpLabel}>{account.completion.percent}%</span>
@@ -299,13 +301,13 @@ export default function HeaderChrome({
 
               <div className={`${styles.accountDropdown} ${dropdownOpen ? styles.open : ''}`} ref={dropdownRef}>
                 <Link href="/profile" onClick={() => setDropdownOpen(false)}>
-                  Mi perfil
+                  {dictionary.header.myProfile}
                 </Link>
                 <Link href="/settings" onClick={() => setDropdownOpen(false)}>
-                  Ajustes
+                  {dictionary.header.settings}
                 </Link>
                 <button className={styles.item} style={{ color: '#a33' }} onClick={handleLogout}>
-                  Cerrar sesión
+                  {dictionary.header.logout}
                 </button>
               </div>
             </>
@@ -313,14 +315,14 @@ export default function HeaderChrome({
 
           {account.authenticated === false && (
             <Link href="/login" className={styles.desktopLoginBtn}>
-              Iniciar sesión
+              {dictionary.header.loginLong}
             </Link>
           )}
         </div>
 
         <nav className={styles.headerBottom} ref={bottomRef}>
           <div className={styles.navScroller} ref={filterScrollerRef}>
-            <button className={styles.scrollArrow} onClick={() => scrollTrackBy(filterTrackRef, -160)} aria-label="Anterior">
+            <button className={styles.scrollArrow} onClick={() => scrollTrackBy(filterTrackRef, -160)} aria-label={dictionary.header.prev}>
               ‹
             </button>
             <div className={`${styles.filterTrack} ${styles.navTrack}`} ref={filterTrackRef}>
@@ -338,7 +340,7 @@ export default function HeaderChrome({
             <button
               className={`${styles.scrollArrow} ${styles.right}`}
               onClick={() => scrollTrackBy(filterTrackRef, 160)}
-              aria-label="Siguiente"
+              aria-label={dictionary.header.next}
             >
               ›
             </button>
