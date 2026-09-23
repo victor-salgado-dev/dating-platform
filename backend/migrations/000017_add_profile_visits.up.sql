@@ -1,4 +1,3 @@
-﻿-- 000017_add_profile_visits.up.sql
 CREATE TABLE profile_visits (
     id                 UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     visitor_profile_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,

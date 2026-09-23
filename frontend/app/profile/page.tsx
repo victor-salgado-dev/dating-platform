@@ -44,6 +44,11 @@ import {
   FAVORITE_SEASON_OPTIONS,
   IDEAL_VACATION_STYLE_OPTIONS,
   VACATION_ACTIVITIES_OPTIONS,
+  DESIRED_TRAITS_OPTIONS,
+  PARTNER_MAY_HAVE_CHILDREN_OPTIONS,
+  PARTNER_RELIGION_PREFERENCE_OPTIONS,
+  FIRST_MEETING_PREFERENCE_OPTIONS,
+  DESIRED_LIVING_PLACE_OPTIONS,
   PARTNER_IMPORTANCE_FIELDS,
   PERSONALITY_TRAIT_LABELS,
   LANGUAGE_OPTIONS,
@@ -231,6 +236,8 @@ export default function MyProfilePage() {
             {profile.relocation_willingness && profile.relocation_willingness.length > 0 && (<><dt>Dispuesto/a a mudarse</dt><dd>{labelList(profile.relocation_willingness, RELOCATION_WILLINGNESS_OPTIONS)}</dd></>)}
             {profile.marital_status && (<><dt>Estado civil</dt><dd>{label(profile.marital_status, MARITAL_STATUS_OPTIONS)}</dd></>)}
             {profile.children_count != null && (<><dt>Número de hijos</dt><dd>{profile.children_count}</dd></>)}
+            {profile.youngest_child_age != null && (<><dt>Edad del hijo/a más pequeño/a</dt><dd>{profile.youngest_child_age}</dd></>)}
+            {profile.oldest_child_age != null && (<><dt>Edad del hijo/a más mayor</dt><dd>{profile.oldest_child_age}</dd></>)}
             {profile.occupation && (<><dt>Ocupación</dt><dd>{label(profile.occupation, OCCUPATION_OPTIONS)}</dd></>)}
             {profile.employment_status && (<><dt>Situación laboral</dt><dd>{label(profile.employment_status, EMPLOYMENT_STATUS_OPTIONS)}</dd></>)}
             {profile.income_level && (<><dt>Nivel de ingresos</dt><dd>{label(profile.income_level, INCOME_LEVEL_OPTIONS)}</dd></>)}
@@ -312,7 +319,19 @@ export default function MyProfilePage() {
                   <><dt>Altura</dt><dd>{partnerPrefs.height_min ?? '?'} – {partnerPrefs.height_max ?? '?'} cm</dd></>
                 )}
                 {partnerPrefs.desired_traits && partnerPrefs.desired_traits.length > 0 && (
-                  <><dt>Rasgos que busco</dt><dd>{partnerPrefs.desired_traits.join(', ')}</dd></>
+                  <><dt>Rasgos que busco</dt><dd>{labelList(partnerPrefs.desired_traits, DESIRED_TRAITS_OPTIONS)}</dd></>
+                )}
+                {partnerPrefs.partner_may_have_children && (
+                  <><dt>¿Puede tener hijos?</dt><dd>{label(partnerPrefs.partner_may_have_children, PARTNER_MAY_HAVE_CHILDREN_OPTIONS)}</dd></>
+                )}
+                {partnerPrefs.partner_religion_preference && (
+                  <><dt>Religión</dt><dd>{label(partnerPrefs.partner_religion_preference, PARTNER_RELIGION_PREFERENCE_OPTIONS)}</dd></>
+                )}
+                {partnerPrefs.first_meeting_preference && (
+                  <><dt>Dónde conoceros</dt><dd>{label(partnerPrefs.first_meeting_preference, FIRST_MEETING_PREFERENCE_OPTIONS)}</dd></>
+                )}
+                {partnerPrefs.desired_living_place && partnerPrefs.desired_living_place.length > 0 && (
+                  <><dt>Dónde vivir</dt><dd>{labelList(partnerPrefs.desired_living_place, DESIRED_LIVING_PLACE_OPTIONS)}</dd></>
                 )}
                 {PARTNER_IMPORTANCE_FIELDS.filter((f) => (partnerPrefs as unknown as Record<string, number | null>)[f.key] != null).map((f) => (
                   <Fragment key={f.key}>
