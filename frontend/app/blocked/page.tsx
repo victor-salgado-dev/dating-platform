@@ -3,9 +3,11 @@
 import { useEffect, useState } from 'react';
 
 import { apiFetch, ApiError, BlockedResponse } from '@/lib/api';
+import { useI18n } from '@/lib/i18n/context';
 import styles from '../discover/page.module.css';
 
 export default function BlockedPage() {
+  const { dictionary } = useI18n();
   const [data, setData] = useState<BlockedResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -18,14 +20,15 @@ export default function BlockedPage() {
       .then(setData)
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 401) {
-          setError('Inicia sesión para ver esta página.');
+          setError(dictionary.blocked.errorUnauthorized);
         } else {
-          setError('No se pudo cargar la lista de bloqueados.');
+          setError(dictionary.blocked.loadError);
         }
       })
       .finally(() => setLoading(false));
   }
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(load, []);
 
   async function unblock(profileId: string) {
@@ -36,7 +39,7 @@ export default function BlockedPage() {
         prev ? { ...prev, items: prev.items.filter((i) => i.profile_id !== profileId) } : prev,
       );
     } catch {
-      setError('No se pudo desbloquear.');
+      setError(dictionary.blocked.errorUnblock);
     } finally {
       setBusyId(null);
     }
@@ -44,15 +47,15 @@ export default function BlockedPage() {
 
   return (
     <main className={styles.main}>
-      <h1>Perfiles bloqueados</h1>
+      <h1>{dictionary.blocked.title}</h1>
 
-      {loading && <p>Cargando…</p>}
+      {loading && <p>{dictionary.common.loading}</p>}
       {error && <p className={styles.error}>{error}</p>}
 
       {data && (
         <>
           {data.items.length === 0 ? (
-            <p>No has bloqueado a nadie.</p>
+            <p>{dictionary.blocked.empty}</p>
           ) : (
             <ul className={styles.grid}>
               {data.items.map((item) => (
@@ -70,7 +73,7 @@ export default function BlockedPage() {
                       disabled={busyId === item.profile_id}
                       style={{ marginTop: '0.5rem' }}
                     >
-                      Desbloquear
+                      {dictionary.common.unblock}
                     </button>
                   </div>
                 </li>

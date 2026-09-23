@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import { apiFetch, ApiError, FavoritesResponse } from '@/lib/api';
+import { useI18n } from '@/lib/i18n/context';
 import styles from './page.module.css';
 
 interface PhotoItem {
@@ -13,6 +14,7 @@ interface PhotoItem {
 }
 
 function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) {
+  const { dictionary } = useI18n();
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -27,13 +29,14 @@ function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) 
   }, [profileId]);
 
   if (!photoUrl) {
-    return <div className={styles.photoPlaceholder}>Sin Foto</div>;
+    return <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>;
   }
 
   return <img src={photoUrl} alt={name} className={styles.photoImg} />;
 }
 
 export default function FavoritesPage() {
+  const { dictionary } = useI18n();
   const [tab, setTab] = useState<'sent' | 'received'>('sent');
   const [data, setData] = useState<FavoritesResponse | null>(null);
   const [page, setPage] = useState(1);
@@ -48,12 +51,13 @@ export default function FavoritesPage() {
       .then(setData)
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 401) {
-          setError('Inicia sesión para ver tus favoritos.');
+          setError(dictionary.favorites.errorUnauthorized);
         } else {
-          setError('No se pudieron cargar los favoritos.');
+          setError(dictionary.favorites.loadError);
         }
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, page]);
 
   function changeTab(nextTab: 'sent' | 'received') {
@@ -66,7 +70,7 @@ export default function FavoritesPage() {
 
   return (
     <main className={styles.main}>
-      <h1 className={styles.title}>Mis Favoritos</h1>
+      <h1 className={styles.title}>{dictionary.favorites.title}</h1>
 
       <div className={styles.tabs} role="tablist">
         <button
@@ -74,18 +78,18 @@ export default function FavoritesPage() {
           className={tab === 'sent' ? styles.activeTab : styles.tab}
           onClick={() => changeTab('sent')}
         >
-          Mis Favoritos
+          {dictionary.favorites.tabSent}
         </button>
         <button
           type="button"
           className={tab === 'received' ? styles.activeTab : styles.tab}
           onClick={() => changeTab('received')}
         >
-          Me Marcaron
+          {dictionary.favorites.tabReceived}
         </button>
       </div>
 
-      {loading && <p style={{ textAlign: 'center', padding: '2rem' }}>Cargando favoritos…</p>}
+      {loading && <p style={{ textAlign: 'center', padding: '2rem' }}>{dictionary.favorites.loading}</p>}
 
       {error && <div className={styles.errorBanner}>{error}</div>}
 
@@ -95,13 +99,13 @@ export default function FavoritesPage() {
             <div className={styles.emptyState}>
               <p className={styles.emptyStateTitle}>
                 {tab === 'sent'
-                  ? 'Todavía no has añadido ningún favorito.'
-                  : 'Todavía nadie te ha marcado como favorito.'}
+                  ? dictionary.favorites.emptySent
+                  : dictionary.favorites.emptyReceived}
               </p>
               <p className={styles.emptyStateSubtitle}>
                 {tab === 'sent'
-                  ? 'Explora perfiles en el inicio y pulsa la estrella ★ para guardarlos aquí.'
-                  : 'Cuando alguien te marque como favorito, aparecerá aquí.'}
+                  ? dictionary.favorites.emptySentSubtitle
+                  : dictionary.favorites.emptyReceivedSubtitle}
               </p>
             </div>
           ) : (
@@ -116,7 +120,7 @@ export default function FavoritesPage() {
                     {item.has_photo ? (
                       <ProfilePhoto profileId={item.profile_id} name={item.display_name} />
                     ) : (
-                      <div className={styles.photoPlaceholder}>Sin Foto</div>
+                      <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>
                     )}
                   </div>
 
@@ -142,10 +146,13 @@ export default function FavoritesPage() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                ← Anterior
+                {dictionary.common.paginationPrev}
               </button>
               <span className={styles.pageInfo}>
-                Página {data?.page} de {totalPages} ({data?.total} favoritos)
+                {dictionary.favorites.paginationInfo
+                  .replace('{page}', String(data?.page ?? page))
+                  .replace('{totalPages}', String(totalPages))
+                  .replace('{total}', String(data?.total ?? 0))}
               </span>
               <button
                 type="button"
@@ -153,7 +160,7 @@ export default function FavoritesPage() {
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Siguiente →
+                {dictionary.common.paginationNext}
               </button>
             </div>
           )}

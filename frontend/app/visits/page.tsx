@@ -1,9 +1,10 @@
-﻿'use client';
+'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import { apiFetch, ApiError, VisitsResponse } from '@/lib/api';
+import { useI18n } from '@/lib/i18n/context';
 import styles from './page.module.css';
 
 interface PhotoItem {
@@ -13,6 +14,7 @@ interface PhotoItem {
 }
 
 function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) {
+  const { dictionary } = useI18n();
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -27,13 +29,14 @@ function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) 
   }, [profileId]);
 
   if (!photoUrl) {
-    return <div className={styles.photoPlaceholder}>Sin Foto</div>;
+    return <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>;
   }
 
   return <img src={photoUrl} alt={name} className={styles.photoImg} />;
 }
 
 export default function VisitsPage() {
+  const { dictionary } = useI18n();
   const [tab, setTab] = useState<'received' | 'sent'>('received');
   const [data, setData] = useState<VisitsResponse | null>(null);
   const [page, setPage] = useState(1);
@@ -48,12 +51,13 @@ export default function VisitsPage() {
       .then(setData)
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 401) {
-          setError('Inicia sesión para ver las visitas a tu perfil.');
+          setError(dictionary.visits.errorUnauthorized);
         } else {
-          setError('No se pudieron cargar las visitas.');
+          setError(dictionary.visits.loadError);
         }
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, page]);
 
   function changeTab(nextTab: 'received' | 'sent') {
@@ -66,7 +70,7 @@ export default function VisitsPage() {
 
   return (
     <main className={styles.main}>
-      <h1 className={styles.title}>Visitas</h1>
+      <h1 className={styles.title}>{dictionary.visits.title}</h1>
 
       <div className={styles.tabs} role="tablist">
         <button
@@ -74,18 +78,18 @@ export default function VisitsPage() {
           className={tab === 'received' ? styles.activeTab : styles.tab}
           onClick={() => changeTab('received')}
         >
-          Quién me ha visitado
+          {dictionary.visits.tabReceived}
         </button>
         <button
           type="button"
           className={tab === 'sent' ? styles.activeTab : styles.tab}
           onClick={() => changeTab('sent')}
         >
-          Perfiles que visité
+          {dictionary.visits.tabSent}
         </button>
       </div>
 
-      {loading && <p style={{ textAlign: 'center', padding: '2rem' }}>Cargando visitas…</p>}
+      {loading && <p style={{ textAlign: 'center', padding: '2rem' }}>{dictionary.visits.loading}</p>}
 
       {error && <div className={styles.errorBanner}>{error}</div>}
 
@@ -95,13 +99,13 @@ export default function VisitsPage() {
             <div className={styles.emptyState}>
               <p className={styles.emptyStateTitle}>
                 {tab === 'received'
-                  ? 'Todavía nadie ha visitado tu perfil.'
-                  : 'Todavía no has visitado ningún perfil.'}
+                  ? dictionary.visits.emptyReceived
+                  : dictionary.visits.emptySent}
               </p>
               <p className={styles.emptyStateSubtitle}>
                 {tab === 'received'
-                  ? 'Mantén tu perfil activo para recibir más visitas.'
-                  : 'Explora perfiles en el inicio para ver a otros usuarios.'}
+                  ? dictionary.visits.emptyReceivedSubtitle
+                  : dictionary.visits.emptySentSubtitle}
               </p>
             </div>
           ) : (
@@ -116,7 +120,7 @@ export default function VisitsPage() {
                     {item.has_photo ? (
                       <ProfilePhoto profileId={item.profile_id} name={item.display_name} />
                     ) : (
-                      <div className={styles.photoPlaceholder}>Sin Foto</div>
+                      <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>
                     )}
                   </div>
 
@@ -142,10 +146,13 @@ export default function VisitsPage() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                ← Anterior
+                {dictionary.common.paginationPrev}
               </button>
               <span className={styles.pageInfo}>
-                Página {data?.page} de {totalPages} ({data?.total} visitas)
+                {dictionary.visits.paginationInfo
+                  .replace('{page}', String(data?.page ?? page))
+                  .replace('{totalPages}', String(totalPages))
+                  .replace('{total}', String(data?.total ?? 0))}
               </span>
               <button
                 type="button"
@@ -153,7 +160,7 @@ export default function VisitsPage() {
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Siguiente →
+                {dictionary.common.paginationNext}
               </button>
             </div>
           )}

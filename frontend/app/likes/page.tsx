@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import { apiFetch, ApiError, LikesResponse } from '@/lib/api';
+import { useI18n } from '@/lib/i18n/context';
 import styles from './page.module.css';
 
 interface PhotoItem {
@@ -13,6 +14,7 @@ interface PhotoItem {
 }
 
 function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) {
+  const { dictionary } = useI18n();
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -27,13 +29,14 @@ function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) 
   }, [profileId]);
 
   if (!photoUrl) {
-    return <div className={styles.photoPlaceholder}>Sin Foto</div>;
+    return <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>;
   }
 
   return <img src={photoUrl} alt={name} className={styles.photoImg} />;
 }
 
 export default function LikesPage() {
+  const { dictionary } = useI18n();
   const [tab, setTab] = useState<'sent' | 'received'>('received');
   const [data, setData] = useState<LikesResponse | null>(null);
   const [page, setPage] = useState(1);
@@ -48,12 +51,13 @@ export default function LikesPage() {
       .then(setData)
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 401) {
-          setError('Inicia sesión para ver tus likes.');
+          setError(dictionary.likes.errorUnauthorized);
         } else {
-          setError('No se pudieron cargar los likes.');
+          setError(dictionary.likes.loadError);
         }
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, page]);
 
   function changeTab(nextTab: 'sent' | 'received') {
@@ -66,7 +70,7 @@ export default function LikesPage() {
 
   return (
     <main className={styles.main}>
-      <h1 className={styles.title}>Likes</h1>
+      <h1 className={styles.title}>{dictionary.likes.title}</h1>
 
       <div className={styles.tabs} role="tablist">
         <button
@@ -74,18 +78,18 @@ export default function LikesPage() {
           className={tab === 'received' ? styles.activeTab : styles.tab}
           onClick={() => changeTab('received')}
         >
-          Recibidos
+          {dictionary.likes.tabReceived}
         </button>
         <button
           type="button"
           className={tab === 'sent' ? styles.activeTab : styles.tab}
           onClick={() => changeTab('sent')}
         >
-          Enviados
+          {dictionary.likes.tabSent}
         </button>
       </div>
 
-      {loading && <p style={{ textAlign: 'center', padding: '2rem' }}>Cargando likes…</p>}
+      {loading && <p style={{ textAlign: 'center', padding: '2rem' }}>{dictionary.likes.loading}</p>}
 
       {error && <div className={styles.errorBanner}>{error}</div>}
 
@@ -94,10 +98,10 @@ export default function LikesPage() {
           {likes.length === 0 ? (
             <div className={styles.emptyState}>
               <p className={styles.emptyStateTitle}>
-                {tab === 'received' ? 'Todavía no has recibido ningún like.' : 'Todavía no le has dado like a nadie.'}
+                {tab === 'received' ? dictionary.likes.emptyReceived : dictionary.likes.emptySent}
               </p>
               <p className={styles.emptyStateSubtitle}>
-                Explora perfiles en el inicio y dale like a los que te interesen.
+                {dictionary.likes.emptySubtitle}
               </p>
             </div>
           ) : (
@@ -112,7 +116,7 @@ export default function LikesPage() {
                     {item.has_photo ? (
                       <ProfilePhoto profileId={item.profile_id} name={item.display_name} />
                     ) : (
-                      <div className={styles.photoPlaceholder}>Sin Foto</div>
+                      <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>
                     )}
                   </div>
 
@@ -138,10 +142,13 @@ export default function LikesPage() {
                 disabled={page <= 1}
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
               >
-                ← Anterior
+                {dictionary.common.paginationPrev}
               </button>
               <span className={styles.pageInfo}>
-                Página {data?.page} de {totalPages} ({data?.total} likes)
+                {dictionary.likes.paginationInfo
+                  .replace('{page}', String(data?.page ?? page))
+                  .replace('{totalPages}', String(totalPages))
+                  .replace('{total}', String(data?.total ?? 0))}
               </span>
               <button
                 type="button"
@@ -149,7 +156,7 @@ export default function LikesPage() {
                 disabled={page >= totalPages}
                 onClick={() => setPage((p) => p + 1)}
               >
-                Siguiente →
+                {dictionary.common.paginationNext}
               </button>
             </div>
           )}
