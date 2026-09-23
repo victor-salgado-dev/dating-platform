@@ -71,6 +71,10 @@ export const es = {
   languageSwitcher: {
     label: 'Idioma',
   },
+  home: {
+    loading: 'Buscando perfiles cerca de ti...',
+    bannerBottom: '[ESPACIO PUBLICITARIO - INFERIOR]',
+  },
   profilePublic: {
     notFound: 'Este perfil no existe o ya no está disponible.',
     unauthorized: 'Inicia sesión para ver este perfil.',

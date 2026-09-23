@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { apiFetch, SearchResponse, LikesResponse, FavoritesResponse } from '@/lib/api';
+import { useI18n } from '@/lib/i18n/context';
 import styles from './page.module.css';
 
 interface ProfileItem {
@@ -25,6 +26,7 @@ interface PhotoItem {
 // Componente de la Galería Modal
 // -----------------------------------------------------------------------------
 function PhotoGalleryModal({ profileId, name, onClose }: { profileId: string, name: string, onClose: () => void }) {
+  const { dictionary } = useI18n();
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -36,16 +38,16 @@ function PhotoGalleryModal({ profileId, name, onClose }: { profileId: string, na
       .finally(() => setLoading(false));
   }, [profileId]);
 
-  const currentPhotoUrl = photos.length > 0 
+  const currentPhotoUrl = photos.length > 0
     ? (photos[currentIndex].url ?? `/api/v1/profiles/${profileId}/photos/${photos[currentIndex].id}/file`)
     : null;
 
   return (
-    <div 
-      onClick={onClose} 
+    <div
+      onClick={onClose}
       style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.9)', zIndex: 9999, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center' }}
     >
-      <button 
+      <button
         onClick={onClose}
         style={{ position: 'absolute', top: '20px', right: '30px', background: 'none', border: 'none', color: 'white', fontSize: '2.5rem', cursor: 'pointer', zIndex: 10, padding: '10px' }}
       >
@@ -54,28 +56,28 @@ function PhotoGalleryModal({ profileId, name, onClose }: { profileId: string, na
 
       <div onClick={(e) => e.stopPropagation()} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', width: '100%', maxWidth: '800px' }}>
         {loading ? (
-          <p style={{ color: 'white', fontSize: '1.2rem' }}>Cargando fotos...</p>
+          <p style={{ color: 'white', fontSize: '1.2rem' }}>{dictionary.common.photoGalleryLoading}</p>
         ) : photos.length === 0 ? (
-          <p style={{ color: 'white', fontSize: '1.2rem' }}>Este perfil no tiene fotos.</p>
+          <p style={{ color: 'white', fontSize: '1.2rem' }}>{dictionary.common.photoGalleryEmpty}</p>
         ) : (
           <div style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center', width: '100%' }}>
             {photos.length > 1 && (
-              <button 
+              <button
                 onClick={() => setCurrentIndex((prev) => (prev > 0 ? prev - 1 : photos.length - 1))}
                 style={{ position: 'absolute', left: '10px', background: 'rgba(255,255,255,0.15)', border: '2px solid rgba(255,255,255,0.5)', color: 'white', fontSize: '2.5rem', cursor: 'pointer', width: '50px', height: '50px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}
               >
                 ‹
               </button>
             )}
-            
-            <img 
-              src={currentPhotoUrl!} 
-              alt={`Foto de ${name}`} 
-              style={{ maxHeight: '80vh', maxWidth: '90vw', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }} 
+
+            <img
+              src={currentPhotoUrl!}
+              alt={dictionary.common.photoGalleryAlt.replace('{name}', name)}
+              style={{ maxHeight: '80vh', maxWidth: '90vw', objectFit: 'contain', borderRadius: '8px', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' }}
             />
 
             {photos.length > 1 && (
-              <button 
+              <button
                 onClick={() => setCurrentIndex((prev) => (prev < photos.length - 1 ? prev + 1 : 0))}
                 style={{ position: 'absolute', right: '10px', background: 'rgba(255,255,255,0.15)', border: '2px solid rgba(255,255,255,0.5)', color: 'white', fontSize: '2.5rem', cursor: 'pointer', width: '50px', height: '50px', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 10 }}
               >
@@ -84,10 +86,13 @@ function PhotoGalleryModal({ profileId, name, onClose }: { profileId: string, na
             )}
           </div>
         )}
-        
+
         {!loading && photos.length > 0 && (
           <p style={{ color: 'rgba(255,255,255,0.8)', marginTop: '1.5rem', fontSize: '1.2rem', fontWeight: '500' }}>
-            {name} — {currentIndex + 1} de {photos.length}
+            {dictionary.common.photoGalleryCounter
+              .replace('{name}', name)
+              .replace('{current}', String(currentIndex + 1))
+              .replace('{total}', String(photos.length))}
           </p>
         )}
       </div>
@@ -98,24 +103,25 @@ function PhotoGalleryModal({ profileId, name, onClose }: { profileId: string, na
 // -----------------------------------------------------------------------------
 // Componente Principal de la Tarjeta
 // -----------------------------------------------------------------------------
-function ProfileCard({ 
-  profile, 
+function ProfileCard({
+  profile,
   isPremium,
-  initialLiked, 
+  initialLiked,
   initialFavorited,
   receivedLike,
   receivedFavorite,
-}: { 
-  profile: ProfileItem; 
+}: {
+  profile: ProfileItem;
   isPremium: boolean;
   initialLiked: boolean;
   initialFavorited: boolean;
   receivedLike: boolean;
   receivedFavorite: boolean;
 }) {
+  const { dictionary } = useI18n();
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
-  
+
   // El estado arranca con el valor REAL que viene de la base de datos
   const [liked, setLiked] = useState(initialLiked);
   const [favorited, setFavorited] = useState(initialFavorited);
@@ -153,7 +159,7 @@ function ProfileCard({
         setLiked(true);
       }
     } catch (err) {
-      console.error("Error al procesar like", err);
+      console.error('Error al procesar like', err);
     }
   };
 
@@ -169,7 +175,7 @@ function ProfileCard({
         setFavorited(true);
       }
     } catch (err) {
-      console.error("Error al procesar favorito", err);
+      console.error('Error al procesar favorito', err);
     }
   };
 
@@ -191,7 +197,7 @@ function ProfileCard({
           {photoUrl ? (
             <img src={photoUrl} alt={profile.display_name} className={styles.photoImg} />
           ) : (
-            <div className={styles.photoPlaceholder}>Sin Foto</div>
+            <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>
           )}
           {(receivedLike || receivedFavorite) && (
             <div className={styles.receivedBadges}>
@@ -215,45 +221,45 @@ function ProfileCard({
 
             <div style={{ display: 'flex', gap: '8px' }}>
               {profile.has_photo && (
-                <button 
-                  onClick={(e) => { 
+                <button
+                  onClick={(e) => {
                     e.preventDefault();
                     e.stopPropagation();
-                    setIsGalleryOpen(true); 
-                  }} 
-                  style={{ 
-                    background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '50%', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1rem', transition: 'all 0.2s' 
-                  }} 
-                  title="Ver fotos"
+                    setIsGalleryOpen(true);
+                  }}
+                  style={{
+                    background: '#f3f4f6', border: '1px solid #e5e7eb', borderRadius: '50%', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1rem', transition: 'all 0.2s'
+                  }}
+                  title={dictionary.common.viewPhotos}
                 >
                   📸
                 </button>
               )}
 
               {/* Botón Like con Datos Reales */}
-              <button 
+              <button
                 onClick={handleLike}
-                style={{ 
-                  background: liked ? '#22c55e' : '#f3f4f6', 
+                style={{
+                  background: liked ? '#22c55e' : '#f3f4f6',
                   border: liked ? 'none' : '1px solid #e5e7eb',
                   boxShadow: liked ? '0 0 10px rgba(34, 197, 94, 0.5)' : 'none',
-                  borderRadius: '50%', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1rem', transition: 'all 0.2s' 
-                }} 
-                title={liked ? "Quitar Like" : "Dar Like"}
+                  borderRadius: '50%', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1rem', transition: 'all 0.2s'
+                }}
+                title={liked ? dictionary.common.unlike : dictionary.common.like}
               >
                 {liked ? '❤️' : '🤍'}
               </button>
 
               {/* Botón Favorito con Datos Reales */}
-              <button 
-                onClick={handleFavorite} 
-                style={{ 
-                  background: favorited ? '#eab308' : '#f3f4f6', 
+              <button
+                onClick={handleFavorite}
+                style={{
+                  background: favorited ? '#eab308' : '#f3f4f6',
                   border: favorited ? 'none' : '1px solid #e5e7eb',
                   boxShadow: favorited ? '0 0 10px rgba(234, 179, 8, 0.5)' : 'none',
-                  borderRadius: '50%', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1.1rem', transition: 'all 0.2s' 
-                }} 
-                title={favorited ? "Quitar Favorito" : "Añadir a Favoritos"}
+                  borderRadius: '50%', width: '34px', height: '34px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', fontSize: '1.1rem', transition: 'all 0.2s'
+                }}
+                title={favorited ? dictionary.common.unfavorite : dictionary.common.favorite}
               >
                 <span style={{ filter: favorited ? 'none' : 'grayscale(100%) opacity(0.6)' }}>⭐</span>
               </button>
@@ -263,10 +269,10 @@ function ProfileCard({
       </Link>
 
       {isGalleryOpen && (
-        <PhotoGalleryModal 
-          profileId={profile.profile_id} 
-          name={profile.display_name} 
-          onClose={() => setIsGalleryOpen(false)} 
+        <PhotoGalleryModal
+          profileId={profile.profile_id}
+          name={profile.display_name}
+          onClose={() => setIsGalleryOpen(false)}
         />
       )}
     </>
@@ -277,10 +283,11 @@ function ProfileCard({
 // Página Principal
 // -----------------------------------------------------------------------------
 export default function HomePage() {
+  const { dictionary } = useI18n();
   const [data, setData] = useState<SearchResponse | null>(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  
+
   // Listas de perfiles con like/favorito traídas del servidor
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [favoritedIds, setFavoritedIds] = useState<Set<string>>(new Set());
@@ -288,7 +295,7 @@ export default function HomePage() {
   // Quién te ha dado like / favorito a TI (para el borde + insignia en la tarjeta)
   const [receivedLikeIds, setReceivedLikeIds] = useState<Set<string>>(new Set());
   const [receivedFavIds, setReceivedFavIds] = useState<Set<string>>(new Set());
-  
+
   const [randomAdIndex, setRandomAdIndex] = useState(-1);
 
   // 1. Cargar perfiles
@@ -344,13 +351,13 @@ export default function HomePage() {
 
   return (
     <main className={styles.main}>
-      {loading && <p style={{ textAlign: 'center', padding: '2rem', fontSize: '1.2rem', color: '#666' }}>Buscando perfiles cerca de ti...</p>}
+      {loading && <p style={{ textAlign: 'center', padding: '2rem', fontSize: '1.2rem', color: '#666' }}>{dictionary.home.loading}</p>}
 
       <div className={styles.grid}>
         {profiles.map((profile, index) => {
-          const isPremium = index === 0; 
-          const showAdSquare = index === randomAdIndex; 
-          const showBannerHorizontal = index === 14; 
+          const isPremium = index === 0;
+          const showAdSquare = index === randomAdIndex;
+          const showBannerHorizontal = index === 14;
 
           // Comprobamos contra la base de datos real
           const isLiked = likedIds.has(profile.profile_id);
@@ -360,12 +367,12 @@ export default function HomePage() {
 
           return (
             <React.Fragment key={profile.profile_id}>
-              {showAdSquare && <div className={styles.adSquare}>[ANUNCIO PATROCINADO - ALEATORIO]</div>}
-              {showBannerHorizontal && <div className={styles.adBanner}>[ESPACIO PUBLICITARIO - INTERMEDIO]</div>}
-              
-              <ProfileCard 
-                profile={profile} 
-                isPremium={isPremium} 
+              {showAdSquare && <div className={styles.adSquare}>{dictionary.discover.sponsoredRandom}</div>}
+              {showBannerHorizontal && <div className={styles.adBanner}>{dictionary.discover.bannerMid}</div>}
+
+              <ProfileCard
+                profile={profile}
+                isPremium={isPremium}
                 initialLiked={isLiked}
                 initialFavorited={isFavorited}
                 receivedLike={gotLike}
@@ -379,26 +386,34 @@ export default function HomePage() {
       {!loading && profiles.length > 0 && (
         <>
           <div className={styles.adBanner} style={{ marginTop: '3rem' }}>
-            [ESPACIO PUBLICITARIO - INFERIOR]
+            {dictionary.home.bannerBottom}
           </div>
 
-          <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', margin: '2rem 0' }}>
-            <button
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1}
-              style={{ padding: '0.75rem 1.5rem', cursor: page <= 1 ? 'not-allowed' : 'pointer', borderRadius: '8px', border: '1px solid #ccc', background: '#fff', fontWeight: 'bold' }}
-            >
-              ← Anterior
-            </button>
-            <span style={{ fontWeight: 600, color: '#444' }}>Página {page} de {totalPages}</span>
-            <button
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages}
-              style={{ padding: '0.75rem 1.5rem', cursor: page >= totalPages ? 'not-allowed' : 'pointer', borderRadius: '8px', border: '1px solid #ccc', background: '#fff', fontWeight: 'bold' }}
-            >
-              Siguiente →
-            </button>
-          </div>
+          {totalPages > 1 && (
+            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', margin: '2rem 0' }}>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.max(1, p - 1))}
+                disabled={page <= 1}
+                style={{ padding: '0.75rem 1.5rem', cursor: page <= 1 ? 'not-allowed' : 'pointer', borderRadius: '8px', border: '1px solid #ccc', background: '#fff', fontWeight: 'bold' }}
+              >
+                {dictionary.common.paginationPrev}
+              </button>
+              <span style={{ fontWeight: 600, color: '#444' }}>
+                {dictionary.common.paginationPage
+                  .replace('{page}', String(page))
+                  .replace('{totalPages}', String(totalPages))}
+              </span>
+              <button
+                type="button"
+                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                disabled={page >= totalPages}
+                style={{ padding: '0.75rem 1.5rem', cursor: page >= totalPages ? 'not-allowed' : 'pointer', borderRadius: '8px', border: '1px solid #ccc', background: '#fff', fontWeight: 'bold' }}
+              >
+                {dictionary.common.paginationNext}
+              </button>
+            </div>
+          )}
         </>
       )}
     </main>

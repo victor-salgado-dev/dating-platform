@@ -73,6 +73,10 @@ export const en: Dictionary = {
   languageSwitcher: {
     label: 'Language',
   },
+  home: {
+    loading: 'Finding profiles near you...',
+    bannerBottom: '[AD SPACE — BOTTOM]',
+  },
   profilePublic: {
     notFound: 'This profile does not exist or is no longer available.',
     unauthorized: 'Log in to view this profile.',
