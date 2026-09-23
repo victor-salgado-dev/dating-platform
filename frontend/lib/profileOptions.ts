@@ -1,495 +1,413 @@
-// Listas de opciones que reflejan los valores permitidos por los CHECK
-// de la base de datos (migraciones 000012 y 000013 del backend). Si se
-// añade o quita un valor allí, hay que reflejarlo aquí también — no hay
-// forma de derivarlo automáticamente porque esas listas viven en SQL.
+// Listas de valores permitidos por los CHECK de la base de datos
+// (migraciones 000012, 000013 y 000014 del backend).
+//
+// Cada array contiene SOLO los valores técnicos que viajan al backend;
+// las etiquetas visibles viven en el namespace `options` de los
+// diccionarios de i18n (es.ts / en.ts), con un bucket por categoría cuyo
+// nombre coincide con el nombre del array en camelCase. Se resuelven con
+// los helpers tOption / tOptionList de lib/i18n/options.ts.
+//
+// Si se añade o quita un valor en la base de datos, hay que reflejarlo
+// aquí Y en ambos diccionarios.
 
-export type Option = { value: string; label: string };
+// --- Básico ---------------------------------------------------------------
 
-// --- Básico -------------------------------------------------------------
-
-export const HAS_CHILDREN_OPTIONS: Option[] = [
-  { value: 'yes', label: 'Sí' },
-  { value: 'no', label: 'No' },
-  { value: 'prefer_not_to_say', label: 'Prefiero no decirlo' },
-];
-
-export const WANTS_CHILDREN_OPTIONS: Option[] = [
-  { value: 'yes', label: 'Sí' },
-  { value: 'no', label: 'No' },
-  { value: 'not_sure', label: 'No lo sé todavía' },
-];
-
-export const RELATIONSHIP_GOAL_OPTIONS: Option[] = [
-  { value: 'casual', label: 'Algo casual' },
-  { value: 'long_term', label: 'Relación estable' },
-  { value: 'friendship', label: 'Amistad' },
-  { value: 'marriage', label: 'Matrimonio' },
-  { value: 'not_sure', label: 'No lo sé todavía' },
-];
+export const HAS_CHILDREN_OPTIONS = ['yes', 'no', 'prefer_not_to_say'];
+export const WANTS_CHILDREN_OPTIONS = ['yes', 'no', 'not_sure'];
+export const RELATIONSHIP_GOAL_OPTIONS = ['casual', 'long_term', 'friendship', 'marriage', 'not_sure'];
 
 // --- Físico y apariencia --------------------------------------------------
 
-export const BODY_TYPE_OPTIONS: Option[] = [
-  { value: 'petite', label: 'Menuda' },
-  { value: 'slim', label: 'Delgada' },
-  { value: 'athletic', label: 'Atlética' },
-  { value: 'average', label: 'Media' },
-  { value: 'few_extra_pounds', label: 'Algunos kilos de más' },
-  { value: 'full_figured', label: 'Con curvas' },
-  { value: 'large_and_lovely', label: 'Grande' },
+export const BODY_TYPE_OPTIONS = [
+  'petite',
+  'slim',
+  'athletic',
+  'average',
+  'few_extra_pounds',
+  'full_figured',
+  'large_and_lovely',
 ];
 
-export const ETHNICITY_OPTIONS: Option[] = [
-  { value: 'arab', label: 'Árabe' },
-  { value: 'asian', label: 'Asiática' },
-  { value: 'black', label: 'Negra' },
-  { value: 'caucasian', label: 'Caucásica' },
-  { value: 'hispanic', label: 'Hispana' },
-  { value: 'indian', label: 'India' },
-  { value: 'mixed', label: 'Mestiza' },
-  { value: 'pacific_islander', label: 'Isleña del Pacífico' },
-  { value: 'other', label: 'Otra' },
+export const ETHNICITY_OPTIONS = [
+  'arab',
+  'asian',
+  'black',
+  'caucasian',
+  'hispanic',
+  'indian',
+  'mixed',
+  'pacific_islander',
+  'other',
 ];
 
-export const APPEARANCE_RATING_OPTIONS: Option[] = [
-  { value: 'below_average', label: 'Por debajo de la media' },
-  { value: 'average', label: 'Media' },
-  { value: 'attractive', label: 'Atractiva' },
-  { value: 'very_attractive', label: 'Muy atractiva' },
+export const APPEARANCE_RATING_OPTIONS = [
+  'below_average',
+  'average',
+  'attractive',
+  'very_attractive',
 ];
 
-export const HAIR_COLOR_OPTIONS: Option[] = [
-  { value: 'bald', label: 'Calvo/a' },
-  { value: 'black', label: 'Negro' },
-  { value: 'blonde', label: 'Rubio' },
-  { value: 'brown', label: 'Castaño' },
-  { value: 'grey', label: 'Canoso' },
-  { value: 'light_brown', label: 'Castaño claro' },
-  { value: 'red', label: 'Pelirrojo' },
-  { value: 'changes_frequently', label: 'Cambia con frecuencia' },
-  { value: 'other', label: 'Otro' },
+export const HAIR_COLOR_OPTIONS = [
+  'bald',
+  'black',
+  'blonde',
+  'brown',
+  'grey',
+  'light_brown',
+  'red',
+  'changes_frequently',
+  'other',
 ];
 
-export const EYE_COLOR_OPTIONS: Option[] = [
-  { value: 'black', label: 'Negros' },
-  { value: 'blue', label: 'Azules' },
-  { value: 'brown', label: 'Marrones' },
-  { value: 'green', label: 'Verdes' },
-  { value: 'grey', label: 'Grises' },
-  { value: 'hazel', label: 'Avellana' },
-  { value: 'other', label: 'Otros' },
-];
+export const EYE_COLOR_OPTIONS = ['black', 'blue', 'brown', 'green', 'grey', 'hazel', 'other'];
 
-export const BODY_ART_OPTIONS: Option[] = [
-  { value: 'branding', label: 'Branding' },
-  { value: 'earrings', label: 'Pendientes' },
-  { value: 'piercing', label: 'Piercing' },
-  { value: 'tattoo', label: 'Tatuajes' },
-  { value: 'other', label: 'Otro' },
-  { value: 'none', label: 'Ninguno' },
-];
+export const BODY_ART_OPTIONS = ['branding', 'earrings', 'piercing', 'tattoo', 'other', 'none'];
 
 // --- Estilo de vida y familia ---------------------------------------------
 
-export const SMOKING_HABIT_OPTIONS: Option[] = [
-  { value: 'yes', label: 'Sí' },
-  { value: 'no', label: 'No' },
-  { value: 'occasionally', label: 'A veces' },
+export const SMOKING_HABIT_OPTIONS = ['yes', 'no', 'occasionally'];
+export const DRINKING_HABIT_OPTIONS = SMOKING_HABIT_OPTIONS;
+
+export const RELOCATION_WILLINGNESS_OPTIONS = [
+  'within_country',
+  'another_country',
+  'not_willing',
+  'not_sure',
 ];
 
-export const DRINKING_HABIT_OPTIONS: Option[] = SMOKING_HABIT_OPTIONS;
+export const MARITAL_STATUS_OPTIONS = ['single', 'separated', 'widowed', 'divorced', 'other'];
 
-export const RELOCATION_WILLINGNESS_OPTIONS: Option[] = [
-  { value: 'within_country', label: 'Dentro de mi país' },
-  { value: 'another_country', label: 'A otro país' },
-  { value: 'not_willing', label: 'No dispuesto/a' },
-  { value: 'not_sure', label: 'No lo sé todavía' },
+export const OCCUPATION_OPTIONS = [
+  'administrative',
+  'advertising',
+  'artistic',
+  'construction',
+  'domestic_helper',
+  'education',
+  'entertainment',
+  'executive',
+  'farming',
+  'finance',
+  'fire_law_enforcement',
+  'hair_dresser',
+  'it_communications',
+  'laborer',
+  'legal',
+  'medical',
+  'military',
+  'nanny',
+  'none',
+  'non_profit',
+  'political',
+  'retail',
+  'retired',
+  'sales',
+  'self_employed',
+  'sports',
+  'student',
+  'technical',
+  'transportation',
+  'travel',
+  'unemployed',
+  'other',
 ];
 
-export const MARITAL_STATUS_OPTIONS: Option[] = [
-  { value: 'single', label: 'Soltero/a' },
-  { value: 'separated', label: 'Separado/a' },
-  { value: 'widowed', label: 'Viudo/a' },
-  { value: 'divorced', label: 'Divorciado/a' },
-  { value: 'other', label: 'Otro' },
+export const EMPLOYMENT_STATUS_OPTIONS = [
+  'student',
+  'part_time',
+  'full_time',
+  'homemaker',
+  'retired',
+  'not_employed',
+  'other',
 ];
 
-export const OCCUPATION_OPTIONS: Option[] = [
-  { value: 'administrative', label: 'Administrativo' },
-  { value: 'advertising', label: 'Publicidad' },
-  { value: 'artistic', label: 'Artístico' },
-  { value: 'construction', label: 'Construcción' },
-  { value: 'domestic_helper', label: 'Empleo doméstico' },
-  { value: 'education', label: 'Educación' },
-  { value: 'entertainment', label: 'Entretenimiento' },
-  { value: 'executive', label: 'Directivo' },
-  { value: 'farming', label: 'Agricultura' },
-  { value: 'finance', label: 'Finanzas' },
-  { value: 'fire_law_enforcement', label: 'Bomberos/Policía' },
-  { value: 'hair_dresser', label: 'Peluquería' },
-  { value: 'it_communications', label: 'IT/Comunicaciones' },
-  { value: 'laborer', label: 'Obrero' },
-  { value: 'legal', label: 'Legal' },
-  { value: 'medical', label: 'Médico' },
-  { value: 'military', label: 'Militar' },
-  { value: 'nanny', label: 'Niñera' },
-  { value: 'none', label: 'Ninguna' },
-  { value: 'non_profit', label: 'ONG' },
-  { value: 'political', label: 'Política' },
-  { value: 'retail', label: 'Comercio' },
-  { value: 'retired', label: 'Jubilado/a' },
-  { value: 'sales', label: 'Ventas' },
-  { value: 'self_employed', label: 'Autónomo/a' },
-  { value: 'sports', label: 'Deporte' },
-  { value: 'student', label: 'Estudiante' },
-  { value: 'technical', label: 'Técnico' },
-  { value: 'transportation', label: 'Transporte' },
-  { value: 'travel', label: 'Turismo' },
-  { value: 'unemployed', label: 'Desempleado/a' },
-  { value: 'other', label: 'Otra' },
+export const INCOME_LEVEL_OPTIONS = ['low', 'medium', 'high', 'very_high', 'prefer_not_to_say'];
+
+export const LIVING_SITUATION_OPTIONS = [
+  'live_alone',
+  'live_with_friends',
+  'live_with_family',
+  'live_with_kids',
+  'live_with_spouse',
+  'other',
 ];
 
-export const EMPLOYMENT_STATUS_OPTIONS: Option[] = [
-  { value: 'student', label: 'Estudiante' },
-  { value: 'part_time', label: 'Media jornada' },
-  { value: 'full_time', label: 'Jornada completa' },
-  { value: 'homemaker', label: 'Labores del hogar' },
-  { value: 'retired', label: 'Jubilado/a' },
-  { value: 'not_employed', label: 'Sin empleo' },
-  { value: 'other', label: 'Otro' },
+// --- Fondo, cultura y valores ---------------------------------------------
+
+export const EDUCATION_LEVEL_OPTIONS = [
+  'high_school',
+  'associates',
+  'bachelors',
+  'masters',
+  'phd',
+  'other',
 ];
 
-export const INCOME_LEVEL_OPTIONS: Option[] = [
-  { value: 'low', label: 'Bajo' },
-  { value: 'medium', label: 'Medio' },
-  { value: 'high', label: 'Alto' },
-  { value: 'very_high', label: 'Muy alto' },
-  { value: 'prefer_not_to_say', label: 'Prefiero no decirlo' },
+export const ENGLISH_ABILITY_OPTIONS = ['none', 'basic', 'intermediate', 'fluent', 'native'];
+
+export const RELIGION_OPTIONS = [
+  'bahai',
+  'buddhist',
+  'catholic',
+  'christian_other',
+  'protestant',
+  'hindu',
+  'islam',
+  'jainism',
+  'jewish',
+  'parsi',
+  'shintoism',
+  'sikhism',
+  'taoism',
+  'other',
+  'none',
 ];
 
-export const LIVING_SITUATION_OPTIONS: Option[] = [
-  { value: 'live_alone', label: 'Vivo solo/a' },
-  { value: 'live_with_friends', label: 'Con amigos' },
-  { value: 'live_with_family', label: 'Con familia' },
-  { value: 'live_with_kids', label: 'Con mis hijos' },
-  { value: 'live_with_spouse', label: 'Con mi pareja' },
-  { value: 'other', label: 'Otra' },
+export const RELIGIOUS_VALUES_OPTIONS = ['not_religious', 'religious', 'very_religious'];
+
+export const STAR_SIGN_OPTIONS = [
+  'aquarius',
+  'aries',
+  'cancer',
+  'capricorn',
+  'gemini',
+  'leo',
+  'libra',
+  'pisces',
+  'sagittarius',
+  'scorpio',
+  'taurus',
+  'virgo',
 ];
 
-// --- Fondo, cultura y valores ----------------------------------------------
+// --- Über mich / estilo de vida -------------------------------------------
 
-export const EDUCATION_LEVEL_OPTIONS: Option[] = [
-  { value: 'high_school', label: 'Secundaria' },
-  { value: 'associates', label: 'Grado medio' },
-  { value: 'bachelors', label: 'Grado / Licenciatura' },
-  { value: 'masters', label: 'Máster' },
-  { value: 'phd', label: 'Doctorado' },
-  { value: 'other', label: 'Otro' },
+export const FUTURE_VISION_OPTIONS = [
+  'balance_family_career',
+  'focus_family_household',
+  'beauty_and_partner_time',
+  'part_time_work',
+  'support_partner_career',
+  'new_education',
 ];
 
-export const ENGLISH_ABILITY_OPTIONS: Option[] = [
-  { value: 'none', label: 'Ninguno' },
-  { value: 'basic', label: 'Básico' },
-  { value: 'intermediate', label: 'Intermedio' },
-  { value: 'fluent', label: 'Fluido' },
-  { value: 'native', label: 'Nativo' },
+export const SPORTS_OPTIONS = [
+  'fitness',
+  'motorsport',
+  'strength_training',
+  'ball_sports',
+  'water_sports',
+  'jogging',
+  'winter_sports',
+  'cycling',
+  'athletics',
+  'climbing',
+  'horse_riding',
+  'hiking',
+  'other',
 ];
 
-export const RELIGION_OPTIONS: Option[] = [
-  { value: 'bahai', label: 'Bahá\u2019í' },
-  { value: 'buddhist', label: 'Budista' },
-  { value: 'catholic', label: 'Católica' },
-  { value: 'christian_other', label: 'Cristiana (otra)' },
-  { value: 'protestant', label: 'Protestante' },
-  { value: 'hindu', label: 'Hindú' },
-  { value: 'islam', label: 'Islam' },
-  { value: 'jainism', label: 'Jainismo' },
-  { value: 'jewish', label: 'Judía' },
-  { value: 'parsi', label: 'Parsi' },
-  { value: 'shintoism', label: 'Sintoísmo' },
-  { value: 'sikhism', label: 'Sijismo' },
-  { value: 'taoism', label: 'Taoísmo' },
-  { value: 'other', label: 'Otra' },
-  { value: 'none', label: 'Ninguna' },
+export const LIKES_PETS_OPTIONS = ['yes', 'neutral', 'no'];
+
+export const PETS_OWNED_OPTIONS = ['none', 'cat', 'dog', 'horse', 'other'];
+
+export const FAVORITE_SEASON_OPTIONS = ['spring', 'summer', 'autumn', 'winter'];
+
+export const IDEAL_VACATION_STYLE_OPTIONS = [
+  'small_charming_hotel',
+  'luxury_hotel',
+  'cruise_ship',
+  'club_hotel',
+  'rental_apartment',
+  'countryside_house',
+  'camping_rv',
+  'staying_home',
+  'at_friends',
 ];
 
-export const RELIGIOUS_VALUES_OPTIONS: Option[] = [
-  { value: 'not_religious', label: 'No religioso/a' },
-  { value: 'religious', label: 'Religioso/a' },
-  { value: 'very_religious', label: 'Muy religioso/a' },
+export const VACATION_ACTIVITIES_OPTIONS = [
+  'cafes_shopping_nightlife',
+  'mix_relaxation_activities',
+  'lazing_and_relaxing',
+  'beach_holiday',
+  'sightseeing_cities',
+  'lots_of_sports',
 ];
 
-export const STAR_SIGN_OPTIONS: Option[] = [
-  { value: 'aquarius', label: 'Acuario' },
-  { value: 'aries', label: 'Aries' },
-  { value: 'cancer', label: 'Cáncer' },
-  { value: 'capricorn', label: 'Capricornio' },
-  { value: 'gemini', label: 'Géminis' },
-  { value: 'leo', label: 'Leo' },
-  { value: 'libra', label: 'Libra' },
-  { value: 'pisces', label: 'Piscis' },
-  { value: 'sagittarius', label: 'Sagitario' },
-  { value: 'scorpio', label: 'Escorpio' },
-  { value: 'taurus', label: 'Tauro' },
-  { value: 'virgo', label: 'Virgo' },
+// --- Preferencias de pareja -----------------------------------------------
+
+export const DESIRED_TRAITS_OPTIONS = [
+  'humorous',
+  'self_confident',
+  'loving',
+  'kind_hearted',
+  'intelligent',
+  'faithful',
+  'honest',
+  'ambitious',
+  'family_oriented',
+  'adventurous',
+  'romantic',
+  'patient',
+  'easy_going',
+  'financially_stable',
+  'other',
 ];
 
-// --- Über mich / estilo de vida (000013) ------------------------------
+export const PARTNER_MAY_HAVE_CHILDREN_OPTIONS = ['yes', 'no', 'doesnt_matter'];
 
-export const FUTURE_VISION_OPTIONS: Option[] = [
-  { value: 'balance_family_career', label: 'Combinar familia y trabajo' },
-  { value: 'focus_family_household', label: 'Centrarme en familia y hogar' },
-  { value: 'beauty_and_partner_time', label: 'Cuidarme y estar con mi pareja' },
-  { value: 'part_time_work', label: 'Trabajar a tiempo parcial' },
-  { value: 'support_partner_career', label: 'Apoyar la carrera de mi pareja' },
-  { value: 'new_education', label: 'Hacer una nueva formación' },
+export const PARTNER_RELIGION_PREFERENCE_OPTIONS = [...RELIGION_OPTIONS, 'doesnt_matter'];
+
+export const FIRST_MEETING_PREFERENCE_OPTIONS = [
+  'doesnt_matter',
+  'public_place',
+  'my_city',
+  'their_city',
+  'video_call_first',
 ];
 
-export const SPORTS_OPTIONS: Option[] = [
-  { value: 'fitness', label: 'Fitness' },
-  { value: 'motorsport', label: 'Motor' },
-  { value: 'strength_training', label: 'Musculación' },
-  { value: 'ball_sports', label: 'Deportes de balón' },
-  { value: 'water_sports', label: 'Deportes acuáticos' },
-  { value: 'jogging', label: 'Correr' },
-  { value: 'winter_sports', label: 'Deportes de invierno' },
-  { value: 'cycling', label: 'Ciclismo' },
-  { value: 'athletics', label: 'Atletismo' },
-  { value: 'climbing', label: 'Escalada' },
-  { value: 'horse_riding', label: 'Equitación' },
-  { value: 'hiking', label: 'Senderismo' },
-  { value: 'other', label: 'Otro' },
+export const DESIRED_LIVING_PLACE_OPTIONS = [
+  'big_city',
+  'medium_city',
+  'small_town',
+  'countryside',
+  'abroad',
 ];
 
-export const LIKES_PETS_OPTIONS: Option[] = [
-  { value: 'yes', label: 'Sí' },
-  { value: 'neutral', label: 'Me da igual' },
-  { value: 'no', label: 'No' },
+// Las 10 barras de "qué es importante en una relación". Lista fija; los
+// campos del partnerForm se indexan por `key`, por eso mantenemos el shape.
+export const PARTNER_IMPORTANCE_FIELDS: { key: string }[] = [
+  { key: 'importance_shared_thoughts' },
+  { key: 'importance_shared_hobbies' },
+  { key: 'importance_intimacy' },
+  { key: 'importance_romantic_love' },
+  { key: 'importance_financial_security' },
+  { key: 'importance_fun' },
+  { key: 'importance_shared_friends' },
+  { key: 'importance_shared_humor' },
+  { key: 'importance_personal_space' },
+  { key: 'importance_independence' },
 ];
 
-export const PETS_OWNED_OPTIONS: Option[] = [
-  { value: 'none', label: 'Ninguna' },
-  { value: 'cat', label: 'Gato' },
-  { value: 'dog', label: 'Perro' },
-  { value: 'horse', label: 'Caballo' },
-  { value: 'other', label: 'Otra' },
+// Los 5 rasgos del Big Five. No se iteran aquí, pero se listan para dejar
+// constancia de los valores admitidos por el backend.
+export const PERSONALITY_TRAIT_KEYS = [
+  'extraversion',
+  'emotional_stability',
+  'conscientiousness',
+  'agreeableness',
+  'openness',
 ];
 
-export const FAVORITE_SEASON_OPTIONS: Option[] = [
-  { value: 'spring', label: 'Primavera' },
-  { value: 'summer', label: 'Verano' },
-  { value: 'autumn', label: 'Otoño' },
-  { value: 'winter', label: 'Invierno' },
+// Categorías de interés del catálogo del backend.
+export const INTEREST_CATEGORY_KEYS = [
+  'sport_activity',
+  'creativity_manual',
+  'culture_intellectual',
+  'leisure_entertainment',
+  'lifestyle_other',
+  'art_creativity',
+  'diy_crafts',
+  'music',
+  'music_genres',
+  'gaming_geek',
+  'sports_specific',
+  'motor',
+  'nature_animals',
+  'travel',
+  'gastronomy',
+  'film_entertainment',
+  'books',
 ];
 
-export const IDEAL_VACATION_STYLE_OPTIONS: Option[] = [
-  { value: 'small_charming_hotel', label: 'Hotel pequeño y con encanto' },
-  { value: 'luxury_hotel', label: 'Hotel de lujo' },
-  { value: 'cruise_ship', label: 'Crucero' },
-  { value: 'club_hotel', label: 'Hotel club' },
-  { value: 'rental_apartment', label: 'Apartamento de alquiler' },
-  { value: 'countryside_house', label: 'Casa rural' },
-  { value: 'camping_rv', label: 'Camping / autocaravana' },
-  { value: 'staying_home', label: 'Quedarme en casa' },
-  { value: 'at_friends', label: 'En casa de amigos' },
-];
-
-export const VACATION_ACTIVITIES_OPTIONS: Option[] = [
-  { value: 'cafes_shopping_nightlife', label: 'Cafés, compras y vida nocturna' },
-  { value: 'mix_relaxation_activities', label: 'Mezcla de relax y actividades' },
-  { value: 'lazing_and_relaxing', label: 'Descansar sin más' },
-  { value: 'beach_holiday', label: 'Playa' },
-  { value: 'sightseeing_cities', label: 'Visitar ciudades' },
-  { value: 'lots_of_sports', label: 'Mucho deporte' },
-];
-
-// --- Preferencias de pareja ---------------------------------------------
-
-export const DESIRED_TRAITS_OPTIONS: Option[] = [
-  { value: 'humorous', label: 'Con sentido del humor' },
-  { value: 'self_confident', label: 'Seguro/a de sí mismo/a' },
-  { value: 'loving', label: 'Cariñoso/a' },
-  { value: 'kind_hearted', label: 'De buen corazón' },
-  { value: 'intelligent', label: 'Inteligente' },
-  { value: 'faithful', label: 'Fiel' },
-  { value: 'honest', label: 'Honesto/a' },
-  { value: 'ambitious', label: 'Ambicioso/a' },
-  { value: 'family_oriented', label: 'Orientado/a a la familia' },
-  { value: 'adventurous', label: 'Aventurero/a' },
-  { value: 'romantic', label: 'Romántico/a' },
-  { value: 'patient', label: 'Paciente' },
-  { value: 'easy_going', label: 'De trato fácil' },
-  { value: 'financially_stable', label: 'Estable económicamente' },
-  { value: 'other', label: 'Otro' },
-];
-
-export const PARTNER_MAY_HAVE_CHILDREN_OPTIONS: Option[] = [
-  { value: 'yes', label: 'Sí' },
-  { value: 'no', label: 'No' },
-  { value: 'doesnt_matter', label: 'Me da igual' },
-];
-
-export const PARTNER_RELIGION_PREFERENCE_OPTIONS: Option[] = [
-  ...RELIGION_OPTIONS,
-  { value: 'doesnt_matter', label: 'Me da igual' },
-];
-
-export const FIRST_MEETING_PREFERENCE_OPTIONS: Option[] = [
-  { value: 'doesnt_matter', label: 'Me da igual' },
-  { value: 'public_place', label: 'Lugar público' },
-  { value: 'my_city', label: 'En mi ciudad' },
-  { value: 'their_city', label: 'En su ciudad' },
-  { value: 'video_call_first', label: 'Videollamada primero' },
-];
-
-export const DESIRED_LIVING_PLACE_OPTIONS: Option[] = [
-  { value: 'big_city', label: 'Gran ciudad' },
-  { value: 'medium_city', label: 'Ciudad media' },
-  { value: 'small_town', label: 'Pueblo' },
-  { value: 'countryside', label: 'Campo' },
-  { value: 'abroad', label: 'Extranjero' },
-];
-
-// Las 10 barras de "qué es importante en una relación". Es una lista
-// fija y pequeña (decisión tomada en la Fase 1: no vive en un catálogo
-// de BD), así que aquí también va como constante, no como fetch.
-export const PARTNER_IMPORTANCE_FIELDS: { key: string; label: string }[] = [
-  { key: 'importance_shared_thoughts', label: 'Compartir pensamientos' },
-  { key: 'importance_shared_hobbies', label: 'Aficiones en común' },
-  { key: 'importance_intimacy', label: 'Intimidad' },
-  { key: 'importance_romantic_love', label: 'Amor romántico' },
-  { key: 'importance_financial_security', label: 'Seguridad económica' },
-  { key: 'importance_fun', label: 'Diversión' },
-  { key: 'importance_shared_friends', label: 'Amigos en común' },
-  { key: 'importance_shared_humor', label: 'Humor en común' },
-  { key: 'importance_personal_space', label: 'Espacio personal' },
-  { key: 'importance_independence', label: 'Independencia' },
-];
-
-// Las 5 etiquetas de rasgos de personalidad (Big Five). A diferencia de
-// las afirmaciones dentro de cada rasgo (que sí vienen del catálogo del
-// backend, porque esas sí crecen), los 5 rasgos son fijos.
-export const PERSONALITY_TRAIT_LABELS: Record<string, string> = {
-  extraversion: 'Extraversión',
-  emotional_stability: 'Estabilidad emocional',
-  conscientiousness: 'Meticulosidad',
-  agreeableness: 'Amabilidad',
-  openness: 'Apertura a experiencias',
-};
-
-export const INTEREST_CATEGORY_LABELS: Record<string, string> = {
-  // Categorías del grupo "con intensidad" (has_level = true)
-  sport_activity: 'Deporte y actividad física',
-  creativity_manual: 'Creatividad y actividades manuales',
-  culture_intellectual: 'Cultura e intereses intelectuales',
-  leisure_entertainment: 'Ocio y entretenimiento',
-  lifestyle_other: 'Estilo de vida y otros',
-
-  // Categorías del grupo "concretos" (has_level = false)
-  art_creativity: 'Arte y creatividad',
-  diy_crafts: 'Manualidades / DIY',
-  music: 'Música',
-  music_genres: 'Géneros musicales',
-  gaming_geek: 'Gaming / geek',
-  sports_specific: 'Deportes concretos',
-  motor: 'Motor',
-  nature_animals: 'Naturaleza y animales',
-  travel: 'Viajes',
-  gastronomy: 'Gastronomía',
-  film_entertainment: 'Cine y entretenimiento',
-  books: 'Libros',
-};
-
-// Códigos ISO permitidos por profile_languages.language_code (migración
-// 000014). Lista estática a propósito: no hay tabla de catálogo para
-// idiomas (a diferencia de los intereses), así que esto tiene que
-// mantenerse a mano si el backend cambia la lista del CHECK.
-export const LANGUAGE_OPTIONS: Option[] = [
-  { value: 'en', label: 'Inglés' },
-  { value: 'tl', label: 'Tagalo' },
-  { value: 'ceb', label: 'Cebuano' },
-  { value: 'hy', label: 'Armenio' },
-  { value: 'ar', label: 'Árabe' },
-  { value: 'es', label: 'Español' },
-  { value: 'ja', label: 'Japonés' },
-  { value: 'af', label: 'Afrikáans' },
-  { value: 'sq', label: 'Albanés' },
-  { value: 'am', label: 'Amárico' },
-  { value: 'syr', label: 'Siríaco' },
-  { value: 'az', label: 'Azerí' },
-  { value: 'id', label: 'Indonesio' },
-  { value: 'ms', label: 'Malayo' },
-  { value: 'be', label: 'Bielorruso' },
-  { value: 'bn', label: 'Bengalí' },
-  { value: 'ber', label: 'Bereber' },
-  { value: 'bg', label: 'Búlgaro' },
-  { value: 'my', label: 'Birmano' },
-  { value: 'zh_yue', label: 'Chino cantonés' },
-  { value: 'zh_cmn', label: 'Chino mandarín' },
-  { value: 'cr', label: 'Cree' },
-  { value: 'hr', label: 'Croata' },
-  { value: 'cs', label: 'Checo' },
-  { value: 'da', label: 'Danés' },
-  { value: 'nl', label: 'Neerlandés' },
-  { value: 'ti', label: 'Tigriña' },
-  { value: 'et', label: 'Estonio' },
-  { value: 'fa', label: 'Persa' },
-  { value: 'fi', label: 'Finés' },
-  { value: 'fr', label: 'Francés' },
-  { value: 'ka', label: 'Georgiano' },
-  { value: 'de', label: 'Alemán' },
-  { value: 'el', label: 'Griego' },
-  { value: 'gu', label: 'Guyaratí' },
-  { value: 'ha', label: 'Hausa' },
-  { value: 'he', label: 'Hebreo' },
-  { value: 'hi', label: 'Hindi' },
-  { value: 'hu', label: 'Húngaro' },
-  { value: 'is', label: 'Islandés' },
-  { value: 'ilo', label: 'Ilocano' },
-  { value: 'iu', label: 'Inuktitut' },
-  { value: 'it', label: 'Italiano' },
-  { value: 'kk', label: 'Kazajo' },
-  { value: 'km', label: 'Jemer' },
-  { value: 'ky', label: 'Kirguís' },
-  { value: 'lo', label: 'Lao' },
-  { value: 'lv', label: 'Letón' },
-  { value: 'lt', label: 'Lituano' },
-  { value: 'mk', label: 'Macedonio' },
-  { value: 'mg', label: 'Malgache' },
-  { value: 'ml', label: 'Malayalam' },
-  { value: 'dv', label: 'Maldivo' },
-  { value: 'mt', label: 'Maltés' },
-  { value: 'mr', label: 'Maratí' },
-  { value: 'mn', label: 'Mongol' },
-  { value: 'ne', label: 'Nepalí' },
-  { value: 'no', label: 'Noruego' },
-  { value: 'ps', label: 'Pastún' },
-  { value: 'pcm', label: 'Pidgin nigeriano' },
-  { value: 'pl', label: 'Polaco' },
-  { value: 'pt', label: 'Portugués' },
-  { value: 'qu', label: 'Quechua' },
-  { value: 'ro', label: 'Rumano' },
-  { value: 'ru', label: 'Ruso' },
-  { value: 'sr', label: 'Serbio' },
-  { value: 'sd', label: 'Sindhi' },
-  { value: 'si', label: 'Cingalés' },
-  { value: 'sk', label: 'Eslovaco' },
-  { value: 'sl', label: 'Esloveno' },
-  { value: 'so', label: 'Somalí' },
-  { value: 'sw', label: 'Suajili' },
-  { value: 'sv', label: 'Sueco' },
-  { value: 'ta', label: 'Tamil' },
-  { value: 'te', label: 'Telugu' },
-  { value: 'th', label: 'Tailandés' },
-  { value: 'bo', label: 'Tibetano' },
-  { value: 'to', label: 'Tongano' },
-  { value: 'tr', label: 'Turco' },
-  { value: 'tk', label: 'Turcomano' },
-  { value: 'uga', label: 'Ugarítico' },
-  { value: 'uk', label: 'Ucraniano' },
-  { value: 'ur', label: 'Urdu' },
-  { value: 'uz', label: 'Uzbeko' },
-  { value: 'vi', label: 'Vietnamita' },
-  { value: 'cy', label: 'Galés' },
-  { value: 'other', label: 'Otro' },
+// Códigos ISO de `profile_languages.language_code`.
+export const LANGUAGE_OPTIONS = [
+  'en',
+  'tl',
+  'ceb',
+  'hy',
+  'ar',
+  'es',
+  'ja',
+  'af',
+  'sq',
+  'am',
+  'syr',
+  'az',
+  'id',
+  'ms',
+  'be',
+  'bn',
+  'ber',
+  'bg',
+  'my',
+  'zh_yue',
+  'zh_cmn',
+  'cr',
+  'hr',
+  'cs',
+  'da',
+  'nl',
+  'ti',
+  'et',
+  'fa',
+  'fi',
+  'fr',
+  'ka',
+  'de',
+  'el',
+  'gu',
+  'ha',
+  'he',
+  'hi',
+  'hu',
+  'is',
+  'ilo',
+  'iu',
+  'it',
+  'kk',
+  'km',
+  'ky',
+  'lo',
+  'lv',
+  'lt',
+  'mk',
+  'mg',
+  'ml',
+  'dv',
+  'mt',
+  'mr',
+  'mn',
+  'ne',
+  'no',
+  'ps',
+  'pcm',
+  'pl',
+  'pt',
+  'qu',
+  'ro',
+  'ru',
+  'sr',
+  'sd',
+  'si',
+  'sk',
+  'sl',
+  'so',
+  'sw',
+  'sv',
+  'ta',
+  'te',
+  'th',
+  'bo',
+  'to',
+  'tr',
+  'tk',
+  'uga',
+  'uk',
+  'ur',
+  'uz',
+  'vi',
+  'cy',
+  'other',
 ];

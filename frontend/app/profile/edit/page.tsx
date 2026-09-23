@@ -18,7 +18,6 @@ import {
   PartnerPreferences,
 } from '@/lib/api';
 import {
-  Option,
   HAS_CHILDREN_OPTIONS,
   WANTS_CHILDREN_OPTIONS,
   RELATIONSHIP_GOAL_OPTIONS,
@@ -54,10 +53,11 @@ import {
   FIRST_MEETING_PREFERENCE_OPTIONS,
   DESIRED_LIVING_PLACE_OPTIONS,
   PARTNER_IMPORTANCE_FIELDS,
-  PERSONALITY_TRAIT_LABELS,
-  INTEREST_CATEGORY_LABELS,
   LANGUAGE_OPTIONS,
 } from '@/lib/profileOptions';
+import { useI18n } from '@/lib/i18n/context';
+import { tOption } from '@/lib/i18n/options';
+import type { Dictionary } from '@/lib/i18n/dictionaries/es';
 import LocationAutocomplete from '@/components/LocationAutocomplete';
 import { PlaceSuggestion } from '@/lib/geocoding';
 import styles from './page.module.css';
@@ -67,7 +67,6 @@ import styles from './page.module.css';
 // =====================================================================
 
 type FormState = {
-  // Básico
   display_name: string;
   birth_date: string;
   gender: string;
@@ -78,7 +77,6 @@ type FormState = {
   wants_children: string;
   bio: string;
 
-  // Físico y apariencia
   height: string;
   weight: string;
   body_type: string;
@@ -88,7 +86,6 @@ type FormState = {
   eye_color: string;
   body_art: string[];
 
-  // Estilo de vida y familia
   smoking_habit: string;
   drinking_habit: string;
   relocation_willingness: string[];
@@ -101,7 +98,6 @@ type FormState = {
   income_level: string;
   living_situation: string;
 
-  // Fondo, cultura y valores
   nationality: string;
   education_level: string;
   english_ability: string;
@@ -109,7 +105,6 @@ type FormState = {
   religious_values: string;
   star_sign: string;
 
-  // Über mich / estilo de vida
   future_vision: string[];
   sports: string[];
   likes_pets: string;
@@ -266,27 +261,16 @@ function partnerFormFromPreferences(pp: PartnerPreferences): PartnerFormState {
   };
 }
 
-const TABS = [
-  { id: 'basic', label: 'Básico' },
-  { id: 'physical', label: 'Físico' },
-  { id: 'lifestyle', label: 'Estilo de vida' },
-  { id: 'background', label: 'Fondo y cultura' },
-  { id: 'uber', label: 'Über mich' },
-  { id: 'languages', label: 'Idiomas' },
-  { id: 'interests', label: 'Intereses' },
-  { id: 'personality', label: 'Personalidad' },
-  { id: 'partner', label: 'Pareja' },
-] as const;
-
-type TabId = (typeof TABS)[number]['id'];
-
 // =====================================================================
 // Componente
 // =====================================================================
 
 export default function EditProfilePage() {
   const router = useRouter();
-  const [tab, setTab] = useState<TabId>('basic');
+  const { dictionary } = useI18n();
+  const [tab, setTab] = useState<
+    'basic' | 'physical' | 'lifestyle' | 'background' | 'uber' | 'languages' | 'interests' | 'personality' | 'partner'
+  >('basic');
 
   const [form, setForm] = useState<FormState>(emptyForm);
   const [photos, setPhotos] = useState<ProfilePhoto[]>([]);
@@ -297,27 +281,22 @@ export default function EditProfilePage() {
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
 
-  // Idiomas
   const [myLanguages, setMyLanguages] = useState<ProfileLanguage[]>([]);
   const [languageQuery, setLanguageQuery] = useState('');
 
-  // Intereses
   const [interestCatalog, setInterestCatalog] = useState<InterestDefinition[]>([]);
   const [myInterests, setMyInterests] = useState<ProfileInterest[]>([]);
   const [interestQuery, setInterestQuery] = useState('');
 
-  // Personalidad
   const [personalityCatalog, setPersonalityCatalog] = useState<PersonalityStatement[]>([]);
   const [personalityAnswers, setPersonalityAnswers] = useState<Record<string, number>>({});
   const [traitScores, setTraitScores] = useState<PersonalityTraitScore[]>([]);
 
-  // Preferencias de pareja
   const [partnerForm, setPartnerForm] = useState<PartnerFormState>(emptyPartnerForm);
   const [partnerSaving, setPartnerSaving] = useState(false);
   const [partnerSaved, setPartnerSaved] = useState(false);
 
   useEffect(() => {
-    // Los catálogos son públicos y no dependen de tener perfil creado.
     apiFetch<InterestDefinition[]>('/catalog/interests').then(setInterestCatalog).catch(() => setInterestCatalog([]));
     apiFetch<PersonalityStatement[]>('/catalog/personality-statements')
       .then(setPersonalityCatalog)
@@ -369,10 +348,11 @@ export default function EditProfilePage() {
         } else if (err instanceof ApiError && err.status === 401) {
           router.push('/login');
         } else {
-          setError('No se pudo cargar el perfil.');
+          setError(dictionary.profileEdit.errorLoad);
         }
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [router]);
 
   function updateField<K extends keyof FormState>(field: K, value: FormState[K]) {
@@ -400,8 +380,6 @@ export default function EditProfilePage() {
     updateField('region', [place.city, place.state].filter(Boolean).join(', '));
     updateField('country_code', place.countryCode);
   }
-
-  // --- Guardar el perfil ---
 
   async function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -469,13 +447,11 @@ export default function EditProfilePage() {
       setCreating(false);
       setSaved(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo guardar el perfil.');
+      setError(err instanceof ApiError ? err.message : dictionary.profileEdit.errorSave);
     } finally {
       setSaving(false);
     }
   }
-
-  // --- Fotos ---
 
   async function handleUpload(event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -493,7 +469,7 @@ export default function EditProfilePage() {
       });
       setPhotos((current) => [...current, photo]);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo subir la foto.');
+      setError(err instanceof ApiError ? err.message : dictionary.profileEdit.errorUploadPhoto);
     } finally {
       setUploading(false);
     }
@@ -505,36 +481,34 @@ export default function EditProfilePage() {
       await apiFetch<void>(`/profiles/me/photos/${photoID}`, { method: 'DELETE' });
       setPhotos((current) => current.filter((photo) => photo.id !== photoID));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo eliminar la foto.');
+      setError(err instanceof ApiError ? err.message : dictionary.profileEdit.errorDeletePhoto);
     }
   }
-
-  // --- Idiomas: cada cambio se guarda al momento ---
 
   async function handleAddLanguage(code: string) {
     setError(null);
     try {
-      const saved = await apiFetch<ProfileLanguage>(`/profiles/me/languages/${code}`, {
+      const savedLang = await apiFetch<ProfileLanguage>(`/profiles/me/languages/${code}`, {
         method: 'PUT',
         body: JSON.stringify({ level: null }),
       });
-      setMyLanguages((current) => [...current.filter((l) => l.language_code !== code), saved]);
+      setMyLanguages((current) => [...current.filter((l) => l.language_code !== code), savedLang]);
       setLanguageQuery('');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo añadir el idioma.');
+      setError(err instanceof ApiError ? err.message : dictionary.profileEdit.errorAddLanguage);
     }
   }
 
   async function handleLanguageLevelChange(code: string, level: number | null) {
     setError(null);
     try {
-      const saved = await apiFetch<ProfileLanguage>(`/profiles/me/languages/${code}`, {
+      const savedLang = await apiFetch<ProfileLanguage>(`/profiles/me/languages/${code}`, {
         method: 'PUT',
         body: JSON.stringify({ level }),
       });
-      setMyLanguages((current) => current.map((l) => (l.language_code === code ? saved : l)));
+      setMyLanguages((current) => current.map((l) => (l.language_code === code ? savedLang : l)));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo guardar el nivel.');
+      setError(err instanceof ApiError ? err.message : dictionary.profileEdit.errorSaveLevel);
     }
   }
 
@@ -544,7 +518,7 @@ export default function EditProfilePage() {
       await apiFetch<void>(`/profiles/me/languages/${code}`, { method: 'DELETE' });
       setMyLanguages((current) => current.filter((l) => l.language_code !== code));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo quitar el idioma.');
+      setError(err instanceof ApiError ? err.message : dictionary.profileEdit.errorRemoveLanguage);
     }
   }
 
@@ -552,22 +526,22 @@ export default function EditProfilePage() {
     const q = languageQuery.trim().toLowerCase();
     if (q === '') return [];
     const selected = new Set(myLanguages.map((l) => l.language_code));
-    return LANGUAGE_OPTIONS.filter((o) => !selected.has(o.value) && o.label.toLowerCase().includes(q)).slice(0, 8);
-  }, [languageQuery, myLanguages]);
-
-  // --- Intereses: cada cambio se guarda al momento ---
+    return LANGUAGE_OPTIONS.filter(
+      (code) => !selected.has(code) && (tOption(dictionary, 'languages', code) ?? code).toLowerCase().includes(q)
+    ).slice(0, 8);
+  }, [languageQuery, myLanguages, dictionary]);
 
   async function handleSetInterest(key: string, level: number | null) {
     setError(null);
     try {
-      const saved = await apiFetch<ProfileInterest>(`/profiles/me/interests/${key}`, {
+      const savedItem = await apiFetch<ProfileInterest>(`/profiles/me/interests/${key}`, {
         method: 'PUT',
         body: JSON.stringify({ level }),
       });
-      setMyInterests((current) => [...current.filter((i) => i.interest_key !== key), saved]);
+      setMyInterests((current) => [...current.filter((i) => i.interest_key !== key), savedItem]);
       setInterestQuery('');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo guardar el interés.');
+      setError(err instanceof ApiError ? err.message : dictionary.profileEdit.errorSaveInterest);
     }
   }
 
@@ -577,7 +551,7 @@ export default function EditProfilePage() {
       await apiFetch<void>(`/profiles/me/interests/${key}`, { method: 'DELETE' });
       setMyInterests((current) => current.filter((i) => i.interest_key !== key));
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo quitar el interés.');
+      setError(err instanceof ApiError ? err.message : dictionary.profileEdit.errorRemoveInterest);
     }
   }
 
@@ -600,8 +574,6 @@ export default function EditProfilePage() {
     return concreteInterests.filter((d) => !myInterestByKey[d.key] && d.label.toLowerCase().includes(q)).slice(0, 8);
   }, [interestQuery, concreteInterests, myInterestByKey]);
 
-  // --- Personalidad: cada respuesta se guarda al momento ---
-
   async function handlePersonalityChange(key: string, score: number) {
     setError(null);
     try {
@@ -613,11 +585,9 @@ export default function EditProfilePage() {
       const refreshed = await apiFetch<PersonalityResponse>('/profiles/me/personality');
       setTraitScores(refreshed.trait_scores);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudo guardar la respuesta.');
+      setError(err instanceof ApiError ? err.message : dictionary.profileEdit.errorSaveAnswer);
     }
   }
-
-  // --- Preferencias de pareja: un único guardado para toda la pestaña ---
 
   function updatePartnerField<K extends keyof PartnerFormState>(field: K, value: PartnerFormState[K]) {
     setPartnerForm((current) => ({ ...current, [field]: value }));
@@ -661,48 +631,56 @@ export default function EditProfilePage() {
     };
 
     try {
-      const saved = await apiFetch<PartnerPreferences>('/profiles/me/partner-preferences', {
+      const savedPrefs = await apiFetch<PartnerPreferences>('/profiles/me/partner-preferences', {
         method: 'PATCH',
         body: JSON.stringify(body),
       });
-      setPartnerForm(partnerFormFromPreferences(saved));
+      setPartnerForm(partnerFormFromPreferences(savedPrefs));
       setPartnerSaved(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'No se pudieron guardar las preferencias de pareja.');
+      setError(err instanceof ApiError ? err.message : dictionary.profileEdit.errorSavePartner);
     } finally {
       setPartnerSaving(false);
     }
   }
 
-  // --- Helpers de render ---
-
-  function renderSelect(field: keyof FormState, label: string, options: Option[]) {
+  function renderSelect<K extends keyof FormState>(
+    field: K,
+    label: string,
+    category: keyof Dictionary['options'],
+    values: string[]
+  ) {
     return (
       <label>
         {label}
         <select value={form[field] as string} onChange={(e) => updateField(field, e.target.value as never)}>
-          <option value="">Prefiero no decirlo</option>
-          {options.map((opt) => (
-            <option key={opt.value} value={opt.value}>{opt.label}</option>
+          <option value="">{dictionary.profileEdit.preferNotToSay}</option>
+          {values.map((value) => (
+            <option key={value} value={value}>{tOption(dictionary, category, value)}</option>
           ))}
         </select>
       </label>
     );
   }
 
-  function renderCheckboxGroup(field: MultiSelectField, label: string, options: Option[]) {
+  function renderCheckboxGroup(
+    field: MultiSelectField,
+    label: string,
+    category: keyof Dictionary['options'],
+    values: string[]
+  ) {
     return (
       <fieldset className={styles.checkboxFieldset}>
         <legend>{label}</legend>
         <div className={styles.checkboxGrid}>
-          {options.map((opt) => (
-            <label key={opt.value} className={styles.checkboxLabel}>
+          {values.map((value) => (
+            <label key={value} className={styles.checkboxLabel}>
               <input
                 type="checkbox"
-                checked={form[field].includes(opt.value)}
-                onChange={() => toggleMulti(field, opt.value)}
+                checked={form[field].includes(value)}
+                onChange={() => toggleMulti(field, value)}
               />
-              {opt.label}
+              {tOption(dictionary, category, value)}
             </label>
           ))}
         </div>
@@ -711,18 +689,34 @@ export default function EditProfilePage() {
   }
 
   if (loading) {
-    return <main className={styles.main}><p>Cargando…</p></main>;
+    return <main className={styles.main}><p>{dictionary.common.loading}</p></main>;
   }
 
   const disabledUntilCreated = creating;
 
+  const tabs: { id: typeof tab; label: string }[] = [
+    { id: 'basic', label: dictionary.profileEdit.tabBasic },
+    { id: 'physical', label: dictionary.profileEdit.tabPhysical },
+    { id: 'lifestyle', label: dictionary.profileEdit.tabLifestyle },
+    { id: 'background', label: dictionary.profileEdit.tabBackground },
+    { id: 'uber', label: dictionary.profileEdit.tabAboutMe },
+    { id: 'languages', label: dictionary.profileEdit.tabLanguages },
+    { id: 'interests', label: dictionary.profileEdit.tabInterests },
+    { id: 'personality', label: dictionary.profileEdit.tabPersonality },
+    { id: 'partner', label: dictionary.profileEdit.tabPartner },
+  ];
+
+  const locationSaved = dictionary.profileEdit.locationSaved
+    .replace('{region}', form.region ? `${form.region}, ` : '')
+    .replace('{country}', form.country_code);
+
   return (
     <main className={styles.main}>
-      <Link href="/profile">&larr; Volver a mi perfil</Link>
-      <h1>{creating ? 'Crear perfil' : 'Modificar perfil'}</h1>
+      <Link href="/profile">{dictionary.profileEdit.back}</Link>
+      <h1>{creating ? dictionary.profileEdit.titleCreate : dictionary.profileEdit.titleEdit}</h1>
 
       <nav className={styles.tabs}>
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t.id}
             type="button"
@@ -741,147 +735,149 @@ export default function EditProfilePage() {
         <form onSubmit={handleSubmit} className={styles.form}>
           {tab === 'basic' && (
             <>
-              <label>Nombre visible<input value={form.display_name} onChange={(e) => updateField('display_name', e.target.value)} required /></label>
-              {creating && <label>Fecha de nacimiento<input type="date" value={form.birth_date} onChange={(e) => updateField('birth_date', e.target.value)} required /></label>}
-              <label>Género
+              <label>{dictionary.profileEdit.fieldDisplayName}<input value={form.display_name} onChange={(e) => updateField('display_name', e.target.value)} required /></label>
+              {creating && <label>{dictionary.profileEdit.fieldBirthDate}<input type="date" value={form.birth_date} onChange={(e) => updateField('birth_date', e.target.value)} required /></label>}
+              <label>{dictionary.profileEdit.fieldGender}
                 <select value={form.gender} onChange={(e) => updateField('gender', e.target.value)} required>
-                  <option value="">Selecciona una opción</option>
-                  <option value="female">Mujer</option><option value="male">Hombre</option>
-                  <option value="non_binary">No binario</option><option value="other">Otro</option>
+                  <option value="">{dictionary.profileEdit.selectOption}</option>
+                  {(['female', 'male', 'non_binary', 'other'] as const).map((value) => (
+                    <option key={value} value={value}>{tOption(dictionary, 'gender', value)}</option>
+                  ))}
                 </select>
               </label>
 
-              <label>Ubicación
+              <label>{dictionary.profileEdit.fieldLocation}
                 <LocationAutocomplete
                   initialValue={form.region && form.country_code ? `${form.region}, ${form.country_code}` : ''}
                   onSelect={handleLocationSelect}
                 />
               </label>
               {form.country_code && (
-                <p className={styles.hint}>Guardado: {form.region ? `${form.region}, ` : ''}{form.country_code}</p>
+                <p className={styles.hint}>{locationSaved}</p>
               )}
 
               <fieldset className={styles.checkboxFieldset}>
-                <legend>¿Qué buscas? (puedes elegir varias)</legend>
+                <legend>{dictionary.profileEdit.fieldRelationshipGoals}</legend>
                 <div className={styles.checkboxGrid}>
-                  {RELATIONSHIP_GOAL_OPTIONS.map((opt) => (
-                    <label key={opt.value} className={styles.checkboxLabel}>
+                  {RELATIONSHIP_GOAL_OPTIONS.map((value) => (
+                    <label key={value} className={styles.checkboxLabel}>
                       <input
                         type="checkbox"
-                        checked={form.relationship_goals.includes(opt.value)}
-                        onChange={() => toggleRelationshipGoal(opt.value)}
+                        checked={form.relationship_goals.includes(value)}
+                        onChange={() => toggleRelationshipGoal(value)}
                       />
-                      {opt.label}
+                      {tOption(dictionary, 'relationshipGoal', value)}
                     </label>
                   ))}
                 </div>
               </fieldset>
 
-              {renderSelect('has_children', '¿Tienes hijos?', HAS_CHILDREN_OPTIONS)}
-              {renderSelect('wants_children', '¿Quieres tener hijos?', WANTS_CHILDREN_OPTIONS)}
-              <label>Biografía<textarea value={form.bio} onChange={(e) => updateField('bio', e.target.value)} maxLength={1000} rows={5} /></label>
+              {renderSelect('has_children', dictionary.profileEdit.fieldHasChildren, 'hasChildren', HAS_CHILDREN_OPTIONS)}
+              {renderSelect('wants_children', dictionary.profileEdit.fieldWantsChildren, 'wantsChildren', WANTS_CHILDREN_OPTIONS)}
+              <label>{dictionary.profileEdit.fieldBio}<textarea value={form.bio} onChange={(e) => updateField('bio', e.target.value)} maxLength={1000} rows={5} /></label>
             </>
           )}
 
           {tab === 'physical' && (
             <>
-              <label>Altura (cm)<input type="number" min={50} max={300} value={form.height} onChange={(e) => updateField('height', e.target.value)} /></label>
-              <label>Peso (kg)<input type="number" min={20} max={400} value={form.weight} onChange={(e) => updateField('weight', e.target.value)} /></label>
-              {renderSelect('body_type', 'Complexión', BODY_TYPE_OPTIONS)}
-              {renderSelect('ethnicity', 'Etnia', ETHNICITY_OPTIONS)}
-              {renderSelect('appearance_rating', 'Cómo describirías tu aspecto', APPEARANCE_RATING_OPTIONS)}
-              {renderSelect('hair_color', 'Color de pelo', HAIR_COLOR_OPTIONS)}
-              {renderSelect('eye_color', 'Color de ojos', EYE_COLOR_OPTIONS)}
-              {renderCheckboxGroup('body_art', 'Piercings / tatuajes', BODY_ART_OPTIONS)}
+              <label>{dictionary.profileEdit.fieldHeight}<input type="number" min={50} max={300} value={form.height} onChange={(e) => updateField('height', e.target.value)} /></label>
+              <label>{dictionary.profileEdit.fieldWeight}<input type="number" min={20} max={400} value={form.weight} onChange={(e) => updateField('weight', e.target.value)} /></label>
+              {renderSelect('body_type', dictionary.profileEdit.fieldBodyType, 'bodyType', BODY_TYPE_OPTIONS)}
+              {renderSelect('ethnicity', dictionary.profileEdit.fieldEthnicity, 'ethnicity', ETHNICITY_OPTIONS)}
+              {renderSelect('appearance_rating', dictionary.profileEdit.fieldAppearance, 'appearanceRating', APPEARANCE_RATING_OPTIONS)}
+              {renderSelect('hair_color', dictionary.profileEdit.fieldHairColor, 'hairColor', HAIR_COLOR_OPTIONS)}
+              {renderSelect('eye_color', dictionary.profileEdit.fieldEyeColor, 'eyeColor', EYE_COLOR_OPTIONS)}
+              {renderCheckboxGroup('body_art', dictionary.profileEdit.fieldBodyArt, 'bodyArt', BODY_ART_OPTIONS)}
             </>
           )}
 
           {tab === 'lifestyle' && (
             <>
-              {renderSelect('smoking_habit', '¿Fumas?', SMOKING_HABIT_OPTIONS)}
-              {renderSelect('drinking_habit', '¿Bebes alcohol?', DRINKING_HABIT_OPTIONS)}
-              {renderCheckboxGroup('relocation_willingness', 'Disposición a mudarte', RELOCATION_WILLINGNESS_OPTIONS)}
-              {renderSelect('marital_status', 'Estado civil', MARITAL_STATUS_OPTIONS)}
-              <label>Número de hijos<input type="number" min={0} max={25} value={form.children_count} onChange={(e) => updateField('children_count', e.target.value)} /></label>
-              <label>Edad del hijo/a más pequeño/a<input type="number" min={0} max={100} value={form.youngest_child_age} onChange={(e) => updateField('youngest_child_age', e.target.value)} /></label>
-              <label>Edad del hijo/a más mayor<input type="number" min={0} max={100} value={form.oldest_child_age} onChange={(e) => updateField('oldest_child_age', e.target.value)} /></label>
-              {renderSelect('occupation', 'Ocupación', OCCUPATION_OPTIONS)}
-              {renderSelect('employment_status', 'Situación laboral', EMPLOYMENT_STATUS_OPTIONS)}
-              {renderSelect('income_level', 'Nivel de ingresos', INCOME_LEVEL_OPTIONS)}
-              {renderSelect('living_situation', 'Con quién vives', LIVING_SITUATION_OPTIONS)}
+              {renderSelect('smoking_habit', dictionary.profileEdit.fieldSmoking, 'smokingHabit', SMOKING_HABIT_OPTIONS)}
+              {renderSelect('drinking_habit', dictionary.profileEdit.fieldDrinking, 'drinkingHabit', DRINKING_HABIT_OPTIONS)}
+              {renderCheckboxGroup('relocation_willingness', dictionary.profileEdit.fieldRelocation, 'relocationWillingness', RELOCATION_WILLINGNESS_OPTIONS)}
+              {renderSelect('marital_status', dictionary.profileEdit.fieldMaritalStatus, 'maritalStatus', MARITAL_STATUS_OPTIONS)}
+              <label>{dictionary.profileEdit.fieldChildrenCount}<input type="number" min={0} max={25} value={form.children_count} onChange={(e) => updateField('children_count', e.target.value)} /></label>
+              <label>{dictionary.profileEdit.fieldYoungestChildAge}<input type="number" min={0} max={100} value={form.youngest_child_age} onChange={(e) => updateField('youngest_child_age', e.target.value)} /></label>
+              <label>{dictionary.profileEdit.fieldOldestChildAge}<input type="number" min={0} max={100} value={form.oldest_child_age} onChange={(e) => updateField('oldest_child_age', e.target.value)} /></label>
+              {renderSelect('occupation', dictionary.profileEdit.fieldOccupation, 'occupation', OCCUPATION_OPTIONS)}
+              {renderSelect('employment_status', dictionary.profileEdit.fieldEmploymentStatus, 'employmentStatus', EMPLOYMENT_STATUS_OPTIONS)}
+              {renderSelect('income_level', dictionary.profileEdit.fieldIncomeLevel, 'incomeLevel', INCOME_LEVEL_OPTIONS)}
+              {renderSelect('living_situation', dictionary.profileEdit.fieldLivingSituation, 'livingSituation', LIVING_SITUATION_OPTIONS)}
             </>
           )}
 
           {tab === 'background' && (
             <>
-              <label>Nacionalidad (código de dos letras)<input value={form.nationality} onChange={(e) => updateField('nationality', e.target.value.toUpperCase())} maxLength={2} /></label>
-              {renderSelect('education_level', 'Nivel educativo', EDUCATION_LEVEL_OPTIONS)}
-              {renderSelect('english_ability', 'Nivel de inglés', ENGLISH_ABILITY_OPTIONS)}
-              {renderSelect('religion', 'Religión', RELIGION_OPTIONS)}
-              {renderSelect('religious_values', 'Nivel de religiosidad', RELIGIOUS_VALUES_OPTIONS)}
-              {renderSelect('star_sign', 'Signo del zodiaco', STAR_SIGN_OPTIONS)}
+              <label>{dictionary.profileEdit.fieldNationality}<input value={form.nationality} onChange={(e) => updateField('nationality', e.target.value.toUpperCase())} maxLength={2} /></label>
+              {renderSelect('education_level', dictionary.profileEdit.fieldEducation, 'educationLevel', EDUCATION_LEVEL_OPTIONS)}
+              {renderSelect('english_ability', dictionary.profileEdit.fieldEnglish, 'englishAbility', ENGLISH_ABILITY_OPTIONS)}
+              {renderSelect('religion', dictionary.profileEdit.fieldReligion, 'religion', RELIGION_OPTIONS)}
+              {renderSelect('religious_values', dictionary.profileEdit.fieldReligiousValues, 'religiousValues', RELIGIOUS_VALUES_OPTIONS)}
+              {renderSelect('star_sign', dictionary.profileEdit.fieldStarSign, 'starSign', STAR_SIGN_OPTIONS)}
             </>
           )}
 
           {tab === 'uber' && (
             <>
-              <label>Frase de presentación <span className={styles.hint}>máx. 500 caracteres</span><textarea value={form.profile_quote} onChange={(e) => updateField('profile_quote', e.target.value)} maxLength={500} rows={3} /></label>
-              {renderCheckboxGroup('future_vision', '¿Cómo te imaginas el futuro?', FUTURE_VISION_OPTIONS)}
-              {renderCheckboxGroup('sports', '¿Qué deporte practicas?', SPORTS_OPTIONS)}
-              {renderSelect('likes_pets', '¿Te gustan las mascotas?', LIKES_PETS_OPTIONS)}
-              {renderCheckboxGroup('pets_owned', '¿Qué mascotas tienes?', PETS_OWNED_OPTIONS)}
-              {renderSelect('favorite_season', 'Estación favorita', FAVORITE_SEASON_OPTIONS)}
-              {renderCheckboxGroup('ideal_vacation_style', 'Vacaciones ideales', IDEAL_VACATION_STYLE_OPTIONS)}
-              {renderCheckboxGroup('vacation_activities', 'Actividades de vacaciones favoritas', VACATION_ACTIVITIES_OPTIONS)}
-              <label>Un sueño o algo que siempre has querido hacer <span className={styles.hint}>máx. 500 caracteres</span><textarea value={form.dream_wish} onChange={(e) => updateField('dream_wish', e.target.value)} maxLength={500} rows={3} /></label>
+              <label>{dictionary.profileEdit.fieldProfileQuote} <span className={styles.hint}>{dictionary.profileEdit.maxCharsShort}</span><textarea value={form.profile_quote} onChange={(e) => updateField('profile_quote', e.target.value)} maxLength={500} rows={3} /></label>
+              {renderCheckboxGroup('future_vision', dictionary.profileEdit.fieldFutureVision, 'futureVision', FUTURE_VISION_OPTIONS)}
+              {renderCheckboxGroup('sports', dictionary.profileEdit.fieldSports, 'sports', SPORTS_OPTIONS)}
+              {renderSelect('likes_pets', dictionary.profileEdit.fieldLikesPets, 'likesPets', LIKES_PETS_OPTIONS)}
+              {renderCheckboxGroup('pets_owned', dictionary.profileEdit.fieldPetsOwned, 'petsOwned', PETS_OWNED_OPTIONS)}
+              {renderSelect('favorite_season', dictionary.profileEdit.fieldFavoriteSeason, 'favoriteSeason', FAVORITE_SEASON_OPTIONS)}
+              {renderCheckboxGroup('ideal_vacation_style', dictionary.profileEdit.fieldIdealVacation, 'idealVacationStyle', IDEAL_VACATION_STYLE_OPTIONS)}
+              {renderCheckboxGroup('vacation_activities', dictionary.profileEdit.fieldVacationActivities, 'vacationActivities', VACATION_ACTIVITIES_OPTIONS)}
+              <label>{dictionary.profileEdit.fieldDreamWish} <span className={styles.hint}>{dictionary.profileEdit.maxCharsShort}</span><textarea value={form.dream_wish} onChange={(e) => updateField('dream_wish', e.target.value)} maxLength={500} rows={3} /></label>
             </>
           )}
 
-          {saved && <p className={styles.success}>Perfil guardado.</p>}
-          <button type="submit" disabled={saving}>{saving ? 'Guardando…' : 'Guardar perfil'}</button>
+          {saved && <p className={styles.success}>{dictionary.profileEdit.saved}</p>}
+          <button type="submit" disabled={saving}>{saving ? dictionary.profileEdit.saving : dictionary.profileEdit.save}</button>
         </form>
       )}
 
       {/* --- Idiomas --- */}
       {tab === 'languages' && (
         disabledUntilCreated ? (
-          <p className={styles.hint}>Guarda el perfil antes de indicar tus idiomas.</p>
+          <p className={styles.hint}>{dictionary.profileEdit.languagesMustSaveFirst}</p>
         ) : (
           <div className={styles.hobbyList}>
             {myLanguages.length > 0 && (
               <fieldset className={styles.checkboxFieldset}>
-                <legend>Tus idiomas</legend>
-                {myLanguages.map((l) => {
-                  const opt = LANGUAGE_OPTIONS.find((o) => o.value === l.language_code);
-                  return (
-                    <div key={l.language_code} className={styles.hobbyRow}>
-                      <span className={styles.hobbyLabel}>{opt?.label ?? l.language_code}</span>
-                      <select
-                        value={l.level ?? ''}
-                        onChange={(e) => handleLanguageLevelChange(l.language_code, e.target.value ? Number(e.target.value) : null)}
-                      >
-                        <option value="">Sin nivel</option>
-                        {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
-                      </select>
-                      <button type="button" onClick={() => handleRemoveLanguage(l.language_code)}>Quitar</button>
-                    </div>
-                  );
-                })}
+                <legend>{dictionary.profileEdit.languagesLegend}</legend>
+                {myLanguages.map((l) => (
+                  <div key={l.language_code} className={styles.hobbyRow}>
+                    <span className={styles.hobbyLabel}>
+                      {tOption(dictionary, 'languages', l.language_code) ?? l.language_code}
+                    </span>
+                    <select
+                      value={l.level ?? ''}
+                      onChange={(e) => handleLanguageLevelChange(l.language_code, e.target.value ? Number(e.target.value) : null)}
+                    >
+                      <option value="">{dictionary.profileEdit.noLevel}</option>
+                      {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
+                    </select>
+                    <button type="button" onClick={() => handleRemoveLanguage(l.language_code)}>{dictionary.profileEdit.remove}</button>
+                  </div>
+                ))}
               </fieldset>
             )}
 
-            <label>Añadir idioma
+            <label>{dictionary.profileEdit.addLanguage}
               <input
                 value={languageQuery}
                 onChange={(e) => setLanguageQuery(e.target.value)}
-                placeholder="Buscar idioma..."
+                placeholder={dictionary.profileEdit.searchLanguage}
               />
             </label>
             {languageSuggestions.length > 0 && (
               <ul className={styles.suggestionList}>
-                {languageSuggestions.map((opt) => (
-                  <li key={opt.value}>
-                    <button type="button" onClick={() => handleAddLanguage(opt.value)}>{opt.label}</button>
+                {languageSuggestions.map((code) => (
+                  <li key={code}>
+                    <button type="button" onClick={() => handleAddLanguage(code)}>
+                      {tOption(dictionary, 'languages', code) ?? code}
+                    </button>
                   </li>
                 ))}
               </ul>
@@ -893,11 +889,11 @@ export default function EditProfilePage() {
       {/* --- Intereses --- */}
       {tab === 'interests' && (
         disabledUntilCreated ? (
-          <p className={styles.hint}>Guarda el perfil antes de indicar tus intereses.</p>
+          <p className={styles.hint}>{dictionary.profileEdit.interestsMustSaveFirst}</p>
         ) : (
           <div className={styles.hobbyList}>
-            <h2>Intereses principales</h2>
-            <p className={styles.hint}>Indica cuánto te gusta cada uno (1 a 5). Los que dejes sin marcar no aparecerán en tu perfil.</p>
+            <h2>{dictionary.profileEdit.primaryInterests}</h2>
+            <p className={styles.hint}>{dictionary.profileEdit.primaryInterestsHint}</p>
             {Object.entries(
               leveledInterests.reduce<Record<string, InterestDefinition[]>>((acc, d) => {
                 (acc[d.category] ??= []).push(d);
@@ -905,7 +901,7 @@ export default function EditProfilePage() {
               }, {})
             ).map(([category, defs]) => (
               <fieldset key={category} className={styles.checkboxFieldset}>
-                <legend>{INTEREST_CATEGORY_LABELS[category] ?? category}</legend>
+                <legend>{tOption(dictionary, 'interestCategories', category) ?? category}</legend>
                 {defs.map((d) => (
                   <div key={d.key} className={styles.hobbyRow}>
                     <span className={styles.hobbyLabel}>{d.label}</span>
@@ -913,7 +909,7 @@ export default function EditProfilePage() {
                       value={myInterestByKey[d.key]?.level ?? ''}
                       onChange={(e) => (e.target.value ? handleSetInterest(d.key, Number(e.target.value)) : handleRemoveInterest(d.key))}
                     >
-                      <option value="">Sin marcar</option>
+                      <option value="">{dictionary.profileEdit.unmarked}</option>
                       {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
                     </select>
                   </div>
@@ -921,25 +917,29 @@ export default function EditProfilePage() {
               </fieldset>
             ))}
 
-            <h2>Otros intereses</h2>
-            <p className={styles.hint}>Cosas más concretas, sin nivel — solo se muestran las que marques.</p>
+            <h2>{dictionary.profileEdit.otherInterests}</h2>
+            <p className={styles.hint}>{dictionary.profileEdit.otherInterestsHint}</p>
 
             {selectedConcreteInterests.length > 0 && (
               <div className={styles.chipRow}>
                 {selectedConcreteInterests.map((d) => (
                   <span key={d.key} className={styles.chip}>
                     {d.label}
-                    <button type="button" onClick={() => handleRemoveInterest(d.key)} aria-label={`Quitar ${d.label}`}>×</button>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveInterest(d.key)}
+                      aria-label={dictionary.profileEdit.removeAria.replace('{label}', d.label)}
+                    >×</button>
                   </span>
                 ))}
               </div>
             )}
 
-            <label>Buscar interés
+            <label>{dictionary.profileEdit.searchInterest}
               <input
                 value={interestQuery}
                 onChange={(e) => setInterestQuery(e.target.value)}
-                placeholder="Ej: guitarra, anime, sushi..."
+                placeholder={dictionary.profileEdit.searchInterestPlaceholder}
               />
             </label>
             {concreteSuggestions.length > 0 && (
@@ -958,7 +958,7 @@ export default function EditProfilePage() {
       {/* --- Personalidad --- */}
       {tab === 'personality' && (
         disabledUntilCreated ? (
-          <p className={styles.hint}>Guarda el perfil antes de contestar el test de personalidad.</p>
+          <p className={styles.hint}>{dictionary.profileEdit.personalityMustSaveFirst}</p>
         ) : (
           <div className={styles.hobbyList}>
             {Object.entries(
@@ -971,8 +971,14 @@ export default function EditProfilePage() {
               return (
                 <fieldset key={trait} className={styles.checkboxFieldset}>
                   <legend>
-                    {PERSONALITY_TRAIT_LABELS[trait] ?? trait}
-                    {score && <span className={styles.hint}> — media: {score.average_score.toFixed(2)} ({score.answered_count} respuestas)</span>}
+                    {tOption(dictionary, 'personalityTraits', trait) ?? trait}
+                    {score && (
+                      <span className={styles.hint}>
+                        {dictionary.profileEdit.personalityAverage
+                          .replace('{avg}', score.average_score.toFixed(2))
+                          .replace('{count}', String(score.answered_count))}
+                      </span>
+                    )}
                   </legend>
                   {statements.map((s) => (
                     <div key={s.key} className={styles.hobbyRow}>
@@ -981,7 +987,7 @@ export default function EditProfilePage() {
                         value={personalityAnswers[s.key] ?? ''}
                         onChange={(e) => handlePersonalityChange(s.key, Number(e.target.value))}
                       >
-                        <option value="">Sin contestar</option>
+                        <option value="">{dictionary.profileEdit.unanswered}</option>
                         {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
                       </select>
                     </div>
@@ -996,113 +1002,119 @@ export default function EditProfilePage() {
       {/* --- Preferencias de pareja --- */}
       {tab === 'partner' && (
         disabledUntilCreated ? (
-          <p className={styles.hint}>Guarda el perfil antes de indicar tus preferencias de pareja.</p>
+          <p className={styles.hint}>{dictionary.profileEdit.partnerMustSaveFirst}</p>
         ) : (
           <form onSubmit={handleSavePartnerPreferences} className={styles.form}>
-            <label>Edad mínima<input type="number" min={18} max={120} value={partnerForm.age_min} onChange={(e) => updatePartnerField('age_min', e.target.value)} /></label>
-            <label>Edad máxima<input type="number" min={18} max={120} value={partnerForm.age_max} onChange={(e) => updatePartnerField('age_max', e.target.value)} /></label>
-            <label>Altura mínima (cm)<input type="number" min={50} max={300} value={partnerForm.height_min} onChange={(e) => updatePartnerField('height_min', e.target.value)} /></label>
-            <label>Altura máxima (cm)<input type="number" min={50} max={300} value={partnerForm.height_max} onChange={(e) => updatePartnerField('height_max', e.target.value)} /></label>
+            <label>{dictionary.profileEdit.fieldPartnerAgeMin}<input type="number" min={18} max={120} value={partnerForm.age_min} onChange={(e) => updatePartnerField('age_min', e.target.value)} /></label>
+            <label>{dictionary.profileEdit.fieldPartnerAgeMax}<input type="number" min={18} max={120} value={partnerForm.age_max} onChange={(e) => updatePartnerField('age_max', e.target.value)} /></label>
+            <label>{dictionary.profileEdit.fieldPartnerHeightMin}<input type="number" min={50} max={300} value={partnerForm.height_min} onChange={(e) => updatePartnerField('height_min', e.target.value)} /></label>
+            <label>{dictionary.profileEdit.fieldPartnerHeightMax}<input type="number" min={50} max={300} value={partnerForm.height_max} onChange={(e) => updatePartnerField('height_max', e.target.value)} /></label>
 
             <fieldset className={styles.checkboxFieldset}>
-              <legend>Rasgos que buscas</legend>
+              <legend>{dictionary.profileEdit.fieldPartnerTraits}</legend>
               <div className={styles.checkboxGrid}>
-                {DESIRED_TRAITS_OPTIONS.map((opt) => (
-                  <label key={opt.value} className={styles.checkboxLabel}>
+                {DESIRED_TRAITS_OPTIONS.map((value) => (
+                  <label key={value} className={styles.checkboxLabel}>
                     <input
                       type="checkbox"
-                      checked={partnerForm.desired_traits.includes(opt.value)}
-                      onChange={() => togglePartnerMulti('desired_traits', opt.value)}
+                      checked={partnerForm.desired_traits.includes(value)}
+                      onChange={() => togglePartnerMulti('desired_traits', value)}
                     />
-                    {opt.label}
+                    {tOption(dictionary, 'desiredTraits', value)}
                   </label>
                 ))}
               </div>
             </fieldset>
 
-            <label>¿Tu pareja puede tener hijos?
+            <label>{dictionary.profileEdit.fieldPartnerMayHaveChildren}
               <select value={partnerForm.partner_may_have_children} onChange={(e) => updatePartnerField('partner_may_have_children', e.target.value)}>
-                <option value="">Prefiero no decirlo</option>
-                {PARTNER_MAY_HAVE_CHILDREN_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                <option value="">{dictionary.profileEdit.preferNotToSay}</option>
+                {PARTNER_MAY_HAVE_CHILDREN_OPTIONS.map((value) => (
+                  <option key={value} value={value}>{tOption(dictionary, 'partnerMayHaveChildren', value)}</option>
+                ))}
               </select>
             </label>
 
-            <label>Religión de tu pareja
+            <label>{dictionary.profileEdit.fieldPartnerReligion}
               <select value={partnerForm.partner_religion_preference} onChange={(e) => updatePartnerField('partner_religion_preference', e.target.value)}>
-                <option value="">Prefiero no decirlo</option>
-                {PARTNER_RELIGION_PREFERENCE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                <option value="">{dictionary.profileEdit.preferNotToSay}</option>
+                {PARTNER_RELIGION_PREFERENCE_OPTIONS.map((value) => (
+                  <option key={value} value={value}>{tOption(dictionary, 'partnerReligionPreference', value)}</option>
+                ))}
               </select>
             </label>
 
-            <label>¿Qué buscas en una pareja? <span className={styles.hint}>máx. 1000 caracteres</span>
+            <label>{dictionary.profileEdit.fieldPartnerAboutText} <span className={styles.hint}>{dictionary.profileEdit.maxCharsLong}</span>
               <textarea value={partnerForm.about_partner_text} onChange={(e) => updatePartnerField('about_partner_text', e.target.value)} maxLength={1000} rows={4} />
             </label>
 
-            <label>Dónde os gustaría conoceros
+            <label>{dictionary.profileEdit.fieldFirstMeeting}
               <select value={partnerForm.first_meeting_preference} onChange={(e) => updatePartnerField('first_meeting_preference', e.target.value)}>
-                <option value="">Prefiero no decirlo</option>
-                {FIRST_MEETING_PREFERENCE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                <option value="">{dictionary.profileEdit.preferNotToSay}</option>
+                {FIRST_MEETING_PREFERENCE_OPTIONS.map((value) => (
+                  <option key={value} value={value}>{tOption(dictionary, 'firstMeetingPreference', value)}</option>
+                ))}
               </select>
             </label>
 
             <fieldset className={styles.checkboxFieldset}>
-              <legend>Dónde os gustaría vivir</legend>
+              <legend>{dictionary.profileEdit.fieldDesiredLivingPlace}</legend>
               <div className={styles.checkboxGrid}>
-                {DESIRED_LIVING_PLACE_OPTIONS.map((opt) => (
-                  <label key={opt.value} className={styles.checkboxLabel}>
+                {DESIRED_LIVING_PLACE_OPTIONS.map((value) => (
+                  <label key={value} className={styles.checkboxLabel}>
                     <input
                       type="checkbox"
-                      checked={partnerForm.desired_living_place.includes(opt.value)}
-                      onChange={() => togglePartnerMulti('desired_living_place', opt.value)}
+                      checked={partnerForm.desired_living_place.includes(value)}
+                      onChange={() => togglePartnerMulti('desired_living_place', value)}
                     />
-                    {opt.label}
+                    {tOption(dictionary, 'desiredLivingPlace', value)}
                   </label>
                 ))}
               </div>
             </fieldset>
 
             <fieldset className={styles.checkboxFieldset}>
-              <legend>¿Qué es importante en una relación? <span className={styles.hint}>1 = poco, 5 = mucho</span></legend>
+              <legend>{dictionary.profileEdit.fieldPartnerImportance} <span className={styles.hint}>{dictionary.profileEdit.partnerImportanceHint}</span></legend>
               {PARTNER_IMPORTANCE_FIELDS.map((f) => (
                 <div key={f.key} className={styles.hobbyRow}>
-                  <span className={styles.hobbyLabel}>{f.label}</span>
+                  <span className={styles.hobbyLabel}>{tOption(dictionary, 'partnerImportance', f.key) ?? f.key}</span>
                   <select
                     value={partnerForm[f.key as keyof PartnerFormState]}
                     onChange={(e) => updatePartnerField(f.key as keyof PartnerFormState, e.target.value)}
                   >
-                    <option value="">Sin contestar</option>
+                    <option value="">{dictionary.profileEdit.unanswered}</option>
                     {[1, 2, 3, 4, 5].map((n) => <option key={n} value={n}>{n}</option>)}
                   </select>
                 </div>
               ))}
             </fieldset>
 
-            {partnerSaved && <p className={styles.success}>Preferencias guardadas.</p>}
-            <button type="submit" disabled={partnerSaving}>{partnerSaving ? 'Guardando…' : 'Guardar preferencias'}</button>
+            {partnerSaved && <p className={styles.success}>{dictionary.profileEdit.partnerSaved}</p>}
+            <button type="submit" disabled={partnerSaving}>{partnerSaving ? dictionary.profileEdit.saving : dictionary.profileEdit.partnerSave}</button>
           </form>
         )
       )}
 
       {/* --- Fotos: visibles en cualquier pestaña, al final --- */}
       <section className={styles.photos}>
-        <h2>Fotos</h2>
+        <h2>{dictionary.profileEdit.photosTitle}</h2>
         {photos.length > 0 && (
           <div className={styles.photoGrid}>
             {photos.map((photo) => (
               <div key={photo.id} className={styles.photo}>
                 <img src={photo.url} alt="" />
-                <button type="button" onClick={() => handleDeletePhoto(photo.id)}>Eliminar</button>
+                <button type="button" onClick={() => handleDeletePhoto(photo.id)}>{dictionary.profileEdit.deletePhoto}</button>
               </div>
             ))}
           </div>
         )}
         {!creating && (
           <label className={styles.upload}>
-            Añadir foto
+            {dictionary.profileEdit.addPhoto}
             <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleUpload} disabled={uploading} />
           </label>
         )}
-        {creating && <p className={styles.hint}>Guarda el perfil antes de añadir fotos.</p>}
+        {creating && <p className={styles.hint}>{dictionary.profileEdit.photosMustSaveFirst}</p>}
       </section>
     </main>
   );
