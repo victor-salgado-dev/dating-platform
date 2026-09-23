@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { apiFetch, ApiError } from '@/lib/api';
+import { useI18n } from '@/lib/i18n/context';
 import styles from './page.module.css';
 
 export default function LoginPage() {
   const router = useRouter();
+  const { dictionary } = useI18n();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -27,11 +29,11 @@ export default function LoginPage() {
       router.push('/discover');
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        setError('Email o contraseña incorrectos.');
+        setError(dictionary.auth.login.errorInvalid);
       } else if (err instanceof ApiError && err.status === 403) {
-        setError('Esta cuenta está suspendida.');
+        setError(dictionary.auth.login.errorSuspended);
       } else {
-        setError('No se pudo iniciar sesión. Inténtalo de nuevo.');
+        setError(dictionary.auth.login.errorGeneric);
       }
     } finally {
       setLoading(false);
@@ -40,11 +42,11 @@ export default function LoginPage() {
 
   return (
     <main className={styles.main}>
-      <h1>Iniciar sesión</h1>
+      <h1>{dictionary.auth.login.title}</h1>
 
       <form onSubmit={handleSubmit} className={styles.form}>
         <label>
-          Email
+          {dictionary.common.fields.email}
           <input
             type="email"
             value={email}
@@ -54,7 +56,7 @@ export default function LoginPage() {
           />
         </label>
         <label>
-          Contraseña
+          {dictionary.common.fields.password}
           <input
             type="password"
             value={password}
@@ -67,12 +69,13 @@ export default function LoginPage() {
         {error && <p className={styles.error}>{error}</p>}
 
         <button type="submit" disabled={loading}>
-          {loading ? 'Entrando…' : 'Entrar'}
+          {loading ? dictionary.auth.login.loading : dictionary.auth.login.submit}
         </button>
       </form>
 
       <p className={styles.switch}>
-        ¿No tienes cuenta? <Link href="/register">Crear cuenta</Link>
+        {dictionary.auth.login.noAccount}{' '}
+        <Link href="/register">{dictionary.auth.register.title}</Link>
       </p>
     </main>
   );

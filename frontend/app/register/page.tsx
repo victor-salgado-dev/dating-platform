@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
 import { apiFetch, ApiError } from '@/lib/api';
+import { useI18n } from '@/lib/i18n/context';
 import styles from '../login/page.module.css';
 
 export default function RegisterPage() {
   const router = useRouter();
+  const { dictionary } = useI18n();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -28,13 +30,13 @@ export default function RegisterPage() {
       router.push('/profile/edit');
     } catch (err) {
       if (err instanceof ApiError && err.code === 'email_taken') {
-        setError('Ese email ya está registrado.');
+        setError(dictionary.auth.register.errorEmailTaken);
       } else if (err instanceof ApiError && err.code === 'weak_password') {
-        setError('La contraseña debe tener al menos 8 caracteres.');
+        setError(dictionary.auth.register.errorWeakPassword);
       } else if (err instanceof ApiError && err.code === 'terms_not_accepted') {
-        setError('Debes aceptar los Términos y la Política de Privacidad.');
+        setError(dictionary.auth.register.errorTermsNotAccepted);
       } else {
-        setError('No se pudo completar el registro. Inténtalo de nuevo.');
+        setError(dictionary.auth.register.errorGeneric);
       }
     } finally {
       setLoading(false);
@@ -43,12 +45,12 @@ export default function RegisterPage() {
 
   return (
     <main className={styles.main}>
-      <h1>Crear cuenta</h1>
-      <p>Debes ser mayor de 18 años para registrarte.</p>
+      <h1>{dictionary.auth.register.title}</h1>
+      <p>{dictionary.auth.register.ageNotice}</p>
 
       <form onSubmit={handleSubmit} className={styles.form}>
         <label>
-          Email
+          {dictionary.common.fields.email}
           <input
             type="email"
             value={email}
@@ -58,7 +60,7 @@ export default function RegisterPage() {
           />
         </label>
         <label>
-          Contraseña (mínimo 8 caracteres)
+          {dictionary.auth.register.passwordLabel}
           <input
             type="password"
             value={password}
@@ -77,20 +79,23 @@ export default function RegisterPage() {
             required
           />
           <span>
-            He leído y acepto los <Link href="/legal/terms">Términos y Condiciones</Link> y la{' '}
-            <Link href="/legal/privacy">Política de Privacidad</Link>.
+            {dictionary.auth.register.termsPrefix}{' '}
+            <Link href="/legal/terms">{dictionary.legal.terms.title}</Link>{' '}
+            {dictionary.auth.register.termsAnd}{' '}
+            <Link href="/legal/privacy">{dictionary.legal.privacy.title}</Link>.
           </span>
         </label>
 
         {error && <p className={styles.error}>{error}</p>}
 
         <button type="submit" disabled={loading || !acceptedTerms}>
-          {loading ? 'Creando cuenta…' : 'Crear cuenta'}
+          {loading ? dictionary.auth.register.loading : dictionary.auth.register.submit}
         </button>
       </form>
 
       <p className={styles.switch}>
-        ¿Ya tienes cuenta? <Link href="/login">Inicia sesión</Link>
+        {dictionary.auth.register.haveAccount}{' '}
+        <Link href="/login">{dictionary.auth.login.link}</Link>
       </p>
     </main>
   );
