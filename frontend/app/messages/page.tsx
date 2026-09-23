@@ -4,9 +4,11 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
 import { apiFetch, ApiError, ConversationsResponse } from '@/lib/api';
+import { useI18n } from '@/lib/i18n/context';
 import styles from './page.module.css';
 
 export default function MessagesPage() {
+  const { dictionary } = useI18n();
   const [data, setData] = useState<ConversationsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -19,25 +21,26 @@ export default function MessagesPage() {
       .then(setData)
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 401) {
-          setError('Inicia sesión para ver tus mensajes.');
+          setError(dictionary.messages.errorUnauthorized);
         } else {
-          setError('No se pudieron cargar las conversaciones.');
+          setError(dictionary.messages.loadError);
         }
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
     <main className={styles.main}>
-      <h1>Mensajes</h1>
+      <h1>{dictionary.messages.title}</h1>
 
-      {loading && <p>Cargando…</p>}
+      {loading && <p>{dictionary.common.loading}</p>}
       {error && <p className={styles.error}>{error}</p>}
 
       {data && (
         <>
           {data.items.length === 0 ? (
-            <p>Todavía no tienes conversaciones.</p>
+            <p>{dictionary.messages.empty}</p>
           ) : (
             <ul className={styles.list}>
               {data.items.map((c) => (
@@ -46,7 +49,7 @@ export default function MessagesPage() {
                     <div className={styles.rowMain}>
                       <span className={styles.name}>{c.other_participant.display_name}</span>
                       <span className={styles.preview}>
-                        {c.last_message.is_mine ? 'Tú: ' : ''}
+                        {c.last_message.is_mine ? dictionary.messages.youPrefix : ''}
                         {c.last_message.body}
                       </span>
                     </div>

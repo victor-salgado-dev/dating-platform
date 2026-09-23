@@ -5,10 +5,12 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 
 import { apiFetch, ApiError, MessagesResponse, MessageItem } from '@/lib/api';
+import { useI18n } from '@/lib/i18n/context';
 import styles from './page.module.css';
 
 export default function ConversationPage() {
   const params = useParams<{ id: string }>();
+  const { dictionary } = useI18n();
   const [messages, setMessages] = useState<MessageItem[] | null>(null);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -27,14 +29,15 @@ export default function ConversationPage() {
       .then((res) => setMessages(res.items))
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 404) {
-          setError('Esta conversación no existe.');
+          setError(dictionary.conversation.notFound);
         } else if (err instanceof ApiError && err.status === 401) {
-          setError('Inicia sesión para ver esta conversación.');
+          setError(dictionary.conversation.errorUnauthorized);
         } else {
-          setError('No se pudieron cargar los mensajes.');
+          setError(dictionary.conversation.loadError);
         }
       })
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params?.id]);
 
   async function handleSend(e: FormEvent) {
@@ -50,7 +53,7 @@ export default function ConversationPage() {
       setMessages((prev) => [...(prev ?? []), sent]);
       setDraft('');
     } catch {
-      setError('No se pudo enviar el mensaje.');
+      setError(dictionary.conversation.sendError);
     } finally {
       setSending(false);
     }
@@ -59,10 +62,10 @@ export default function ConversationPage() {
   return (
     <main className={styles.main}>
       <Link href="/messages" className={styles.back}>
-        &larr; Todas las conversaciones
+        {dictionary.conversation.back}
       </Link>
 
-      {loading && <p>Cargando…</p>}
+      {loading && <p>{dictionary.common.loading}</p>}
       {error && <p className={styles.error}>{error}</p>}
 
       {messages && (
@@ -83,12 +86,12 @@ export default function ConversationPage() {
               type="text"
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              placeholder="Escribe un mensaje…"
+              placeholder={dictionary.conversation.placeholder}
               maxLength={2000}
               disabled={sending}
             />
             <button type="submit" disabled={sending || !draft.trim()}>
-              Enviar
+              {dictionary.common.send}
             </button>
           </form>
         </>

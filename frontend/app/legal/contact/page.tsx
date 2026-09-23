@@ -3,10 +3,12 @@
 import { FormEvent, useState } from 'react';
 
 import { apiFetch, ApiError } from '@/lib/api';
+import { useI18n } from '@/lib/i18n/context';
 import styles from '../legal.module.css';
 import formStyles from '../../login/page.module.css';
 
 export default function ContactPage() {
+  const { dictionary } = useI18n();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
@@ -27,9 +29,9 @@ export default function ContactPage() {
       setSent(true);
     } catch (err) {
       if (err instanceof ApiError && err.status === 429) {
-        setError('Demasiados mensajes seguidos. Inténtalo de nuevo en un rato.');
+        setError(dictionary.contact.errorRateLimited);
       } else {
-        setError('No se pudo enviar el mensaje. Inténtalo de nuevo.');
+        setError(dictionary.contact.errorGeneric);
       }
     } finally {
       setSending(false);
@@ -38,23 +40,19 @@ export default function ContactPage() {
 
   return (
     <main className={styles.main}>
-      <h1>Contacto</h1>
-      <p>
-        ¿Dudas, problemas o quieres reportar algo grave? Escríbenos aquí. Para reportar
-        a una persona concreta, hazlo directamente desde su perfil (botón
-        &quot;Reportar&quot;) — así el equipo de moderación tiene todo el contexto.
-      </p>
+      <h1>{dictionary.contact.title}</h1>
+      <p>{dictionary.contact.intro}</p>
 
       {sent ? (
-        <p>Gracias, hemos recibido tu mensaje. Te responderemos por email.</p>
+        <p>{dictionary.contact.success}</p>
       ) : (
         <form onSubmit={handleSubmit} className={formStyles.form}>
           <label>
-            Nombre
+            {dictionary.contact.fieldName}
             <input type="text" value={name} onChange={(e) => setName(e.target.value)} required />
           </label>
           <label>
-            Email
+            {dictionary.common.fields.email}
             <input
               type="email"
               value={email}
@@ -63,7 +61,7 @@ export default function ContactPage() {
             />
           </label>
           <label>
-            Mensaje
+            {dictionary.contact.fieldMessage}
             <textarea
               value={message}
               onChange={(e) => setMessage(e.target.value)}
@@ -76,7 +74,7 @@ export default function ContactPage() {
           {error && <p className={formStyles.error}>{error}</p>}
 
           <button type="submit" disabled={sending}>
-            {sending ? 'Enviando…' : 'Enviar'}
+            {sending ? dictionary.contact.sending : dictionary.common.send}
           </button>
         </form>
       )}
