@@ -1,51 +1,49 @@
+import type { Metadata } from 'next';
+import { cookies } from 'next/headers';
+
+import { DEFAULT_LOCALE, LOCALE_COOKIE_NAME, isValidLocale, type Locale } from '@/lib/i18n/config';
+import { getDictionary } from '@/lib/i18n/get-dictionary';
 import styles from '../legal.module.css';
 
-export const metadata = { title: 'Aviso Legal' };
+function resolveLocale(): Locale {
+  const cookieLocale = cookies().get(LOCALE_COOKIE_NAME)?.value ?? '';
+  return isValidLocale(cookieLocale) ? cookieLocale : DEFAULT_LOCALE;
+}
+
+export async function generateMetadata(): Promise<Metadata> {
+  const dictionary = getDictionary(resolveLocale());
+  return { title: dictionary.legal.impressum.title };
+}
 
 export default function ImpressumPage() {
+  const dictionary = getDictionary(resolveLocale());
+  const t = dictionary.legal.impressum;
+
   return (
     <main className={styles.main}>
-      <p className={styles.placeholderNotice}>
-        <strong>Plantilla, no es asesoramiento legal.</strong> El contenido exacto exigido
-        para un aviso legal / Impressum varía mucho según el país (por ejemplo, es un
-        requisito específico y detallado en Alemania). Completa los datos reales de tu
-        empresa y revísalo con un abogado antes de publicarlo.
-      </p>
+      <p
+        className={styles.placeholderNotice}
+        dangerouslySetInnerHTML={{
+          __html: `<strong>${dictionary.legal.notice.title}</strong> ${t.noticeBody}`,
+        }}
+      />
 
-      <h1>Aviso Legal</h1>
+      <h1>{t.title}</h1>
 
-      <h2>Titular del sitio</h2>
-      <p>
-        [NOMBRE DE LA EMPRESA / PERSONA RESPONSABLE]
-        <br />
-        [FORMA JURÍDICA, p. ej. S.L. / GmbH]
-        <br />
-        [DIRECCIÓN COMPLETA]
-        <br />
-        [PAÍS]
-      </p>
+      <h2>{t.ownerTitle}</h2>
+      <p dangerouslySetInnerHTML={{ __html: t.ownerBody }} />
 
-      <h2>Contacto</h2>
-      <p>
-        Email: [EMAIL DE CONTACTO]
-        <br />
-        Teléfono: [TELÉFONO, si aplica]
-      </p>
+      <h2>{t.contactTitle}</h2>
+      <p dangerouslySetInnerHTML={{ __html: t.contactBody }} />
 
-      <h2>Registro / identificación fiscal</h2>
-      <p>
-        [PLACEHOLDER: número de registro mercantil, NIF/CIF/VAT ID u otro identificador
-        exigido en tu jurisdicción].
-      </p>
+      <h2>{t.registrationTitle}</h2>
+      <p>{t.registrationBody}</p>
 
-      <h2>Responsable editorial</h2>
-      <p>[PLACEHOLDER: persona responsable del contenido, si la normativa local lo exige].</p>
+      <h2>{t.editorialTitle}</h2>
+      <p>{t.editorialBody}</p>
 
-      <h2>Resolución de litigios</h2>
-      <p>
-        [PLACEHOLDER: enlace a la plataforma de resolución de litigios en línea de la UE
-        u otro mecanismo aplicable, si corresponde].
-      </p>
+      <h2>{t.disputeTitle}</h2>
+      <p>{t.disputeBody}</p>
     </main>
   );
 }

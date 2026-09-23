@@ -146,14 +146,112 @@ export const es = {
     },
   },
   legal: {
+    notice: {
+      title: 'Plantilla, no es asesoramiento legal.',
+    },
     terms: {
       title: 'Términos y Condiciones',
+      noticeBody:
+        'Este texto es un punto de partida estructural para que un abogado lo revise y adapte a tu jurisdicción, tu empresa y tu operativa real antes de publicarlo. No uses esta página tal cual en producción.',
+      meta:
+        'Versión: v1 · Última actualización: [FECHA] · Aplicable desde el registro en la plataforma.',
+      s1Title: '1. Quiénes somos',
+      s1Body:
+        '[NOMBRE DE LA EMPRESA], con domicilio en [DIRECCIÓN], [PAÍS] (en adelante, "la Plataforma"), opera este servicio de dating/relaciones. Puedes contactarnos en [EMAIL DE CONTACTO] o a través de la <a href="/legal/contact">página de contacto</a>.',
+      s2Title: '2. Requisitos de edad',
+      s2Body:
+        'La Plataforma está reservada a personas mayores de 18 años. Al registrarte, declaras y garantizas que tienes al menos 18 años. Nos reservamos el derecho de suspender o eliminar cualquier cuenta que incumpla este requisito.',
+      s3Title: '3. Tu cuenta',
+      s3Body:
+        'Eres responsable de mantener la confidencialidad de tu contraseña y de toda la actividad que ocurra en tu cuenta. Debes proporcionar información veraz al registrarte y mantenerla actualizada.',
+      s4Title: '4. Normas de conducta',
+      s4Intro: 'Al usar la Plataforma, te comprometes a no:',
+      s4Items: [
+        'Suplantar la identidad de otra persona ni crear perfiles falsos.',
+        'Acosar, amenazar o intimidar a otros usuarios.',
+        'Publicar contenido ilegal, difamatorio o sexualmente explícito no consentido.',
+        'Usar la Plataforma con fines comerciales no autorizados (spam, publicidad).',
+        'Intentar acceder a cuentas ajenas o vulnerar la seguridad del servicio.',
+      ],
+      s4Closing:
+        'El incumplimiento puede dar lugar a la suspensión o eliminación de tu cuenta, conforme a nuestros mecanismos de moderación (bloqueo, reportes y revisión por el equipo de la Plataforma).',
+      s5Title: '5. Contenido del usuario',
+      s5Body:
+        'Mantienes la propiedad del contenido que publicas (fotos, biografía, mensajes). Nos concedes una licencia limitada para almacenarlo y mostrarlo dentro de la Plataforma con el único fin de prestar el servicio.',
+      s6Title: '6. Eliminación de cuenta',
+      s6Body:
+        'Puedes eliminar tu cuenta en cualquier momento desde <a href="/settings">tu página de ajustes</a>. Consulta la <a href="/legal/privacy">Política de Privacidad</a> para saber qué ocurre con tus datos tras la eliminación.',
+      s7Title: '7. Limitación de responsabilidad',
+      s7Body:
+        '[PLACEHOLDER: cláusula de limitación de responsabilidad específica de tu jurisdicción — revisar con un abogado].',
+      s8Title: '8. Ley aplicable',
+      s8Body:
+        'Estos términos se rigen por las leyes de [JURISDICCIÓN]. [PLACEHOLDER: fuero competente / arbitraje, según corresponda].',
+      s9Title: '9. Cambios en estos términos',
+      s9Body:
+        'Podemos actualizar estos términos. Los cambios sustanciales se comunicarán y requerirán una nueva aceptación; el sistema conserva un registro con la versión y fecha exactas que cada usuario aceptó.',
     },
     privacy: {
       title: 'Política de Privacidad',
+      noticeBody:
+        'Este texto describe, a alto nivel, qué datos trata realmente esta versión del sistema (para que la descripción sea honesta), pero el documento en sí debe ser redactado o revisado por un abogado especializado en protección de datos (RGPD u otra normativa aplicable) antes de publicarse.',
+      meta:
+        'Versión: v1 · Última actualización: [FECHA] · Responsable: [NOMBRE DE LA EMPRESA], [EMAIL DE CONTACTO]',
+      s1Title: '1. Qué datos tratamos',
+      s1Items: [
+        '<strong>Cuenta:</strong> email, contraseña (almacenada como hash, nunca en claro), estado de la cuenta.',
+        '<strong>Perfil:</strong> nombre visible, fecha de nacimiento, género, país/región, idiomas, objetivo de relación, información familiar, biografía, intereses, fotos.',
+        '<strong>Actividad:</strong> favoritos, mensajes enviados/recibidos, bloqueos, reportes.',
+        '<strong>Técnicos:</strong> dirección IP y registros de acceso, con fines de seguridad (rate limiting, detección de abuso).',
+        '<strong>Consentimientos:</strong> qué versión de estos documentos aceptaste y cuándo (puedes consultarlo en tu <a href="/settings">página de ajustes</a>).',
+      ],
+      s1Closing:
+        'Ningún dato de perfil se asume ni se inventa: si no lo indicas, se guarda como "no indicado" y no se trata como si fuera una respuesta negativa.',
+      s2Title: '2. Datos especialmente sensibles',
+      s2Body:
+        'Algunos campos de perfil (p. ej. religión, orientación, salud, si se llegaran a habilitar en el futuro) pueden constituir categorías especiales de datos según la normativa aplicable. [PLACEHOLDER: describir la base legal específica y el mecanismo de consentimiento granular para estos campos, si se activan].',
+      s3Title: '3. Para qué usamos tus datos',
+      s3Items: [
+        'Prestar el servicio: crear tu perfil, mostrarlo a otros usuarios, permitir la búsqueda y la mensajería.',
+        'Seguridad: prevenir abuso, spam y accesos no autorizados.',
+        'Moderación: revisar reportes y aplicar nuestras normas de conducta.',
+        'Comunicación operativa: verificación de email, recuperación de contraseña.',
+      ],
+      s3Closing: 'No usamos tus datos para publicidad ni los vendemos a terceros.',
+      s4Title: '4. Con quién compartimos datos',
+      s4Body:
+        'Con otros usuarios, en la medida en que tu perfil es visible según las reglas de la Plataforma (perfiles bloqueados o de cuentas suspendidas nunca son visibles). Con proveedores técnicos estrictamente necesarios para operar el servicio (hosting, almacenamiento, envío de email transaccional) — [PLACEHOLDER: listar proveedores reales cuando se contraten en producción].',
+      s5Title: '5. Cuánto tiempo conservamos tus datos',
+      s5Body:
+        'Mientras tu cuenta esté activa. Al eliminar tu cuenta, se marca como eliminada y deja de ser visible o utilizable de inmediato; [PLACEHOLDER: definir el plazo de conservación del histórico mínimo antes del borrado físico definitivo, y la base legal para conservarlo ese tiempo].',
+      s6Title: '6. Tus derechos',
+      s6Body:
+        'Puedes ejercer tus derechos de acceso, rectificación, supresión, portabilidad y oposición escribiendo a [EMAIL DE CONTACTO] o desde la <a href="/legal/contact">página de contacto</a>. La eliminación de cuenta está disponible en autoservicio desde <a href="/settings">tu página de ajustes</a>.',
+      s7Title: '7. Seguridad',
+      s7Body:
+        'Las contraseñas se almacenan con hashing seguro (bcrypt), las sesiones usan cookies httpOnly, y aplicamos límites de tasa y validaciones para reducir el riesgo de abuso. Ningún sistema es 100% seguro; si detectas una vulnerabilidad, repórtala a [EMAIL DE CONTACTO].',
+      s8Title: '8. Cambios en esta política',
+      s8Body:
+        'Los cambios sustanciales se comunicarán y, si afectan al tratamiento de tus datos, se te pedirá un nuevo consentimiento explícito.',
     },
     impressum: {
       title: 'Aviso Legal',
+      noticeBody:
+        'El contenido exacto exigido para un aviso legal / Impressum varía mucho según el país (por ejemplo, es un requisito específico y detallado en Alemania). Completa los datos reales de tu empresa y revísalo con un abogado antes de publicarlo.',
+      ownerTitle: 'Titular del sitio',
+      ownerBody:
+        '[NOMBRE DE LA EMPRESA / PERSONA RESPONSABLE]<br />[FORMA JURÍDICA, p. ej. S.L. / GmbH]<br />[DIRECCIÓN COMPLETA]<br />[PAÍS]',
+      contactTitle: 'Contacto',
+      contactBody: 'Email: [EMAIL DE CONTACTO]<br />Teléfono: [TELÉFONO, si aplica]',
+      registrationTitle: 'Registro / identificación fiscal',
+      registrationBody:
+        '[PLACEHOLDER: número de registro mercantil, NIF/CIF/VAT ID u otro identificador exigido en tu jurisdicción].',
+      editorialTitle: 'Responsable editorial',
+      editorialBody:
+        '[PLACEHOLDER: persona responsable del contenido, si la normativa local lo exige].',
+      disputeTitle: 'Resolución de litigios',
+      disputeBody:
+        '[PLACEHOLDER: enlace a la plataforma de resolución de litigios en línea de la UE u otro mecanismo aplicable, si corresponde].',
     },
   },
   settings: {

@@ -148,14 +148,112 @@ export const en: Dictionary = {
     },
   },
   legal: {
+    notice: {
+      title: 'Template, not legal advice.',
+    },
     terms: {
       title: 'Terms and Conditions',
+      noticeBody:
+        'This text is a structural starting point for a lawyer to review and adapt to your jurisdiction, your company and your real operations before publishing. Do not use this page as-is in production.',
+      meta:
+        'Version: v1 · Last updated: [DATE] · Applies from registration on the platform.',
+      s1Title: '1. Who we are',
+      s1Body:
+        '[COMPANY NAME], with registered address at [ADDRESS], [COUNTRY] (hereafter, "the Platform"), operates this dating/relationship service. You can contact us at [CONTACT EMAIL] or through the <a href="/legal/contact">contact page</a>.',
+      s2Title: '2. Age requirement',
+      s2Body:
+        'The Platform is reserved for people aged 18 or older. By registering, you represent and warrant that you are at least 18 years old. We reserve the right to suspend or delete any account that does not meet this requirement.',
+      s3Title: '3. Your account',
+      s3Body:
+        'You are responsible for keeping your password confidential and for all activity that occurs on your account. You must provide truthful information when registering and keep it up to date.',
+      s4Title: '4. Code of conduct',
+      s4Intro: 'By using the Platform, you agree not to:',
+      s4Items: [
+        "Impersonate another person or create fake profiles.",
+        'Harass, threaten or intimidate other users.',
+        'Publish illegal, defamatory or non-consensual sexually explicit content.',
+        'Use the Platform for unauthorized commercial purposes (spam, advertising).',
+        'Attempt to access other people’s accounts or breach the security of the service.',
+      ],
+      s4Closing:
+        'Non-compliance may result in the suspension or deletion of your account, in line with our moderation mechanisms (blocking, reports and review by the Platform team).',
+      s5Title: '5. User content',
+      s5Body:
+        'You retain ownership of the content you publish (photos, bio, messages). You grant us a limited licence to store it and display it within the Platform with the sole purpose of providing the service.',
+      s6Title: '6. Account deletion',
+      s6Body:
+        'You can delete your account at any time from <a href="/settings">your settings page</a>. See the <a href="/legal/privacy">Privacy Policy</a> to learn what happens to your data after deletion.',
+      s7Title: '7. Limitation of liability',
+      s7Body:
+        '[PLACEHOLDER: limitation of liability clause specific to your jurisdiction — review with a lawyer].',
+      s8Title: '8. Governing law',
+      s8Body:
+        'These terms are governed by the laws of [JURISDICTION]. [PLACEHOLDER: competent court / arbitration, as applicable].',
+      s9Title: '9. Changes to these terms',
+      s9Body:
+        'We may update these terms. Substantial changes will be communicated and will require a new acceptance; the system keeps a record of the exact version and date each user accepted.',
     },
     privacy: {
       title: 'Privacy Policy',
+      noticeBody:
+        'This text describes, at a high level, what data this version of the system actually processes (so the description is honest), but the document itself must be drafted or reviewed by a lawyer specialising in data protection (GDPR or other applicable regulation) before being published.',
+      meta:
+        'Version: v1 · Last updated: [DATE] · Controller: [COMPANY NAME], [CONTACT EMAIL]',
+      s1Title: '1. What data we process',
+      s1Items: [
+        '<strong>Account:</strong> email, password (stored as a hash, never in plain text), account status.',
+        '<strong>Profile:</strong> display name, date of birth, gender, country/region, languages, relationship goal, family information, bio, interests, photos.',
+        '<strong>Activity:</strong> favorites, sent/received messages, blocks, reports.',
+        '<strong>Technical:</strong> IP address and access logs, for security purposes (rate limiting, abuse detection).',
+        '<strong>Consents:</strong> which version of these documents you accepted and when (you can check it on your <a href="/settings">settings page</a>).',
+      ],
+      s1Closing:
+        'No profile data is assumed or invented: if you do not provide it, it is stored as "not provided" and is not treated as if it were a negative answer.',
+      s2Title: '2. Especially sensitive data',
+      s2Body:
+        'Some profile fields (e.g. religion, orientation, health, if they were to be enabled in the future) may constitute special categories of data under applicable regulation. [PLACEHOLDER: describe the specific legal basis and the granular consent mechanism for these fields, if they are enabled].',
+      s3Title: '3. What we use your data for',
+      s3Items: [
+        'Providing the service: creating your profile, showing it to other users, allowing search and messaging.',
+        'Security: preventing abuse, spam and unauthorized access.',
+        'Moderation: reviewing reports and enforcing our code of conduct.',
+        'Operational communication: email verification, password recovery.',
+      ],
+      s3Closing: 'We do not use your data for advertising and we do not sell it to third parties.',
+      s4Title: '4. Who we share data with',
+      s4Body:
+        'With other users, to the extent that your profile is visible under the Platform rules (blocked profiles or profiles of suspended accounts are never visible). With technical providers strictly necessary to operate the service (hosting, storage, transactional email) — [PLACEHOLDER: list the real providers once they are contracted in production].',
+      s5Title: '5. How long we keep your data',
+      s5Body:
+        'While your account is active. When you delete your account, it is marked as deleted and becomes non-visible and non-usable immediately; [PLACEHOLDER: define the retention period for the minimum historic record before the final physical deletion, and the legal basis for retaining it that long].',
+      s6Title: '6. Your rights',
+      s6Body:
+        'You can exercise your rights of access, rectification, erasure, portability and objection by writing to [CONTACT EMAIL] or from the <a href="/legal/contact">contact page</a>. Account deletion is available as self-service from <a href="/settings">your settings page</a>.',
+      s7Title: '7. Security',
+      s7Body:
+        'Passwords are stored with secure hashing (bcrypt), sessions use httpOnly cookies, and we apply rate limits and validations to reduce the risk of abuse. No system is 100% secure; if you find a vulnerability, report it to [CONTACT EMAIL].',
+      s8Title: '8. Changes to this policy',
+      s8Body:
+        'Substantial changes will be communicated and, if they affect the processing of your data, you will be asked for a new explicit consent.',
     },
     impressum: {
       title: 'Legal notice',
+      noticeBody:
+        'The exact content required for a legal notice / Impressum varies widely by country (for example, it is a specific and detailed requirement in Germany). Fill in your real company data and have it reviewed by a lawyer before publishing.',
+      ownerTitle: 'Site owner',
+      ownerBody:
+        '[COMPANY NAME / RESPONSIBLE PERSON]<br />[LEGAL FORM, e.g. Ltd. / GmbH]<br />[FULL ADDRESS]<br />[COUNTRY]',
+      contactTitle: 'Contact',
+      contactBody: 'Email: [CONTACT EMAIL]<br />Phone: [PHONE, if applicable]',
+      registrationTitle: 'Registration / tax identification',
+      registrationBody:
+        '[PLACEHOLDER: trade registry number, VAT ID or other identifier required in your jurisdiction].',
+      editorialTitle: 'Editorial responsibility',
+      editorialBody:
+        '[PLACEHOLDER: person responsible for the content, if local regulation requires it].',
+      disputeTitle: 'Dispute resolution',
+      disputeBody:
+        '[PLACEHOLDER: link to the EU online dispute resolution platform or another applicable mechanism, if relevant].',
     },
   },
   settings: {
