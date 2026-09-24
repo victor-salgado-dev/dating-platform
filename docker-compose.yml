@@ -1,1 +1,1 @@
-docker compose exec postgres env | findstr POSTGRES
+git checkout 72fc33b^ -- docker-compose.yml
