@@ -74,11 +74,11 @@ func TestBuildParamsRejectsInvalidSort(t *testing.T) {
 }
 
 func TestBuildParamsAcceptsKnownRelationshipGoal(t *testing.T) {
-	params, err := buildParams(uuid.New(), RawQuery{RelationshipGoal: string(profiles.RelationshipLongTerm)})
+	params, err := buildParams(uuid.New(), RawQuery{RelationshipGoals: []string{string(profiles.RelationshipLongTerm)}})
 	if err != nil {
 		t.Fatalf("un objetivo de relación válido no debería rechazarse: %v", err)
 	}
-	if params.Filters.RelationshipGoal == nil || *params.Filters.RelationshipGoal != profiles.RelationshipLongTerm {
+	if len(params.Filters.RelationshipGoals) != 1 || params.Filters.RelationshipGoals[0] != profiles.RelationshipLongTerm {
 		t.Error("el filtro de objetivo de relación no se aplicó correctamente")
 	}
 }
@@ -97,11 +97,11 @@ func TestBuildParamsLeavesUnsetFiltersNil(t *testing.T) {
 	}
 
 	f := params.Filters
-	if f.MinAge != nil || f.MaxAge != nil || f.CountryCode != nil || f.RelationshipGoal != nil ||
+	if f.MinAge != nil || f.MaxAge != nil || f.CountryCode != nil ||
 		f.HasChildren != nil || f.WantsChildren != nil {
 		t.Error("los filtros no enviados deberían quedar en nil, nunca con un valor por defecto")
 	}
-	if len(f.Genders) != 0 || len(f.Languages) != 0 || len(f.Interests) != 0 {
+	if len(f.Genders) != 0 || len(f.Languages) != 0 || len(f.Interests) != 0 || len(f.RelationshipGoals) != 0 {
 		t.Error("las listas de filtros no enviadas deberían quedar vacías")
 	}
 }
