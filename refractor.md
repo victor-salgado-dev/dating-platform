@@ -120,3 +120,119 @@ Linux (contenedor/CI).
 
 ### Paso 1 — Compilación y estáticos
 
+`go build ./...` y `go vet ./...`, ambos sin salida. Confirma que el alias
+`ValidationError` y el embed `BaseListItem` no rompen tipos.
+
+### Paso 2 — Test de integración del orden de columnas
+
+**Commit:** `bed0a1a` — `test: añadir test de integración para verificar orden de columnas`
+
+- `backend/internal/integration/doc.go` (nuevo): documenta el paquete.
+- `backend/internal/integration/list_items_integration_test.go` (nuevo):
+  siembra perfiles con datos conocidos y afirma que los cuatro listados
+  (`favorites.List`, `likes.ListSent`, `visits.ListSent`, `blocking.List`)
+  devuelven **exactamente** esos valores. Es lo que detecta un desajuste de
+  orden de columnas: si dos columnas del mismo tipo se cruzan, el escaneo
+  no falla pero los campos salen mal.
+- Build tag `integration`. Requiere `TEST_DATABASE_URL`; si no está
+  definida, el test hace `t.Skip`.
+
+**Resultado:** `ok  dating-platform/backend/internal/integration` sin
+`SKIP`. Orden de columnas correcto en los cuatro repositorios.
+
+### Fixes necesarios para poder ejecutar la integración
+
+Estos no forman parte del refactor, pero fueron necesarios para que los
+tests de integración se ejecutaran de verdad (hasta entonces hacían
+`t.Skip` silencioso por el placeholder):
+
+- `.env.example` — `fix: corregir placeholder TU_DB en TEST_DATABASE_URL`
+  (`3acbcbc`). La cadena de ejemplo llevaba el placeholder literal `TU_DB`.
+- `Makefile` — `fix: derivar TEST_DATABASE_URL para los tests de integración`
+  (`4cd5869`). El target `test-integration` ahora construye la cadena desde
+  las variables `POSTGRES_*` e inyecta `TEST_DATABASE_URL` con `-e`.
+- `Makefile` — `fix: renombrar variable file a FILE en el target restore`
+  (`38f6de7`). `file` es una función incorporada de GNU Make; usarla como
+  variable rompía el target `restore`.
+
+### Arreglo colateral en search
+
+Al ejecutarse por primera vez los tests de integración, `search` **no
+compilaba**: `search_integration_hobby_personality_test.go` llamaba a
+`profilesRepo.UpsertProfileHobby`, método que ya no existe (la escritura de
+hobbies se sustituyó por `profile_interests`). Era **deuda previa oculta**,
+no causada por el refactor.
+
+- `a3c0cb9` — se retiraron los tests de hobby obsoletos (primera pasada).
+- `28b82f5` — `test: migrar tests de hobbies al filtro por intereses en
+  search`. Los tests se reescribieron contra el camino actual:
+  `profilesRepo.ListInterestDefinitions` para obtener claves reales del
+  catálogo y `profilesRepo.UpsertProfileInterest` con `level *int`
+  (`nil` permitido). El filtro comprobado es de pertenencia
+  (`search.Filters.Interests`), no de rango. Hobbies no se modificó.
+
+### Resultado final de `make test-all`
+
+- Unitarios: todos `ok`.
+- Integración: todos `ok` (`activity`, `auth`, `httpx`, `integration`,
+  `likes`, `messaging`, `profiles`, `ratelimit`, `search`, `server`,
+  `migrations`).
+
+---
+
+## Estado actual y límites de la verificación
+
+**Verificado:**
+- Compila limpio (`go build`, `go vet`).
+- Tests unitarios e integración en verde, incluido el que valida el orden
+  de columnas de `ScanBaseListItem` en los cuatro repositorios.
+
+**NO verificado todavía (pendiente):**
+- El comportamiento en runtime a través de HTTP. No se ha levantado la app
+  y pegado a los endpoints reales (`/favorites`, `/favorites/sent`,
+  `/favorites/received`, `/likes/sent`, `/likes/received`, `/matches`,
+  `/visits/sent`, `/visits/received`, `/blocks`) para confirmar que el JSON
+  devuelto es idéntico al de antes (y, en el caso de `/blocks`, si gana el
+  campo `has_photo`).
+- Los tests cubren el escaneo de columnas en el repositorio, **no** la
+  serialización del handler ni los nombres de campo del JSON. El contrato
+  HTTP completo no está comprobado.
+
+---
+
+## Deuda pendiente (identificada, no abordada)
+
+- Unificar el resto de `ValidationError` (`admin`, `contact`, `messaging`,
+  `reports`, `search`) como alias de `apperr.ValidationError`.
+- Sustituir el `totalPages` inline de `messaging` y `search` por
+  `pagination.TotalPages`.
+- Unificar el helper `orderPair` (hoy duplicado en `likes` y `messaging`,
+  con implementaciones distintas).
+- `visits/types.go` define solo `DefaultPageSize`, no `MaxPageSize`.
+- `likes.Add` hace un `SELECT EXISTS` extra tras el `INSERT`; se podría
+  resolver con `RETURNING` y ahorrar un round-trip.
+- `COUNT(*) OVER()` en listados paginados paga el window completo en tablas
+  grandes; valorar `LIMIT pageSize+1` + `has_more` o un `COUNT` separado.
+- `httpx.ClientIP` confía en `X-Forwarded-For` sin filtrar por proxy de
+  confianza; relevante en producción tras Caddy.
+
+---
+
+## Siguiente paso propuesto — Paso B: eliminar el N+1 de fotos
+
+No iniciado. En `favorites`, `likes` y `visits`, cada tarjeta con foto
+dispara un `GET /profiles/{id}/photos` propio (una petición por tarjeta). El
+listado de `search` ya lo resuelve bien: devuelve `photo_url` ya armado en
+la misma consulta. El plan es replicar ese patrón:
+
+1. `profiles.ScanBaseListItem` gana `PhotoID *uuid.UUID` (foto principal,
+   `position` más baja).
+2. Los `SELECT` de los listados añaden esa subquery.
+3. `ListItem` de favorites/likes/visits gana `PhotoURL *string`; el handler
+   lo arma.
+4. `frontend/lib/api.ts` añade `photo_url` a los tipos correspondientes.
+5. Los tres `page.tsx` dejan de hacer fetch por tarjeta y usan
+   `item.photo_url`.
+6. Se amplía el test de integración para cubrir el campo nuevo.
+
+`blocking` no entra: su ficha no expone foto.
