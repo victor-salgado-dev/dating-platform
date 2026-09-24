@@ -14,6 +14,9 @@ interface ProfileItem {
   country_code: string;
   region: string | null;
   has_photo: boolean;
+  // URL ya armada por el backend de la foto principal, o null si el
+  // perfil no tiene ninguna. Evita que cada tarjeta pida su foto aparte.
+  photo_url?: string | null;
 }
 
 interface PhotoItem {
@@ -119,7 +122,6 @@ function ProfileCard({
   receivedFavorite: boolean;
 }) {
   const { dictionary } = useI18n();
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
 
   // El estado arranca con el valor REAL que viene de la base de datos
@@ -134,18 +136,6 @@ function ProfileCard({
   useEffect(() => {
     setFavorited(initialFavorited);
   }, [initialFavorited]);
-
-  useEffect(() => {
-    if (profile.has_photo) {
-      apiFetch<PhotoItem[]>(`/profiles/${profile.profile_id}/photos`)
-        .then((photos) => {
-          if (photos && photos.length > 0) {
-            setPhotoUrl(photos[0].url ?? `/api/v1/profiles/${profile.profile_id}/photos/${photos[0].id}/file`);
-          }
-        })
-        .catch(() => setPhotoUrl(null));
-    }
-  }, [profile.profile_id, profile.has_photo]);
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -194,8 +184,8 @@ function ProfileCard({
         className={`${styles.card} ${isPremium ? styles.cardPremium : ''} ${receivedClass}`}
       >
         <div className={styles.imageContainer}>
-          {photoUrl ? (
-            <img src={photoUrl} alt={profile.display_name} className={styles.photoImg} />
+          {profile.photo_url ? (
+            <img src={profile.photo_url} alt={profile.display_name} className={styles.photoImg} />
           ) : (
             <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>
           )}
@@ -327,10 +317,7 @@ export default function HomePage() {
       })
       .catch(() => {});
 
-    // Quién te ha dado like / favorito a ti. OJO: estos dos endpoints
-    // (/likes/received y /favorites/received) son una suposición siguiendo
-    // el mismo patrón que /likes/sent — confirma o ajusta las rutas reales
-    // de tu API antes de dar esto por definitivo.
+    // Quién te ha dado like / favorito a ti.
     apiFetch<LikesResponse>('/likes/received?page_size=100')
       .then((res) => {
         const ids = new Set(res.items.map((item) => item.profile_id));
