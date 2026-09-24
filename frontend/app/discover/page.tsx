@@ -24,6 +24,7 @@ interface ProfileItem {
   relationship_goal?: string | null;
   relationship_goals?: string[] | null;
   has_photo: boolean;
+  photo_url?: string | null;
 }
 
 interface PhotoItem {
@@ -222,7 +223,6 @@ function ProfileCard({
   receivedFavorite: boolean;
 }) {
   const { dictionary } = useI18n();
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
   const [liked, setLiked] = useState(initialLiked);
   const [favorited, setFavorited] = useState(initialFavorited);
@@ -234,20 +234,6 @@ function ProfileCard({
   useEffect(() => {
     setFavorited(initialFavorited);
   }, [initialFavorited]);
-
-  useEffect(() => {
-    if (profile.has_photo) {
-      apiFetch<PhotoItem[]>(`/profiles/${profile.profile_id}/photos`)
-        .then((photos) => {
-          if (photos && photos.length > 0) {
-            setPhotoUrl(
-              photos[0].url ?? `/api/v1/profiles/${profile.profile_id}/photos/${photos[0].id}/file`
-            );
-          }
-        })
-        .catch(() => setPhotoUrl(null));
-    }
-  }, [profile.profile_id, profile.has_photo]);
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
@@ -303,8 +289,8 @@ function ProfileCard({
         className={`${styles.card} ${isPremium ? styles.cardPremium : ''} ${receivedClass}`}
       >
         <div className={styles.imageContainer}>
-          {photoUrl ? (
-            <img src={photoUrl} alt={profile.display_name} className={styles.photoImg} />
+          {profile.photo_url ? (
+            <img src={profile.photo_url} alt={profile.display_name} className={styles.photoImg} />
           ) : (
             <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>
           )}

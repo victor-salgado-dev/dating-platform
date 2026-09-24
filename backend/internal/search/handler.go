@@ -2,6 +2,7 @@ package search
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -29,7 +30,12 @@ type resultItemResponse struct {
 	RelationshipGoal  *string  `json:"relationship_goal,omitempty"`
 	RelationshipGoals []string `json:"relationship_goals"`
 	HasPhoto          bool     `json:"has_photo"`
-	CreatedAt         string   `json:"created_at"`
+	// PhotoURL es la URL ya armada de la foto principal del perfil, o
+	// null si no tiene ninguna. Se resuelve en la misma consulta que
+	// trae la lista, para que el grid del cliente no haga una petición
+	// por tarjeta.
+	PhotoURL  *string `json:"photo_url"`
+	CreatedAt string  `json:"created_at"`
 }
 
 type searchResponse struct {
@@ -131,6 +137,13 @@ func toSearchResponse(res *Result) searchResponse {
 			firstGoal = &goals[0]
 		}
 
+		var photoURL *string
+		if it.PhotoID != nil {
+			u := fmt.Sprintf("/api/v1/profiles/%s/photos/%s/file",
+				it.ProfileID.String(), it.PhotoID.String())
+			photoURL = &u
+		}
+
 		items = append(items, resultItemResponse{
 			ProfileID:         it.ProfileID.String(),
 			DisplayName:       it.DisplayName,
@@ -141,6 +154,7 @@ func toSearchResponse(res *Result) searchResponse {
 			RelationshipGoal:  firstGoal,
 			RelationshipGoals: goals,
 			HasPhoto:          it.HasPhoto,
+			PhotoURL:          photoURL,
 			CreatedAt:         it.CreatedAt.Format(time.RFC3339),
 		})
 	}

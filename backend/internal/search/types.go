@@ -154,7 +154,12 @@ type ResultItem struct {
 	Region            *string
 	RelationshipGoals []profiles.RelationshipGoal
 	HasPhoto          bool
-	CreatedAt         time.Time
+	// PhotoID es el id de la foto principal (la de position más baja),
+	// como subconsulta escalar dentro del mismo SELECT. Es nil si el
+	// perfil no tiene ninguna foto. El handler lo usa para armar
+	// photo_url sin una petición adicional por resultado.
+	PhotoID   *uuid.UUID
+	CreatedAt time.Time
 }
 
 // Result es una página de resultados de búsqueda.

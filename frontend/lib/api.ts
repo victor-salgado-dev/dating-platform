@@ -55,8 +55,13 @@ export type SearchResultItem = {
   gender: string;
   country_code: string;
   region: string | null;
-  relationship_goal: string | null;
+  relationship_goal?: string | null;
+  relationship_goals: string[] | null;
   has_photo: boolean;
+  // URL ya armada por el backend de la foto principal (position más
+  // baja), o null si el perfil no tiene ninguna. Evita que cada tarjeta
+  // tenga que pedir /profiles/{id}/photos por su cuenta.
+  photo_url: string | null;
   created_at: string;
 };
 

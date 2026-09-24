@@ -220,6 +220,10 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
 			COALESCE(p.relationship_goals, '{}') AS relationship_goals, p.created_at,
 			EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
+			(SELECT ph.id FROM profile_photos ph
+				WHERE ph.profile_id = p.id
+				ORDER BY ph.position ASC, ph.id ASC
+				LIMIT 1) AS photo_id,
 			COUNT(*) OVER() AS total_count
 		FROM profiles p
 		JOIN users u ON u.id = p.user_id
@@ -248,7 +252,8 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 
 		if err := rows.Scan(
 			&item.ProfileID, &item.DisplayName, &birthDate, &genderStr, &item.CountryCode,
-			&item.Region, &relGoalsList, &item.CreatedAt, &item.HasPhoto, &totalCount,
+			&item.Region, &relGoalsList, &item.CreatedAt, &item.HasPhoto,
+			&item.PhotoID, &totalCount,
 		); err != nil {
 			return nil, fmt.Errorf("search: leer resultado: %w", err)
 		}
