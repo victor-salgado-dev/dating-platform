@@ -31,3 +31,7 @@ backups/
 # Docker
 docker-compose.override.yml
 .aider*
+
+# Ficheros temporales de pruebas manuales con curl
+cookies.txt
+login.json
