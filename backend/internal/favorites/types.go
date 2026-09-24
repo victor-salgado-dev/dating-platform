@@ -8,28 +8,21 @@ package favorites
 import (
 	"time"
 
-	"github.com/google/uuid"
-
+	"dating-platform/backend/internal/pagination"
 	"dating-platform/backend/internal/profiles"
 )
 
 const (
-	DefaultPageSize = 20
-	MaxPageSize     = 50
+	DefaultPageSize = pagination.DefaultPageSize
+	MaxPageSize     = pagination.MaxPageSize
 )
 
-// ListItem es la ficha resumida de un perfil favorito, con el mismo
-// nivel de detalle que un resultado de búsqueda (Fase 5): no expone
+// ListItem es la ficha resumida de un perfil favorito, con el mismo nivel
+// de detalle que un resultado de búsqueda (Fase 5): no expone
 // bio/intereses/idiomas completos.
 type ListItem struct {
-	ProfileID        uuid.UUID
-	DisplayName      string
-	Age              int
-	Gender           profiles.Gender
-	CountryCode      string
-	Region           *string
+	profiles.BaseListItem
 	RelationshipGoal *profiles.RelationshipGoal
-	HasPhoto         bool
 	FavoritedAt      time.Time
 }
 

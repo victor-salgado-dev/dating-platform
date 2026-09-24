@@ -9,25 +9,19 @@ package blocking
 import (
 	"time"
 
-	"github.com/google/uuid"
-
+	"dating-platform/backend/internal/pagination"
 	"dating-platform/backend/internal/profiles"
 )
 
 const (
-	DefaultPageSize = 20
-	MaxPageSize     = 50
+	DefaultPageSize = pagination.DefaultPageSize
+	MaxPageSize     = pagination.MaxPageSize
 )
 
 // ListItem es la ficha resumida de una persona bloqueada.
 type ListItem struct {
-	ProfileID   uuid.UUID
-	DisplayName string
-	Age         int
-	Gender      profiles.Gender
-	CountryCode string
-	Region      *string
-	BlockedAt   time.Time
+	profiles.BaseListItem
+	BlockedAt time.Time
 }
 
 type ListResult struct {

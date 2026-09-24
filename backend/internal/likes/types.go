@@ -5,34 +5,23 @@ import (
 
 	"github.com/google/uuid"
 
+	"dating-platform/backend/internal/pagination"
 	"dating-platform/backend/internal/profiles"
 )
 
 const (
-	DefaultPageSize = 20
-	MaxPageSize     = 50
+	DefaultPageSize = pagination.DefaultPageSize
+	MaxPageSize     = pagination.MaxPageSize
 )
 
 type ListItem struct {
-	ProfileID        uuid.UUID
-	DisplayName      string
-	Age              int
-	Gender           profiles.Gender
-	CountryCode      string
-	Region           *string
+	profiles.BaseListItem
 	RelationshipGoal *profiles.RelationshipGoal
-	HasPhoto         bool
 	LikedAt          time.Time
 }
 
 type MatchItem struct {
-	ProfileID      uuid.UUID
-	DisplayName    string
-	Age            int
-	Gender         profiles.Gender
-	CountryCode    string
-	Region         *string
-	HasPhoto       bool
+	profiles.BaseListItem
 	MatchedAt      time.Time
 	ConversationID *uuid.UUID
 }

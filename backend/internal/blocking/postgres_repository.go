@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"dating-platform/backend/internal/pagination"
 	"dating-platform/backend/internal/profiles"
 )
 
@@ -63,6 +64,7 @@ func (r *PostgresRepository) List(ctx context.Context, blockerID uuid.UUID, page
 	const query = `
 		SELECT
 			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
+			EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
 			b.created_at,
 			COUNT(*) OVER() AS total_count
 		FROM blocks b
@@ -78,38 +80,28 @@ func (r *PostgresRepository) List(ctx context.Context, blockerID uuid.UUID, page
 	}
 	defer rows.Close()
 
-	now := time.Now()
 	var items []ListItem
 	total := 0
 
 	for rows.Next() {
 		var (
-			item       ListItem
-			genderStr  string
-			birthDate  time.Time
+			blockedAt  time.Time
 			totalCount int
 		)
 
-		if err := rows.Scan(
-			&item.ProfileID, &item.DisplayName, &birthDate, &genderStr,
-			&item.CountryCode, &item.Region, &item.BlockedAt, &totalCount,
-		); err != nil {
-			return nil, fmt.Errorf("blocking: leer bloqueado: %w", err)
+		base, scanErr := profiles.ScanBaseListItem(rows, &blockedAt, &totalCount)
+		if scanErr != nil {
+			return nil, fmt.Errorf("blocking: leer bloqueado: %w", scanErr)
 		}
 
-		item.Age = profiles.AgeAt(birthDate, now)
-		item.Gender = profiles.Gender(genderStr)
-
+		items = append(items, ListItem{
+			BaseListItem: base,
+			BlockedAt:    blockedAt,
+		})
 		total = totalCount
-		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("blocking: listar bloqueados: %w", err)
-	}
-
-	totalPages := 0
-	if total > 0 {
-		totalPages = (total + pageSize - 1) / pageSize
 	}
 
 	return &ListResult{
@@ -117,6 +109,6 @@ func (r *PostgresRepository) List(ctx context.Context, blockerID uuid.UUID, page
 		Total:      total,
 		Page:       page,
 		PageSize:   pageSize,
-		TotalPages: totalPages,
+		TotalPages: pagination.TotalPages(total, pageSize),
 	}, nil
 }

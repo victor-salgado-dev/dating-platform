@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"dating-platform/backend/internal/pagination"
 	"dating-platform/backend/internal/profiles"
 )
 
@@ -133,8 +134,8 @@ func (r *PostgresRepository) listLikes(ctx context.Context, profileID uuid.UUID,
 	}
 	query := fmt.Sprintf(`
         SELECT p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
+               EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
                p.relationship_goals[1], l.created_at,
-               EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id),
                COUNT(*) OVER()
         FROM likes l
         JOIN profiles viewer ON viewer.id = $1
@@ -155,7 +156,7 @@ func (r *PostgresRepository) listLikes(ctx context.Context, profileID uuid.UUID,
 func (r *PostgresRepository) ListMatches(ctx context.Context, profileID uuid.UUID, page, pageSize int) (*MatchResult, error) {
 	const query = `
         SELECT p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
-               EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id),
+               EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
                m.created_at, c.id, COUNT(*) OVER()
         FROM matches m
         JOIN profiles viewer ON viewer.id = $1
@@ -173,31 +174,46 @@ func (r *PostgresRepository) ListMatches(ctx context.Context, profileID uuid.UUI
         ORDER BY m.created_at DESC
         LIMIT $2 OFFSET $3
     `
+
 	rows, err := r.db.Query(ctx, query, profileID, pageSize, (page-1)*pageSize)
 	if err != nil {
 		return nil, fmt.Errorf("likes: listar matches: %w", err)
 	}
 	defer rows.Close()
-	now := time.Now()
+
 	var items []MatchItem
 	total := 0
+
 	for rows.Next() {
-		var item MatchItem
-		var gender string
-		var birth time.Time
-		var totalCount int
-		if err := rows.Scan(&item.ProfileID, &item.DisplayName, &birth, &gender, &item.CountryCode, &item.Region, &item.HasPhoto, &item.MatchedAt, &item.ConversationID, &totalCount); err != nil {
-			return nil, fmt.Errorf("likes: leer match: %w", err)
+		var (
+			matchedAt      time.Time
+			conversationID *uuid.UUID
+			totalCount     int
+		)
+
+		base, scanErr := profiles.ScanBaseListItem(rows, &matchedAt, &conversationID, &totalCount)
+		if scanErr != nil {
+			return nil, fmt.Errorf("likes: leer match: %w", scanErr)
 		}
-		item.Age = profiles.AgeAt(birth, now)
-		item.Gender = profiles.Gender(gender)
+
+		items = append(items, MatchItem{
+			BaseListItem:   base,
+			MatchedAt:      matchedAt,
+			ConversationID: conversationID,
+		})
 		total = totalCount
-		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("likes: listar matches: %w", err)
 	}
-	return &MatchResult{Items: items, Total: total, Page: page, PageSize: pageSize, TotalPages: totalPages(total, pageSize)}, nil
+
+	return &MatchResult{
+		Items:      items,
+		Total:      total,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: pagination.TotalPages(total, pageSize),
+	}, nil
 }
 
 func (r *PostgresRepository) scanList(ctx context.Context, query string, profileID uuid.UUID, page, pageSize int, action string) (*ListResult, error) {
@@ -206,38 +222,45 @@ func (r *PostgresRepository) scanList(ctx context.Context, query string, profile
 		return nil, fmt.Errorf("likes: %s: %w", action, err)
 	}
 	defer rows.Close()
-	now := time.Now()
+
 	var items []ListItem
 	total := 0
+
 	for rows.Next() {
-		var item ListItem
-		var gender string
-		var rel *string
-		var birth time.Time
-		var totalCount int
-		if err := rows.Scan(&item.ProfileID, &item.DisplayName, &birth, &gender, &item.CountryCode, &item.Region, &rel, &item.LikedAt, &item.HasPhoto, &totalCount); err != nil {
-			return nil, fmt.Errorf("likes: leer like: %w", err)
+		var (
+			relGoalStr *string
+			likedAt    time.Time
+			totalCount int
+		)
+
+		base, scanErr := profiles.ScanBaseListItem(rows, &relGoalStr, &likedAt, &totalCount)
+		if scanErr != nil {
+			return nil, fmt.Errorf("likes: leer like: %w", scanErr)
 		}
-		item.Age = profiles.AgeAt(birth, now)
-		item.Gender = profiles.Gender(gender)
-		if rel != nil {
-			goal := profiles.RelationshipGoal(*rel)
+
+		item := ListItem{
+			BaseListItem: base,
+			LikedAt:      likedAt,
+		}
+		if relGoalStr != nil {
+			goal := profiles.RelationshipGoal(*relGoalStr)
 			item.RelationshipGoal = &goal
 		}
+
 		total = totalCount
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("likes: %s: %w", action, err)
 	}
-	return &ListResult{Items: items, Total: total, Page: page, PageSize: pageSize, TotalPages: totalPages(total, pageSize)}, nil
-}
 
-func totalPages(total, pageSize int) int {
-	if total == 0 {
-		return 0
-	}
-	return (total + pageSize - 1) / pageSize
+	return &ListResult{
+		Items:      items,
+		Total:      total,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: pagination.TotalPages(total, pageSize),
+	}, nil
 }
 
 func orderPair(a, b uuid.UUID) (uuid.UUID, uuid.UUID) {

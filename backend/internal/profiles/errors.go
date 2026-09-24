@@ -2,7 +2,8 @@ package profiles
 
 import (
 	"errors"
-	"fmt"
+
+	"dating-platform/backend/internal/apperr"
 )
 
 var (
@@ -24,18 +25,11 @@ var (
 	ErrInterestNotFound = errors.New("profiles: interés no encontrado en el catálogo")
 )
 
-// ValidationError señala que un campo del perfil no cumple las reglas
-// de negocio (formato, rango, valor permitido). El handler HTTP la
-// traduce a un 400 con el nombre de campo incluido.
-type ValidationError struct {
-	Field   string
-	Message string
-}
-
-func (e *ValidationError) Error() string {
-	return fmt.Sprintf("profiles: campo %q inválido: %s", e.Field, e.Message)
-}
+// ValidationError es un alias de apperr.ValidationError: la definición vive
+// ahora en un único paquete y errors.As sigue funcionando desde fuera
+// (profiles.ValidationError y apperr.ValidationError son el mismo tipo).
+type ValidationError = apperr.ValidationError
 
 func invalidField(field, message string) error {
-	return &ValidationError{Field: field, Message: message}
+	return apperr.InvalidField(field, message)
 }

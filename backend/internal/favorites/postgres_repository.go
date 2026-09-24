@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"dating-platform/backend/internal/pagination"
 	"dating-platform/backend/internal/profiles"
 )
 
@@ -57,8 +58,8 @@ func (r *PostgresRepository) List(ctx context.Context, userID uuid.UUID, page, p
 	const query = `
 		SELECT
 			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
-			p.relationship_goals[1], f.created_at,
 			EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
+			p.relationship_goals[1], f.created_at,
 			COUNT(*) OVER() AS total_count
 		FROM favorites f
 		JOIN profiles p ON p.id = f.favorite_profile_id
@@ -79,28 +80,25 @@ func (r *PostgresRepository) List(ctx context.Context, userID uuid.UUID, page, p
 	}
 	defer rows.Close()
 
-	now := time.Now()
 	var items []ListItem
 	total := 0
 
 	for rows.Next() {
 		var (
-			item       ListItem
-			genderStr  string
-			relGoalStr *string
-			birthDate  time.Time
-			totalCount int
+			relGoalStr  *string
+			favoritedAt time.Time
+			totalCount  int
 		)
 
-		if err := rows.Scan(
-			&item.ProfileID, &item.DisplayName, &birthDate, &genderStr, &item.CountryCode,
-			&item.Region, &relGoalStr, &item.FavoritedAt, &item.HasPhoto, &totalCount,
-		); err != nil {
-			return nil, fmt.Errorf("favorites: leer favorito: %w", err)
+		base, scanErr := profiles.ScanBaseListItem(rows, &relGoalStr, &favoritedAt, &totalCount)
+		if scanErr != nil {
+			return nil, fmt.Errorf("favorites: leer favorito: %w", scanErr)
 		}
 
-		item.Age = profiles.AgeAt(birthDate, now)
-		item.Gender = profiles.Gender(genderStr)
+		item := ListItem{
+			BaseListItem: base,
+			FavoritedAt:  favoritedAt,
+		}
 		if relGoalStr != nil {
 			g := profiles.RelationshipGoal(*relGoalStr)
 			item.RelationshipGoal = &g
@@ -113,17 +111,12 @@ func (r *PostgresRepository) List(ctx context.Context, userID uuid.UUID, page, p
 		return nil, fmt.Errorf("favorites: listar favoritos: %w", err)
 	}
 
-	totalPages := 0
-	if total > 0 {
-		totalPages = (total + pageSize - 1) / pageSize
-	}
-
 	return &ListResult{
 		Items:      items,
 		Total:      total,
 		Page:       page,
 		PageSize:   pageSize,
-		TotalPages: totalPages,
+		TotalPages: pagination.TotalPages(total, pageSize),
 	}, nil
 }
 
@@ -131,9 +124,9 @@ func (r *PostgresRepository) ListReceived(ctx context.Context, profileID uuid.UU
 	const query = `
 		SELECT
 			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
+			EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
 			p.relationship_goals[1], f.created_at,
-			EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id),
-			COUNT(*) OVER()
+			COUNT(*) OVER() AS total_count
 		FROM favorites f
 		JOIN profiles viewer ON viewer.id = $1
 		JOIN profiles p ON p.user_id = f.user_id
@@ -148,39 +141,49 @@ func (r *PostgresRepository) ListReceived(ctx context.Context, profileID uuid.UU
 		ORDER BY f.created_at DESC
 		LIMIT $2 OFFSET $3
 	`
+
 	rows, err := r.db.Query(ctx, query, profileID, pageSize, (page-1)*pageSize)
 	if err != nil {
 		return nil, fmt.Errorf("favorites: listar favoritos recibidos: %w", err)
 	}
 	defer rows.Close()
 
-	now := time.Now()
 	var items []ListItem
 	total := 0
+
 	for rows.Next() {
-		var item ListItem
-		var genderStr string
-		var relGoalStr *string
-		var birthDate time.Time
-		var totalCount int
-		if err := rows.Scan(&item.ProfileID, &item.DisplayName, &birthDate, &genderStr, &item.CountryCode, &item.Region, &relGoalStr, &item.FavoritedAt, &item.HasPhoto, &totalCount); err != nil {
-			return nil, fmt.Errorf("favorites: leer favorito recibido: %w", err)
+		var (
+			relGoalStr  *string
+			favoritedAt time.Time
+			totalCount  int
+		)
+
+		base, scanErr := profiles.ScanBaseListItem(rows, &relGoalStr, &favoritedAt, &totalCount)
+		if scanErr != nil {
+			return nil, fmt.Errorf("favorites: leer favorito recibido: %w", scanErr)
 		}
-		item.Age = profiles.AgeAt(birthDate, now)
-		item.Gender = profiles.Gender(genderStr)
+
+		item := ListItem{
+			BaseListItem: base,
+			FavoritedAt:  favoritedAt,
+		}
 		if relGoalStr != nil {
-			goal := profiles.RelationshipGoal(*relGoalStr)
-			item.RelationshipGoal = &goal
+			g := profiles.RelationshipGoal(*relGoalStr)
+			item.RelationshipGoal = &g
 		}
+
 		total = totalCount
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("favorites: listar favoritos recibidos: %w", err)
 	}
-	totalPages := 0
-	if total > 0 {
-		totalPages = (total + pageSize - 1) / pageSize
-	}
-	return &ListResult{Items: items, Total: total, Page: page, PageSize: pageSize, TotalPages: totalPages}, nil
+
+	return &ListResult{
+		Items:      items,
+		Total:      total,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: pagination.TotalPages(total, pageSize),
+	}, nil
 }
