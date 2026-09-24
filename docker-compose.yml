@@ -1,1 +1,1 @@
-docker compose exec postgres env | findstr POSTGRES
+docker compose config --quiet
