@@ -1,4 +1,4 @@
-ame: dating-platform
+name: dating-platform
 
 services:
   postgres:
