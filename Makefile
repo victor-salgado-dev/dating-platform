@@ -141,7 +141,7 @@ prod-logs:
 backup:
 	./scripts/backup.sh
 
-## Restaura un backup. Uso: make restore file=backups/xxx.sql.gz
+## Restaura un backup. Uso: make restore FILE=backups/xxx.sql.gz
 restore:
-	@if [ -z "$(file)" ]; then echo "ERROR: falta file. Uso: make restore file=backups/xxx.sql.gz"; exit 1; fi
-	./scripts/restore.sh $(file)
+	@if [ -z "$(FILE)" ]; then echo "ERROR: falta FILE. Uso: make restore FILE=backups/xxx.sql.gz"; exit 1; fi
+	./scripts/restore.sh "$(FILE)"
