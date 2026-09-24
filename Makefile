@@ -10,6 +10,12 @@ export
 
 DB_URL := postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)?sslmode=$(POSTGRES_SSLMODE)
 
+# Cadena de conexión para los tests de integración. Se deriva de las mismas
+# variables POSTGRES_* que DB_URL (host "postgres" porque los tests corren
+# DENTRO de la red Docker). Así no hay que mantener una copia a mano en
+# .env y no puede quedar desactualizada.
+TEST_DATABASE_URL := postgres://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@postgres:5432/$(POSTGRES_DB)?sslmode=disable
+
 # ---------------------------------------------------------
 # Ciclo de vida del entorno de desarrollo
 # ---------------------------------------------------------
@@ -92,11 +98,12 @@ admin-promote:
 test:
 	docker compose run --rm --entrypoint go backend test ./...
 
-## Tests de integración: requieren Postgres y Redis levantados
-## (usan la misma base de datos de desarrollo; ver README).
+## Tests de integración: requieren Postgres y Redis levantados.
+## TEST_DATABASE_URL se inyecta aquí (sobrescribe lo que haya en .env)
+## para que no dependa de mantener una cadena duplicada a mano.
 test-integration:
 	docker compose up -d postgres redis
-	docker compose run --rm --entrypoint go backend test -tags=integration ./...
+	docker compose run --rm -e TEST_DATABASE_URL="$(TEST_DATABASE_URL)" --entrypoint go backend test -tags=integration ./...
 
 ## Unitarios + integración en una sola llamada.
 test-all: test test-integration
