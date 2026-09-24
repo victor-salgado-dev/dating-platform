@@ -1,0 +1,8 @@
+# Fuerza finales de línea LF para todo el contenido de texto, tanto en el
+# repositorio como en el checkout, en cualquier sistema operativo.
+#
+# Motivo: gofmt (y el tooling de Go y Node) esperan LF. Si un editor en
+# Windows guarda con CRLF, el archivo sigue siendo válido, pero `gofmt -l`
+# lo marca como "no formateado" y ensucia la salida y el CI con falsos
+# positivos. `text=auto` detecta y respeta los binarios (imágenes, etc.).
+* text=auto eol=lf
