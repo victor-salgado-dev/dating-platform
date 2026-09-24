@@ -1,1 +1,1 @@
-curl -i -c cookies.txt -X POST http://localhost/api/v1/auth/login -H "Content-Type: application/json" -d "{\"email\":\"TU_EMAIL\",\"password\":\"TU_PASSWORD\"}"
+del cookies.txt
