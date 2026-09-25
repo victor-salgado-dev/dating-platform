@@ -132,9 +132,15 @@ func (r *PostgresRepository) listLikes(ctx context.Context, profileID uuid.UUID,
 		direction = "l.to_profile_id = $1"
 		profileColumn = "l.from_profile_id"
 	}
+	// La foto principal se resuelve en la misma consulta (patrón de
+	// discovery/search) para no disparar una consulta por ítem (N+1).
 	query := fmt.Sprintf(`
         SELECT p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
                EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
+               (SELECT ph.id FROM profile_photos ph
+                    WHERE ph.profile_id = p.id
+                    ORDER BY ph.position ASC, ph.id ASC
+                    LIMIT 1) AS photo_id,
                p.relationship_goals[1], l.created_at,
                COUNT(*) OVER()
         FROM likes l
@@ -154,9 +160,15 @@ func (r *PostgresRepository) listLikes(ctx context.Context, profileID uuid.UUID,
 }
 
 func (r *PostgresRepository) ListMatches(ctx context.Context, profileID uuid.UUID, page, pageSize int) (*MatchResult, error) {
+	// Igual que en listLikes: traemos photo_id en la misma query en vez
+	// de dejar que el cliente haga una consulta por match (N+1).
 	const query = `
         SELECT p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
                EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
+               (SELECT ph.id FROM profile_photos ph
+                    WHERE ph.profile_id = p.id
+                    ORDER BY ph.position ASC, ph.id ASC
+                    LIMIT 1) AS photo_id,
                m.created_at, c.id, COUNT(*) OVER()
         FROM matches m
         JOIN profiles viewer ON viewer.id = $1
@@ -186,12 +198,13 @@ func (r *PostgresRepository) ListMatches(ctx context.Context, profileID uuid.UUI
 
 	for rows.Next() {
 		var (
+			photoID        *uuid.UUID
 			matchedAt      time.Time
 			conversationID *uuid.UUID
 			totalCount     int
 		)
 
-		base, scanErr := profiles.ScanBaseListItem(rows, &matchedAt, &conversationID, &totalCount)
+		base, scanErr := profiles.ScanBaseListItem(rows, &photoID, &matchedAt, &conversationID, &totalCount)
 		if scanErr != nil {
 			return nil, fmt.Errorf("likes: leer match: %w", scanErr)
 		}
@@ -200,6 +213,7 @@ func (r *PostgresRepository) ListMatches(ctx context.Context, profileID uuid.UUI
 			BaseListItem:   base,
 			MatchedAt:      matchedAt,
 			ConversationID: conversationID,
+			PhotoID:        photoID,
 		})
 		total = totalCount
 	}
@@ -228,12 +242,13 @@ func (r *PostgresRepository) scanList(ctx context.Context, query string, profile
 
 	for rows.Next() {
 		var (
+			photoID    *uuid.UUID
 			relGoalStr *string
 			likedAt    time.Time
 			totalCount int
 		)
 
-		base, scanErr := profiles.ScanBaseListItem(rows, &relGoalStr, &likedAt, &totalCount)
+		base, scanErr := profiles.ScanBaseListItem(rows, &photoID, &relGoalStr, &likedAt, &totalCount)
 		if scanErr != nil {
 			return nil, fmt.Errorf("likes: leer like: %w", scanErr)
 		}
@@ -241,6 +256,7 @@ func (r *PostgresRepository) scanList(ctx context.Context, query string, profile
 		item := ListItem{
 			BaseListItem: base,
 			LikedAt:      likedAt,
+			PhotoID:      photoID,
 		}
 		if relGoalStr != nil {
 			goal := profiles.RelationshipGoal(*relGoalStr)

@@ -26,6 +26,7 @@ type profileResponse struct {
 	Region           *string `json:"region"`
 	RelationshipGoal *string `json:"relationship_goal"`
 	HasPhoto         bool    `json:"has_photo"`
+	PhotoID          *string `json:"photo_id"`
 	LikedAt          string  `json:"liked_at"`
 }
 type listResponse struct {
@@ -43,6 +44,7 @@ type matchResponse struct {
 	CountryCode    string  `json:"country_code"`
 	Region         *string `json:"region"`
 	HasPhoto       bool    `json:"has_photo"`
+	PhotoID        *string `json:"photo_id"`
 	MatchedAt      string  `json:"matched_at"`
 	ConversationID *string `json:"conversation_id,omitempty"`
 }
@@ -142,7 +144,7 @@ func (h *Handler) ListMatches(w http.ResponseWriter, r *http.Request) {
 			v := it.ConversationID.String()
 			conversationID = &v
 		}
-		items = append(items, matchResponse{ProfileID: it.ProfileID.String(), DisplayName: it.DisplayName, Age: it.Age, Gender: string(it.Gender), CountryCode: it.CountryCode, Region: it.Region, HasPhoto: it.HasPhoto, MatchedAt: it.MatchedAt.Format(time.RFC3339), ConversationID: conversationID})
+		items = append(items, matchResponse{ProfileID: it.ProfileID.String(), DisplayName: it.DisplayName, Age: it.Age, Gender: string(it.Gender), CountryCode: it.CountryCode, Region: it.Region, HasPhoto: it.HasPhoto, PhotoID: photoIDString(it.PhotoID), MatchedAt: it.MatchedAt.Format(time.RFC3339), ConversationID: conversationID})
 	}
 	httpx.WriteJSON(w, http.StatusOK, matchesResponse{Items: items, Page: result.Page, PageSize: result.PageSize, Total: result.Total, TotalPages: result.TotalPages})
 }
@@ -185,6 +187,15 @@ func parsePaging(w http.ResponseWriter, r *http.Request) (int, int, bool) {
 	}
 	return page, size, true
 }
+
+func photoIDString(id *uuid.UUID) *string {
+	if id == nil {
+		return nil
+	}
+	v := id.String()
+	return &v
+}
+
 func toListResponse(result *ListResult) listResponse {
 	items := make([]profileResponse, 0, len(result.Items))
 	for _, it := range result.Items {
@@ -193,7 +204,7 @@ func toListResponse(result *ListResult) listResponse {
 			v := string(*it.RelationshipGoal)
 			goal = &v
 		}
-		items = append(items, profileResponse{ProfileID: it.ProfileID.String(), DisplayName: it.DisplayName, Age: it.Age, Gender: string(it.Gender), CountryCode: it.CountryCode, Region: it.Region, RelationshipGoal: goal, HasPhoto: it.HasPhoto, LikedAt: it.LikedAt.Format(time.RFC3339)})
+		items = append(items, profileResponse{ProfileID: it.ProfileID.String(), DisplayName: it.DisplayName, Age: it.Age, Gender: string(it.Gender), CountryCode: it.CountryCode, Region: it.Region, RelationshipGoal: goal, HasPhoto: it.HasPhoto, PhotoID: photoIDString(it.PhotoID), LikedAt: it.LikedAt.Format(time.RFC3339)})
 	}
 	return listResponse{Items: items, Page: result.Page, PageSize: result.PageSize, Total: result.Total, TotalPages: result.TotalPages}
 }
