@@ -235,6 +235,11 @@ export type FavoriteItem = {
   region: string | null;
   relationship_goal: string | null;
   has_photo: boolean;
+  // URL de la foto principal ya armada por el backend (mismo patrón que
+  // discover/search, likes, visits y activity), o null si el perfil no tiene
+  // ninguna. Viene en la misma respuesta que la lista, para que cada tarjeta
+  // no tenga que pedir /profiles/{id}/photos por su cuenta (evita el N+1).
+  photo_url: string | null;
   favorited_at: string;
 };
 
@@ -281,6 +286,11 @@ export interface VisitsResponse {
     region: string | null;
     relationship_goal: string | null;
     has_photo: boolean;
+    // URL de la foto principal ya armada por el backend (mismo patrón que
+    // discover/search y likes), o null si el perfil no tiene ninguna. Viene
+    // en la misma respuesta que la lista, para que cada tarjeta no tenga que
+    // pedir la foto por su cuenta (evita el N+1 en el cliente).
+    photo_url: string | null;
     visited_at: string;
   }>;
   page: number;
@@ -321,6 +331,11 @@ export type ActivityItem = {
   country_code: string;
   region: string | null;
   has_photo: boolean;
+  // URL de la foto principal ya armada por el backend (mismo patrón que
+  // discover/search, likes y visits), o null si el perfil no tiene ninguna.
+  // Viene en la misma respuesta que la lista, para que cada tarjeta no tenga
+  // que pedir la foto por su cuenta (evita el N+1 en el cliente).
+  photo_url: string | null;
   created_at: string;
 };
 

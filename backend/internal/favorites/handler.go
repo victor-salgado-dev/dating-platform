@@ -2,6 +2,7 @@ package favorites
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -31,6 +32,14 @@ type favoriteItemResponse struct {
 	RelationshipGoal *string `json:"relationship_goal"`
 	HasPhoto         bool    `json:"has_photo"`
 	FavoritedAt      string  `json:"favorited_at"`
+	// PhotoID es el id de la foto principal, resuelto por el repositorio en
+	// la misma consulta que la lista (evita el N+1). Nil si el perfil no
+	// tiene fotos.
+	PhotoID *string `json:"photo_id"`
+	// PhotoURL es la URL de la foto principal ya armada, con el mismo formato
+	// que discover/search, likes, visits y activity:
+	// /api/v1/profiles/{profileID}/photos/{photoID}/file
+	PhotoURL *string `json:"photo_url"`
 }
 
 type listResponse struct {
@@ -170,6 +179,27 @@ func (h *Handler) authAndProfileID(w http.ResponseWriter, r *http.Request) (user
 	return userID, profileID, true
 }
 
+// photoIDString devuelve la representación en string del id de foto, o nil.
+func photoIDString(id *uuid.UUID) *string {
+	if id == nil {
+		return nil
+	}
+	v := id.String()
+	return &v
+}
+
+// photoURL arma la URL de la foto principal del perfil a partir de su
+// ProfileID y PhotoID, con el mismo formato que discover/search, likes,
+// visits y activity: /api/v1/profiles/{profileID}/photos/{photoID}/file
+// Devuelve nil si el perfil no tiene foto.
+func photoURL(profileID uuid.UUID, photoID *uuid.UUID) *string {
+	if photoID == nil {
+		return nil
+	}
+	u := fmt.Sprintf("/api/v1/profiles/%s/photos/%s/file", profileID.String(), photoID.String())
+	return &u
+}
+
 func toListResponse(res *ListResult) listResponse {
 	items := make([]favoriteItemResponse, 0, len(res.Items))
 	for _, it := range res.Items {
@@ -188,6 +218,8 @@ func toListResponse(res *ListResult) listResponse {
 			RelationshipGoal: relGoal,
 			HasPhoto:         it.HasPhoto,
 			FavoritedAt:      it.FavoritedAt.Format(time.RFC3339),
+			PhotoID:          photoIDString(it.PhotoID),
+			PhotoURL:         photoURL(it.ProfileID, it.PhotoID),
 		})
 	}
 

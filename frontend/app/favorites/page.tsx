@@ -7,35 +7,7 @@ import { apiFetch, ApiError, FavoritesResponse } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/context';
 import styles from './page.module.css';
 
-interface PhotoItem {
-  id: string;
-  url: string;
-  position: number;
-}
-
 type Tab = 'sent' | 'received' | 'mutual';
-
-function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) {
-  const { dictionary } = useI18n();
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiFetch<PhotoItem[]>(`/profiles/${profileId}/photos`)
-      .then((photos) => {
-        if (photos && photos.length > 0) {
-          const firstPhoto = photos[0];
-          setPhotoUrl(firstPhoto.url ?? `/api/v1/profiles/${profileId}/photos/${firstPhoto.id}/file`);
-        }
-      })
-      .catch(() => setPhotoUrl(null));
-  }, [profileId]);
-
-  if (!photoUrl) {
-    return <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>;
-  }
-
-  return <img src={photoUrl} alt={name} className={styles.photoImg} />;
-}
 
 export default function FavoritesPage() {
   const { dictionary } = useI18n();
@@ -129,8 +101,12 @@ export default function FavoritesPage() {
                   className={styles.card}
                 >
                   <div className={styles.imageContainer}>
-                    {item.has_photo ? (
-                      <ProfilePhoto profileId={item.profile_id} name={item.display_name} />
+                    {item.photo_url ? (
+                      <img
+                        src={item.photo_url}
+                        alt={item.display_name}
+                        className={styles.photoImg}
+                      />
                     ) : (
                       <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>
                     )}
