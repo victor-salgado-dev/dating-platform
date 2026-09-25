@@ -943,13 +943,17 @@ export const en: Dictionary = {
     title: 'My Favorites',
     tabSent: 'My Favorites',
     tabReceived: 'Who favorited me',
+    tabMutual: 'Mutual',
     loading: 'Loading favorites…',
     errorUnauthorized: 'Log in to see your favorites.',
     loadError: 'Favorites could not be loaded.',
     emptySent: "You haven't added any favorites yet.",
     emptyReceived: 'No one has favorited you yet.',
+    emptyMutual: "You don't have any mutual favorites yet.",
     emptySentSubtitle: 'Browse profiles on the home page and tap the star ★ to save them here.',
     emptyReceivedSubtitle: 'When someone favorites you, they will show up here.',
+    emptyMutualSubtitle:
+      "When someone you favorited also favorites you back, they'll show up here.",
     paginationInfo: 'Page {page} of {totalPages} ({total} favorites)',
   },
   blocked: {
