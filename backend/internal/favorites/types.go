@@ -19,7 +19,8 @@ const (
 
 // ListItem es la ficha resumida de un perfil favorito, con el mismo nivel
 // de detalle que un resultado de búsqueda (Fase 5): no expone
-// bio/intereses/idiomas completos.
+// bio/intereses/idiomas completos. Se reutiliza tanto para favoritos
+// enviados y recibidos como para los mutuos.
 type ListItem struct {
 	profiles.BaseListItem
 	RelationshipGoal *profiles.RelationshipGoal

@@ -18,4 +18,10 @@ type Repository interface {
 	IsFavorited(ctx context.Context, userID, profileID uuid.UUID) (bool, error)
 	List(ctx context.Context, userID uuid.UUID, page, pageSize int) (*ListResult, error)
 	ListReceived(ctx context.Context, profileID uuid.UUID, page, pageSize int) (*ListResult, error)
+
+	// ListMutual lista los favoritos mutuos: perfiles a los que userID
+	// ha marcado como favoritos y que, a su vez, han marcado a userID.
+	// A diferencia de ListReceived, recibe el user_id (no el profile_id)
+	// porque la condición "yo marqué" se resuelve por user_id.
+	ListMutual(ctx context.Context, userID uuid.UUID, page, pageSize int) (*ListResult, error)
 }
