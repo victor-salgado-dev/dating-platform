@@ -71,3 +71,20 @@ func (s *Service) ListReceived(ctx context.Context, userID uuid.UUID, page, page
 	}
 	return s.repo.ListReceived(ctx, profile.ID, page, pageSize)
 }
+
+// ListMutual lista los favoritos mutuos del usuario. A diferencia de
+// ListReceived, no necesita resolver el perfil: el repositorio recibe el
+// user_id directamente (la condición "yo marqué" se resuelve por user_id,
+// y "me marcaron" se contrasta internamente contra mi profile_id).
+func (s *Service) ListMutual(ctx context.Context, userID uuid.UUID, page, pageSize int) (*ListResult, error) {
+	if page < 1 {
+		page = 1
+	}
+	if pageSize < 1 {
+		pageSize = DefaultPageSize
+	}
+	if pageSize > MaxPageSize {
+		pageSize = MaxPageSize
+	}
+	return s.repo.ListMutual(ctx, userID, page, pageSize)
+}
