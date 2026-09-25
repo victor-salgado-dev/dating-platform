@@ -54,6 +54,10 @@ func (r *PostgresRepository) ListMutual(ctx context.Context, profileID uuid.UUID
 	const query = `
 SELECT p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
        EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
+       (SELECT ph.id FROM profile_photos ph
+            WHERE ph.profile_id = p.id
+            ORDER BY ph.position ASC, ph.id ASC
+            LIMIT 1) AS photo_id,
        GREATEST(v.visited_at, r.visited_at) AS visited_at,
        COUNT(*) OVER()
 FROM profile_visits v
@@ -85,11 +89,12 @@ LIMIT $2 OFFSET $3
 
 	for rows.Next() {
 		var (
+			photoID    *uuid.UUID
 			visitedAt  time.Time
 			totalCount int
 		)
 
-		base, scanErr := profiles.ScanBaseListItem(rows, &visitedAt, &totalCount)
+		base, scanErr := profiles.ScanBaseListItem(rows, &photoID, &visitedAt, &totalCount)
 		if scanErr != nil {
 			return nil, fmt.Errorf("visits: leer visita mutua: %w", scanErr)
 		}
@@ -97,6 +102,7 @@ LIMIT $2 OFFSET $3
 		items = append(items, ListItem{
 			BaseListItem: base,
 			VisitedAt:    visitedAt,
+			PhotoID:      photoID,
 		})
 		total = totalCount
 	}
@@ -123,6 +129,10 @@ func (r *PostgresRepository) listVisits(ctx context.Context, profileID uuid.UUID
 	query := fmt.Sprintf(`
 SELECT p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
        EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
+       (SELECT ph.id FROM profile_photos ph
+            WHERE ph.profile_id = p.id
+            ORDER BY ph.position ASC, ph.id ASC
+            LIMIT 1) AS photo_id,
        v.visited_at,
        COUNT(*) OVER()
 FROM profile_visits v
@@ -150,11 +160,12 @@ LIMIT $2 OFFSET $3
 
 	for rows.Next() {
 		var (
+			photoID    *uuid.UUID
 			visitedAt  time.Time
 			totalCount int
 		)
 
-		base, scanErr := profiles.ScanBaseListItem(rows, &visitedAt, &totalCount)
+		base, scanErr := profiles.ScanBaseListItem(rows, &photoID, &visitedAt, &totalCount)
 		if scanErr != nil {
 			return nil, fmt.Errorf("visits: leer visita: %w", scanErr)
 		}
@@ -162,6 +173,7 @@ LIMIT $2 OFFSET $3
 		items = append(items, ListItem{
 			BaseListItem: base,
 			VisitedAt:    visitedAt,
+			PhotoID:      photoID,
 		})
 		total = totalCount
 	}
