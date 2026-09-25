@@ -355,6 +355,12 @@ export type ConversationParticipant = {
   country_code: string;
   region: string | null;
   has_photo: boolean;
+  // URL de la foto principal ya armada por el backend (mismo patrón que
+  // discover/search, likes, visits, activity y favorites), o null si el
+  // participante no tiene ninguna. Viene en la misma respuesta que la lista
+  // de conversaciones, para que cada fila no tenga que pedir la foto por su
+  // cuenta (evita el N+1 en el cliente).
+  photo_url: string | null;
 };
 
 export type ConversationItem = {

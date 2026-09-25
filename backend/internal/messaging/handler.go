@@ -2,6 +2,7 @@ package messaging
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -60,6 +61,14 @@ type participantResponse struct {
 	CountryCode string  `json:"country_code"`
 	Region      *string `json:"region"`
 	HasPhoto    bool    `json:"has_photo"`
+	// PhotoID es el id de la foto principal, resuelto por el repositorio en
+	// la misma consulta que la lista (evita el N+1). Nil si el perfil no
+	// tiene fotos.
+	PhotoID *string `json:"photo_id"`
+	// PhotoURL es la URL de la foto principal ya armada, con el mismo formato
+	// que discover/search, likes, visits, activity y favorites:
+	// /api/v1/profiles/{profileID}/photos/{photoID}/file
+	PhotoURL *string `json:"photo_url"`
 }
 
 type lastMessageResponse struct {
@@ -86,6 +95,8 @@ func toConversationResponse(c *ConversationSummary) conversationResponse {
 			CountryCode: c.OtherParticipant.CountryCode,
 			Region:      c.OtherParticipant.Region,
 			HasPhoto:    c.OtherParticipant.HasPhoto,
+			PhotoID:     photoIDString(c.OtherParticipant.PhotoID),
+			PhotoURL:    photoURL(c.OtherParticipant.ProfileID, c.OtherParticipant.PhotoID),
 		},
 		LastMessage: lastMessageResponse{
 			Body:      c.LastMessageBody,
@@ -266,6 +277,28 @@ func parsePaging(r *http.Request) (page, pageSize int, err error) {
 	}
 
 	return page, pageSize, nil
+}
+
+// photoIDString devuelve la representación en string del id de foto, o nil.
+func photoIDString(id *uuid.UUID) *string {
+	if id == nil {
+		return nil
+	}
+	v := id.String()
+	return &v
+}
+
+// photoURL arma la URL de la foto principal del perfil a partir de su
+// ProfileID y PhotoID, con el mismo formato que discover/search, likes,
+// visits, activity y favorites:
+// /api/v1/profiles/{profileID}/photos/{photoID}/file
+// Devuelve nil si el perfil no tiene foto.
+func photoURL(profileID uuid.UUID, photoID *uuid.UUID) *string {
+	if photoID == nil {
+		return nil
+	}
+	u := fmt.Sprintf("/api/v1/profiles/%s/photos/%s/file", profileID.String(), photoID.String())
+	return &u
 }
 
 func writeMessagingError(w http.ResponseWriter, err error) {

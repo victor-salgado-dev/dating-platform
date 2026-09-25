@@ -42,6 +42,11 @@ type Participant struct {
 	CountryCode string
 	Region      *string
 	HasPhoto    bool
+	// PhotoID es el id de la foto principal (la de position más baja),
+	// resuelto en la misma consulta que lista las conversaciones para
+	// evitar una consulta por ítem (N+1). Es nil si el perfil no tiene
+	// fotos.
+	PhotoID *uuid.UUID
 }
 
 // ConversationSummary es una fila de la lista de conversaciones.

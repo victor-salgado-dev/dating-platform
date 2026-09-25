@@ -158,6 +158,10 @@ func (r *PostgresRepository) ListConversations(ctx context.Context, userID uuid.
 			c.id,
 			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
 			EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
+			(SELECT ph.id FROM profile_photos ph
+			     WHERE ph.profile_id = p.id
+			     ORDER BY ph.position ASC, ph.id ASC
+			     LIMIT 1) AS photo_id,
 			lm.body, lm.created_at, lm.sender_id,
 			(
 				SELECT COUNT(*) FROM messages um
@@ -199,6 +203,7 @@ func (r *PostgresRepository) ListConversations(ctx context.Context, userID uuid.
 			item         ConversationSummary
 			genderStr    string
 			birthDate    time.Time
+			photoID      *uuid.UUID
 			lastSenderID uuid.UUID
 			totalCount   int
 		)
@@ -208,6 +213,7 @@ func (r *PostgresRepository) ListConversations(ctx context.Context, userID uuid.
 			&item.OtherParticipant.ProfileID, &item.OtherParticipant.DisplayName, &birthDate,
 			&genderStr, &item.OtherParticipant.CountryCode, &item.OtherParticipant.Region,
 			&item.OtherParticipant.HasPhoto,
+			&photoID,
 			&item.LastMessageBody, &item.LastMessageAt, &lastSenderID,
 			&item.UnreadCount, &totalCount,
 		); err != nil {
@@ -216,6 +222,7 @@ func (r *PostgresRepository) ListConversations(ctx context.Context, userID uuid.
 
 		item.OtherParticipant.Age = profiles.AgeAt(birthDate, now)
 		item.OtherParticipant.Gender = profiles.Gender(genderStr)
+		item.OtherParticipant.PhotoID = photoID
 		item.LastMessageIsMine = lastSenderID == userID
 
 		total = totalCount
