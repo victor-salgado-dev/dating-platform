@@ -7,19 +7,6 @@ import { apiFetch, ApiError, MatchesResponse } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/context';
 import styles from './page.module.css';
 
-function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) {
-  const { dictionary } = useI18n();
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  useEffect(() => {
-    apiFetch<{ id: string; url: string }[]>(`/profiles/${profileId}/photos`)
-      .then((photos) => photos[0] && setPhotoUrl(photos[0].url ?? `/api/v1/profiles/${profileId}/photos/${photos[0].id}/file`))
-      .catch(() => setPhotoUrl(null));
-  }, [profileId]);
-  return photoUrl
-    ? <img src={photoUrl} alt={name} className={styles.photoImg} />
-    : <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>;
-}
-
 export default function MatchesPage() {
   const { dictionary } = useI18n();
   const [data, setData] = useState<MatchesResponse | null>(null);
@@ -54,7 +41,7 @@ export default function MatchesPage() {
         : <div className={styles.grid}>
           {matches.map((item) => <article key={item.profile_id} className={styles.card}>
             <Link href={`/profiles/${item.profile_id}`} className={styles.profileLink}>
-              <div className={styles.imageContainer}>{item.has_photo ? <ProfilePhoto profileId={item.profile_id} name={item.display_name} /> : <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>}</div>
+              <div className={styles.imageContainer}>{item.photo_url ? <img src={item.photo_url} alt={item.display_name} className={styles.photoImg} /> : <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>}</div>
               <div className={styles.cardInfo}><h2 className={styles.name}>{item.display_name}<span className={styles.age}> · {item.age}</span></h2><p className={styles.details}>{[item.region, item.country_code].filter(Boolean).join(', ')}</p></div>
             </Link>
             {item.conversation_id && <Link href={`/messages/${item.conversation_id}`} className={styles.messageLink}>{dictionary.matches.openConversation}</Link>}
