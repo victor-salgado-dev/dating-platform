@@ -59,6 +59,10 @@ func (r *PostgresRepository) List(ctx context.Context, userID uuid.UUID, page, p
 		SELECT
 			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
 			EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
+			(SELECT ph.id FROM profile_photos ph
+			     WHERE ph.profile_id = p.id
+			     ORDER BY ph.position ASC, ph.id ASC
+			     LIMIT 1) AS photo_id,
 			p.relationship_goals[1], f.created_at,
 			COUNT(*) OVER() AS total_count
 		FROM favorites f
@@ -85,12 +89,13 @@ func (r *PostgresRepository) List(ctx context.Context, userID uuid.UUID, page, p
 
 	for rows.Next() {
 		var (
+			photoID     *uuid.UUID
 			relGoalStr  *string
 			favoritedAt time.Time
 			totalCount  int
 		)
 
-		base, scanErr := profiles.ScanBaseListItem(rows, &relGoalStr, &favoritedAt, &totalCount)
+		base, scanErr := profiles.ScanBaseListItem(rows, &photoID, &relGoalStr, &favoritedAt, &totalCount)
 		if scanErr != nil {
 			return nil, fmt.Errorf("favorites: leer favorito: %w", scanErr)
 		}
@@ -98,6 +103,7 @@ func (r *PostgresRepository) List(ctx context.Context, userID uuid.UUID, page, p
 		item := ListItem{
 			BaseListItem: base,
 			FavoritedAt:  favoritedAt,
+			PhotoID:      photoID,
 		}
 		if relGoalStr != nil {
 			g := profiles.RelationshipGoal(*relGoalStr)
@@ -125,6 +131,10 @@ func (r *PostgresRepository) ListReceived(ctx context.Context, profileID uuid.UU
 		SELECT
 			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
 			EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
+			(SELECT ph.id FROM profile_photos ph
+			     WHERE ph.profile_id = p.id
+			     ORDER BY ph.position ASC, ph.id ASC
+			     LIMIT 1) AS photo_id,
 			p.relationship_goals[1], f.created_at,
 			COUNT(*) OVER() AS total_count
 		FROM favorites f
@@ -153,12 +163,13 @@ func (r *PostgresRepository) ListReceived(ctx context.Context, profileID uuid.UU
 
 	for rows.Next() {
 		var (
+			photoID     *uuid.UUID
 			relGoalStr  *string
 			favoritedAt time.Time
 			totalCount  int
 		)
 
-		base, scanErr := profiles.ScanBaseListItem(rows, &relGoalStr, &favoritedAt, &totalCount)
+		base, scanErr := profiles.ScanBaseListItem(rows, &photoID, &relGoalStr, &favoritedAt, &totalCount)
 		if scanErr != nil {
 			return nil, fmt.Errorf("favorites: leer favorito recibido: %w", scanErr)
 		}
@@ -166,6 +177,7 @@ func (r *PostgresRepository) ListReceived(ctx context.Context, profileID uuid.UU
 		item := ListItem{
 			BaseListItem: base,
 			FavoritedAt:  favoritedAt,
+			PhotoID:      photoID,
 		}
 		if relGoalStr != nil {
 			g := profiles.RelationshipGoal(*relGoalStr)
@@ -196,6 +208,10 @@ func (r *PostgresRepository) ListMutual(ctx context.Context, userID uuid.UUID, p
 		SELECT
 			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
 			EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
+			(SELECT ph.id FROM profile_photos ph
+			     WHERE ph.profile_id = p.id
+			     ORDER BY ph.position ASC, ph.id ASC
+			     LIMIT 1) AS photo_id,
 			p.relationship_goals[1], f.created_at,
 			COUNT(*) OVER() AS total_count
 		FROM favorites f
@@ -228,12 +244,13 @@ func (r *PostgresRepository) ListMutual(ctx context.Context, userID uuid.UUID, p
 
 	for rows.Next() {
 		var (
+			photoID     *uuid.UUID
 			relGoalStr  *string
 			favoritedAt time.Time
 			totalCount  int
 		)
 
-		base, scanErr := profiles.ScanBaseListItem(rows, &relGoalStr, &favoritedAt, &totalCount)
+		base, scanErr := profiles.ScanBaseListItem(rows, &photoID, &relGoalStr, &favoritedAt, &totalCount)
 		if scanErr != nil {
 			return nil, fmt.Errorf("favorites: leer favorito mutuo: %w", scanErr)
 		}
@@ -241,6 +258,7 @@ func (r *PostgresRepository) ListMutual(ctx context.Context, userID uuid.UUID, p
 		item := ListItem{
 			BaseListItem: base,
 			FavoritedAt:  favoritedAt,
+			PhotoID:      photoID,
 		}
 		if relGoalStr != nil {
 			g := profiles.RelationshipGoal(*relGoalStr)
