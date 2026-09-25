@@ -3,7 +3,14 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 
-import { apiFetch, ApiError, LikesResponse } from '@/lib/api';
+import {
+  apiFetch,
+  ApiError,
+  LikesResponse,
+  MatchesResponse,
+  LikeItem,
+  MatchItem,
+} from '@/lib/api';
 import { useI18n } from '@/lib/i18n/context';
 import styles from './page.module.css';
 
@@ -11,6 +18,22 @@ interface PhotoItem {
   id: string;
   url: string;
   position: number;
+}
+
+type Tab = 'sent' | 'received' | 'mutual';
+
+// Forma común de tarjeta: /likes/{sent,received} devuelven LikeItem (con
+// liked_at) y /matches devuelve MatchItem (con matched_at y un
+// conversation_id opcional). Normalizamos a esta forma para poder pintar
+// la misma tarjeta en las tres tabs.
+interface CardItem {
+  profile_id: string;
+  display_name: string;
+  age: number;
+  country_code: string;
+  region: string | null;
+  has_photo: boolean;
+  conversation_id: string | null;
 }
 
 function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) {
@@ -37,9 +60,12 @@ function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) 
 
 export default function LikesPage() {
   const { dictionary } = useI18n();
-  const [tab, setTab] = useState<'sent' | 'received'>('received');
-  const [data, setData] = useState<LikesResponse | null>(null);
+  const [tab, setTab] = useState<Tab>('received');
+  const [items, setItems] = useState<CardItem[]>([]);
   const [page, setPage] = useState(1);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,8 +73,27 @@ export default function LikesPage() {
     setLoading(true);
     setError(null);
 
-    apiFetch<LikesResponse>(`/likes/${tab}?page=${page}`)
-      .then(setData)
+    // "Mutuos" en likes equivale a los matches ya existentes: reutilizamos
+    // GET /matches en lugar de un /likes/mutual (que no existe).
+    const path = tab === 'mutual' ? `/matches?page=${page}` : `/likes/${tab}?page=${page}`;
+
+    apiFetch<LikesResponse | MatchesResponse>(path)
+      .then((data) => {
+        const normalized: CardItem[] = (data.items as Array<LikeItem | MatchItem>).map((item) => ({
+          profile_id: item.profile_id,
+          display_name: item.display_name,
+          age: item.age,
+          country_code: item.country_code,
+          region: item.region,
+          has_photo: item.has_photo,
+          conversation_id: 'conversation_id' in item ? item.conversation_id ?? null : null,
+        }));
+
+        setItems(normalized);
+        setCurrentPage(data.page);
+        setTotalPages(data.total_pages);
+        setTotal(data.total);
+      })
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 401) {
           setError(dictionary.likes.errorUnauthorized);
@@ -60,13 +105,21 @@ export default function LikesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, page]);
 
-  function changeTab(nextTab: 'sent' | 'received') {
+  function changeTab(nextTab: Tab) {
     setTab(nextTab);
     setPage(1);
   }
 
-  const likes = data?.items ?? [];
-  const totalPages = data?.total_pages ?? 1;
+  const emptyTitle: Record<Tab, string> = {
+    received: dictionary.likes.emptyReceived,
+    sent: dictionary.likes.emptySent,
+    mutual: dictionary.likes.emptyMutual,
+  };
+  const emptySubtitle: Record<Tab, string> = {
+    received: dictionary.likes.emptySubtitle,
+    sent: dictionary.likes.emptySubtitle,
+    mutual: dictionary.likes.emptyMutualSubtitle,
+  };
 
   return (
     <main className={styles.main}>
@@ -87,6 +140,13 @@ export default function LikesPage() {
         >
           {dictionary.likes.tabSent}
         </button>
+        <button
+          type="button"
+          className={tab === 'mutual' ? styles.activeTab : styles.tab}
+          onClick={() => changeTab('mutual')}
+        >
+          {dictionary.likes.tabMutual}
+        </button>
       </div>
 
       {loading && <p style={{ textAlign: 'center', padding: '2rem' }}>{dictionary.likes.loading}</p>}
@@ -95,41 +155,44 @@ export default function LikesPage() {
 
       {!loading && !error && (
         <>
-          {likes.length === 0 ? (
+          {items.length === 0 ? (
             <div className={styles.emptyState}>
-              <p className={styles.emptyStateTitle}>
-                {tab === 'received' ? dictionary.likes.emptyReceived : dictionary.likes.emptySent}
-              </p>
-              <p className={styles.emptyStateSubtitle}>
-                {dictionary.likes.emptySubtitle}
-              </p>
+              <p className={styles.emptyStateTitle}>{emptyTitle[tab]}</p>
+              <p className={styles.emptyStateSubtitle}>{emptySubtitle[tab]}</p>
             </div>
           ) : (
             <div className={styles.grid}>
-              {likes.map((item) => (
-                <Link
-                  key={item.profile_id}
-                  href={`/profiles/${item.profile_id}`}
-                  className={styles.card}
-                >
-                  <div className={styles.imageContainer}>
-                    {item.has_photo ? (
-                      <ProfilePhoto profileId={item.profile_id} name={item.display_name} />
-                    ) : (
-                      <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>
-                    )}
-                  </div>
+              {items.map((item) => (
+                <div key={item.profile_id} className={styles.card}>
+                  <Link href={`/profiles/${item.profile_id}`} className={styles.cardLink}>
+                    <div className={styles.imageContainer}>
+                      {item.has_photo ? (
+                        <ProfilePhoto profileId={item.profile_id} name={item.display_name} />
+                      ) : (
+                        <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>
+                      )}
+                    </div>
 
-                  <div className={styles.cardInfo}>
-                    <h3 className={styles.name}>
-                      {item.display_name}
-                      <span className={styles.age}> · {item.age}</span>
-                    </h3>
-                    <p className={styles.details}>
-                      {[item.region, item.country_code].filter(Boolean).join(', ')}
-                    </p>
-                  </div>
-                </Link>
+                    <div className={styles.cardInfo}>
+                      <h3 className={styles.name}>
+                        {item.display_name}
+                        <span className={styles.age}> · {item.age}</span>
+                      </h3>
+                      <p className={styles.details}>
+                        {[item.region, item.country_code].filter(Boolean).join(', ')}
+                      </p>
+                    </div>
+                  </Link>
+
+                  {item.conversation_id && (
+                    <Link
+                      href={`/messages/${item.conversation_id}`}
+                      className={styles.openConversation}
+                    >
+                      {dictionary.likes.openConversation}
+                    </Link>
+                  )}
+                </div>
               ))}
             </div>
           )}
@@ -146,9 +209,9 @@ export default function LikesPage() {
               </button>
               <span className={styles.pageInfo}>
                 {dictionary.likes.paginationInfo
-                  .replace('{page}', String(data?.page ?? page))
+                  .replace('{page}', String(currentPage))
                   .replace('{totalPages}', String(totalPages))
-                  .replace('{total}', String(data?.total ?? 0))}
+                  .replace('{total}', String(total))}
               </span>
               <button
                 type="button"

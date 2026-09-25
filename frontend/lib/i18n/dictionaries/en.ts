@@ -909,12 +909,17 @@ export const en: Dictionary = {
     title: 'Likes',
     tabReceived: 'Received',
     tabSent: 'Sent',
+    tabMutual: 'Mutual',
     loading: 'Loading likes…',
     errorUnauthorized: 'Log in to see your likes.',
     loadError: 'Likes could not be loaded.',
     emptyReceived: "You haven't received any likes yet.",
     emptySent: "You haven't liked anyone yet.",
+    emptyMutual: "You don't have any mutual likes yet.",
     emptySubtitle: 'Browse profiles on the home page and like the ones that interest you.',
+    emptyMutualSubtitle:
+      'When you and another person have liked each other, they will appear here.',
+    openConversation: 'Go to conversation',
     paginationInfo: 'Page {page} of {totalPages} ({total} likes)',
   },
   visits: {

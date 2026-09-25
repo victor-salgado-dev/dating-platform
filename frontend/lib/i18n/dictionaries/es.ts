@@ -907,12 +907,17 @@ export const es = {
     title: 'Likes',
     tabReceived: 'Recibidos',
     tabSent: 'Enviados',
+    tabMutual: 'Mutuos',
     loading: 'Cargando likes…',
     errorUnauthorized: 'Inicia sesión para ver tus likes.',
     loadError: 'No se pudieron cargar los likes.',
     emptyReceived: 'Todavía no has recibido ningún like.',
     emptySent: 'Todavía no le has dado like a nadie.',
+    emptyMutual: 'Todavía no tienes likes mutuos.',
     emptySubtitle: 'Explora perfiles en el inicio y dale like a los que te interesen.',
+    emptyMutualSubtitle:
+      'Cuando tú y otra persona os hayáis dado like mutuamente, aparecerá aquí.',
+    openConversation: 'Ir a la conversación',
     paginationInfo: 'Página {page} de {totalPages} ({total} likes)',
   },
   visits: {
