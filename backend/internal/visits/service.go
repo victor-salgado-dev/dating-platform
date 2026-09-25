@@ -1,4 +1,4 @@
-﻿package visits
+package visits
 
 import (
 "context"
@@ -47,4 +47,12 @@ if err != nil {
 return nil, fmt.Errorf("visits: resolver perfil: %w", err)
 }
 return s.repo.ListReceived(ctx, p.ID, page, pageSize)
+}
+
+func (s *Service) ListMutual(ctx context.Context, userID uuid.UUID, page, pageSize int) (*ListResult, error) {
+p, err := s.profiles.GetByUserID(ctx, userID)
+if err != nil {
+return nil, fmt.Errorf("visits: resolver perfil: %w", err)
+}
+return s.repo.ListMutual(ctx, p.ID, page, pageSize)
 }
