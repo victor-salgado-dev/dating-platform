@@ -25,9 +25,12 @@ type Item struct {
 	Gender      profiles.Gender
 	CountryCode string
 	Region      *string
-	PhotoURL    *string         `json:"photo_url"` 
-	HasPhoto    bool
-	CreatedAt   time.Time
+	// PhotoURL es la URL de la foto principal ya armada por el repositorio
+	// en la misma consulta que la lista (evita el N+1). Nil si el perfil no
+	// tiene fotos.
+	PhotoURL  *string
+	HasPhoto  bool
+	CreatedAt time.Time
 }
 
 type Result struct {
