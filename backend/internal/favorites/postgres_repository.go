@@ -189,6 +189,9 @@ func (r *PostgresRepository) ListReceived(ctx context.Context, profileID uuid.UU
 }
 
 func (r *PostgresRepository) ListMutual(ctx context.Context, userID uuid.UUID, page, pageSize int) (*ListResult, error) {
+	// "me" resuelve mi perfil a partir de mi usuario: la mutualidad hay
+	// que comprobarla por profile_id (favorites.favorite_profile_id
+	// apunta a profiles.id), no por user_id.
 	const query = `
 		SELECT
 			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
@@ -196,13 +199,14 @@ func (r *PostgresRepository) ListMutual(ctx context.Context, userID uuid.UUID, p
 			p.relationship_goals[1], f.created_at,
 			COUNT(*) OVER() AS total_count
 		FROM favorites f
+		JOIN profiles me ON me.user_id = $1
 		JOIN profiles p ON p.id = f.favorite_profile_id
 		JOIN users u ON u.id = p.user_id
 		WHERE f.user_id = $1
 		  AND u.status = 'active' AND u.deleted_at IS NULL
 		  AND EXISTS (
 		      SELECT 1 FROM favorites back
-		      WHERE back.user_id = p.user_id AND back.favorite_profile_id = $1
+		      WHERE back.user_id = p.user_id AND back.favorite_profile_id = me.id
 		  )
 		  AND NOT EXISTS (
 		      SELECT 1 FROM blocks b
