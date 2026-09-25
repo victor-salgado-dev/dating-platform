@@ -84,15 +84,30 @@ func (h *Handler) Status(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, map[string]bool{"favorited": favorited})
 }
 
+// listKind distingue qué listado de favoritos se está pidiendo. Se usa
+// en lugar de un booleano porque ya hay tres variantes (enviados,
+// recibidos y mutuos) y un flag booleano dejaría de ser autoexplicativo.
+type listKind string
+
+const (
+	listSent     listKind = "sent"
+	listReceived listKind = "received"
+	listMutual   listKind = "mutual"
+)
+
 func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
-	h.list(w, r, false)
+	h.list(w, r, listSent)
 }
 
 func (h *Handler) ListReceived(w http.ResponseWriter, r *http.Request) {
-	h.list(w, r, true)
+	h.list(w, r, listReceived)
 }
 
-func (h *Handler) list(w http.ResponseWriter, r *http.Request, received bool) {
+func (h *Handler) ListMutual(w http.ResponseWriter, r *http.Request) {
+	h.list(w, r, listMutual)
+}
+
+func (h *Handler) list(w http.ResponseWriter, r *http.Request, kind listKind) {
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
 		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
@@ -121,9 +136,12 @@ func (h *Handler) list(w http.ResponseWriter, r *http.Request, received bool) {
 
 	var result *ListResult
 	var err error
-	if received {
+	switch kind {
+	case listReceived:
 		result, err = h.svc.ListReceived(r.Context(), userID, page, pageSize)
-	} else {
+	case listMutual:
+		result, err = h.svc.ListMutual(r.Context(), userID, page, pageSize)
+	default:
 		result, err = h.svc.List(r.Context(), userID, page, pageSize)
 	}
 	if err != nil {

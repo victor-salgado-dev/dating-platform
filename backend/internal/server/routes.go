@@ -135,6 +135,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/favorites", requireAuth(http.HandlerFunc(deps.FavoritesHandler.List)))
 	mux.Handle("GET /api/v1/favorites/sent", requireAuth(http.HandlerFunc(deps.FavoritesHandler.List)))
 	mux.Handle("GET /api/v1/favorites/received", requireAuth(http.HandlerFunc(deps.FavoritesHandler.ListReceived)))
+	mux.Handle("GET /api/v1/favorites/mutual", requireAuth(http.HandlerFunc(deps.FavoritesHandler.ListMutual)))
 	mux.Handle("POST /api/v1/favorites/{profileID}", requireAuth(http.HandlerFunc(deps.FavoritesHandler.Add)))
 	mux.Handle("DELETE /api/v1/favorites/{profileID}", requireAuth(http.HandlerFunc(deps.FavoritesHandler.Remove)))
 	mux.Handle("GET /api/v1/favorites/{profileID}", requireAuth(http.HandlerFunc(deps.FavoritesHandler.Status)))
