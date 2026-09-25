@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useLayoutEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useAccountData, logoutAndRedirect } from './account-nav';
@@ -49,8 +49,11 @@ export default function HeaderChrome({
   const pillRef = useRef<HTMLButtonElement>(null);
   const avatarRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const highlightPillRef = useRef<HTMLDivElement>(null);
-  const highlightCircleRef = useRef<HTMLDivElement>(null);
+
+  const mobileHamburgerRef = useRef<HTMLButtonElement>(null);
+  const mobileNavDrawerRef = useRef<HTMLDivElement>(null);
+  const mobileAccButtonRef = useRef<HTMLButtonElement>(null);
+  const mobileAccDropdownRef = useRef<HTMLDivElement>(null);
 
   const topTrackRef = useRef<HTMLElement>(null);
   const topScrollerRef = useRef<HTMLDivElement>(null);
@@ -66,8 +69,6 @@ export default function HeaderChrome({
     const pill = pillRef.current;
     const avatar = avatarRef.current;
     const dropdown = dropdownRef.current;
-    const hPill = highlightPillRef.current;
-    const hCircle = highlightCircleRef.current;
     const content = contentRef.current;
     const bottom = bottomRef.current;
     if (!wrap || !shape) return;
@@ -81,7 +82,7 @@ export default function HeaderChrome({
       `A${BUMP_RADIUS},${BUMP_RADIUS} 0 0 1 ${cx - BUMP_RADIUS},${BAR_HEIGHT} L0,${BAR_HEIGHT} Z`;
     shape.style.clipPath = `path('${d}')`;
 
-    if (!pill || !avatar || !dropdown || !hPill || !hCircle) return; // sin sesión: no hay pieza de cuenta que posicionar
+    if (!pill || !avatar || !dropdown) return; // sin sesión: no hay pieza de cuenta que posicionar
 
     const innerR = BUMP_RADIUS - COLLAR;
     avatar.style.width = `${innerR * 2}px`;
@@ -100,18 +101,6 @@ export default function HeaderChrome({
     const spaceNeeded = Math.round(wrapRect.right - pillRect.left + 24);
     if (content) content.style.paddingRight = `${spaceNeeded}px`;
     if (bottom) bottom.style.paddingRight = `${spaceNeeded}px`;
-
-    // Resaltado fundido (pastilla + círculo como una sola forma al hover/abrir)
-    const pillLeftLocal = pillRect.left - wrapRect.left;
-    hPill.style.left = `${Math.round(pillLeftLocal - 10)}px`;
-    hPill.style.top = `${Math.round(Math.max(BAR_HEIGHT / 2 - 26, cy - BUMP_RADIUS))}px`;
-    hPill.style.height = '52px';
-    hPill.style.width = `${Math.max(0, Math.round(cx - (pillLeftLocal - 10)))}px`;
-
-    hCircle.style.left = `${cx - BUMP_RADIUS}px`;
-    hCircle.style.top = `${cy - BUMP_RADIUS}px`;
-    hCircle.style.width = `${BUMP_RADIUS * 2}px`;
-    hCircle.style.height = `${BUMP_RADIUS * 2}px`;
   }, []);
 
   const refreshArrows = useCallback(() => {
@@ -140,6 +129,50 @@ export default function HeaderChrome({
     // account.photo / authenticated cambian el ancho real del botón -> recalcular
   }, [updateShape, refreshArrows, account.authenticated, account.photo]);
 
+  // Cierra cada desplegable si se pincha fuera de su botón + panel
+  useEffect(() => {
+    if (!dropdownOpen && !mobileNavOpen && !mobileAccOpen) return;
+
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as Node;
+
+      if (
+        dropdownOpen &&
+        dropdownRef.current &&
+        pillRef.current &&
+        avatarRef.current &&
+        !dropdownRef.current.contains(target) &&
+        !pillRef.current.contains(target) &&
+        !avatarRef.current.contains(target)
+      ) {
+        setDropdownOpen(false);
+      }
+
+      if (
+        mobileNavOpen &&
+        mobileNavDrawerRef.current &&
+        mobileHamburgerRef.current &&
+        !mobileNavDrawerRef.current.contains(target) &&
+        !mobileHamburgerRef.current.contains(target)
+      ) {
+        setMobileNavOpen(false);
+      }
+
+      if (
+        mobileAccOpen &&
+        mobileAccDropdownRef.current &&
+        mobileAccButtonRef.current &&
+        !mobileAccDropdownRef.current.contains(target) &&
+        !mobileAccButtonRef.current.contains(target)
+      ) {
+        setMobileAccOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [dropdownOpen, mobileNavOpen, mobileAccOpen]);
+
   function scrollTrackBy(ref: React.RefObject<HTMLElement | null>, amount: number) {
     ref.current?.scrollBy({ left: amount, behavior: 'smooth' });
   }
@@ -157,6 +190,7 @@ export default function HeaderChrome({
         <div className={styles.mobileHeaderTop}>
           <button
             className={styles.mobileHamburger}
+            ref={mobileHamburgerRef}
             onClick={() => {
               setMobileAccOpen(false);
               setMobileNavOpen((o) => !o);
@@ -178,6 +212,7 @@ export default function HeaderChrome({
           {account.authenticated && (
             <button
               className={styles.mobileAccountBtn}
+              ref={mobileAccButtonRef}
               style={{
                 background: `conic-gradient(${account.completion.color} ${account.completion.percent}%, rgba(255,255,255,0.4) 0)`,
               }}
@@ -206,7 +241,7 @@ export default function HeaderChrome({
             <Link
               key={f.href + f.label}
               href={f.href}
-              className={`${styles.filterBtn} ${f.active ? styles.active : ''}`}
+              className={`${styles.filterBtn} ${pathname === f.href ? styles.active : ''}`}
             >
               {f.online && <span className={styles.fdot} />}
               {f.label}
@@ -214,7 +249,11 @@ export default function HeaderChrome({
           ))}
         </div>
 
-        <div className={`${styles.mobileDropdown} ${mobileNavOpen ? styles.open : ''}`} style={{ top: 58, left: 14 }}>
+        <div
+          className={`${styles.mobileDropdown} ${mobileNavOpen ? styles.open : ''}`}
+          style={{ top: 58, left: 14 }}
+          ref={mobileNavDrawerRef}
+        >
           {navLinks.map((n) => (
             <Link
               key={n.href}
@@ -228,7 +267,11 @@ export default function HeaderChrome({
         </div>
 
         {account.authenticated && (
-          <div className={`${styles.mobileDropdown} ${mobileAccOpen ? styles.open : ''}`} style={{ top: 58, right: 14 }}>
+          <div
+            className={`${styles.mobileDropdown} ${mobileAccOpen ? styles.open : ''}`}
+            style={{ top: 58, right: 14 }}
+            ref={mobileAccDropdownRef}
+          >
             <Link href="/profile" onClick={() => setMobileAccOpen(false)}>
               {dictionary.header.myProfile}
             </Link>
@@ -276,10 +319,11 @@ export default function HeaderChrome({
 
           {account.authenticated && (
             <>
-              <div className={styles.accountHighlightPill} ref={highlightPillRef} />
-              <div className={styles.accountHighlightCircle} ref={highlightCircleRef} />
-
-              <button className={styles.accountPill} ref={pillRef} onClick={() => setDropdownOpen((o) => !o)}>
+              <button
+                className={`${styles.accountPill} ${dropdownOpen ? styles.open : ''}`}
+                ref={pillRef}
+                onClick={() => setDropdownOpen((o) => !o)}
+              >
                 <span>{dictionary.header.myAccount}</span>
               </button>
 
@@ -330,7 +374,7 @@ export default function HeaderChrome({
                 <Link
                   key={f.href + f.label}
                   href={f.href}
-                  className={`${styles.filterBtn} ${f.active ? styles.active : ''}`}
+                  className={`${styles.filterBtn} ${pathname === f.href ? styles.active : ''}`}
                 >
                   {f.online && <span className={styles.fdot} />}
                   {f.label}
