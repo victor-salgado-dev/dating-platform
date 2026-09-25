@@ -49,7 +49,8 @@
   align-items: stretch;
 }
 
-/* Tarjeta */
+/* Tarjeta: ahora es un <div> contenedor, no un <a>. Dentro van dos
+   enlaces hermanos (al perfil y, si hay match, a la conversación). */
 .card {
   background: white;
   border-radius: 8px;
@@ -57,7 +58,6 @@
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
-  text-decoration: none;
   color: inherit;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
@@ -65,6 +65,14 @@
 .card:hover {
   transform: translateY(-3px);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* Enlace al perfil que ocupa la parte superior de la tarjeta. Hereda de
+   .card el comportamiento visual que antes tenía el propio <a>. */
+.cardLink {
+  display: block;
+  color: inherit;
+  text-decoration: none;
 }
 
 /* Contenedor de foto con proporción 3:4 */
@@ -122,6 +130,26 @@
   font-size: 0.8rem;
   color: #6b7280;
   margin: 2px 0 0 0;
+}
+
+/* Enlace "Ir a la conversación" (solo en la tab de mutuos/matches) */
+.openConversation {
+  display: block;
+  margin: 0 14px 12px;
+  padding: 0.45rem 0.75rem;
+  border: 1px solid #9f1239;
+  border-radius: 6px;
+  color: #9f1239;
+  font-size: 0.85rem;
+  font-weight: 600;
+  text-align: center;
+  text-decoration: none;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.openConversation:hover {
+  background: #9f1239;
+  color: #ffffff;
 }
 
 /* Mensajes de estado */
