@@ -13,6 +13,8 @@ interface PhotoItem {
   position: number;
 }
 
+type Tab = 'sent' | 'received' | 'mutual';
+
 function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) {
   const { dictionary } = useI18n();
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -37,7 +39,7 @@ function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) 
 
 export default function FavoritesPage() {
   const { dictionary } = useI18n();
-  const [tab, setTab] = useState<'sent' | 'received'>('sent');
+  const [tab, setTab] = useState<Tab>('sent');
   const [data, setData] = useState<FavoritesResponse | null>(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -60,13 +62,24 @@ export default function FavoritesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, page]);
 
-  function changeTab(nextTab: 'sent' | 'received') {
+  function changeTab(nextTab: Tab) {
     setTab(nextTab);
     setPage(1);
   }
 
   const favorites = data?.items ?? [];
   const totalPages = data?.total_pages ?? 1;
+
+  const emptyTitle: Record<Tab, string> = {
+    sent: dictionary.favorites.emptySent,
+    received: dictionary.favorites.emptyReceived,
+    mutual: dictionary.favorites.emptyMutual,
+  };
+  const emptySubtitle: Record<Tab, string> = {
+    sent: dictionary.favorites.emptySentSubtitle,
+    received: dictionary.favorites.emptyReceivedSubtitle,
+    mutual: dictionary.favorites.emptyMutualSubtitle,
+  };
 
   return (
     <main className={styles.main}>
@@ -87,6 +100,13 @@ export default function FavoritesPage() {
         >
           {dictionary.favorites.tabReceived}
         </button>
+        <button
+          type="button"
+          className={tab === 'mutual' ? styles.activeTab : styles.tab}
+          onClick={() => changeTab('mutual')}
+        >
+          {dictionary.favorites.tabMutual}
+        </button>
       </div>
 
       {loading && <p style={{ textAlign: 'center', padding: '2rem' }}>{dictionary.favorites.loading}</p>}
@@ -97,16 +117,8 @@ export default function FavoritesPage() {
         <>
           {favorites.length === 0 ? (
             <div className={styles.emptyState}>
-              <p className={styles.emptyStateTitle}>
-                {tab === 'sent'
-                  ? dictionary.favorites.emptySent
-                  : dictionary.favorites.emptyReceived}
-              </p>
-              <p className={styles.emptyStateSubtitle}>
-                {tab === 'sent'
-                  ? dictionary.favorites.emptySentSubtitle
-                  : dictionary.favorites.emptyReceivedSubtitle}
-              </p>
+              <p className={styles.emptyStateTitle}>{emptyTitle[tab]}</p>
+              <p className={styles.emptyStateSubtitle}>{emptySubtitle[tab]}</p>
             </div>
           ) : (
             <div className={styles.grid}>
