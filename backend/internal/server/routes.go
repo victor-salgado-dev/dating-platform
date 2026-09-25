@@ -154,6 +154,7 @@ func NewRouter(deps Dependencies) http.Handler {
   	mux.Handle("POST /api/v1/visits/{profileID}", requireAuth(http.HandlerFunc(deps.VisitsHandler.Record)))
   	mux.Handle("GET /api/v1/visits/sent", requireAuth(http.HandlerFunc(deps.VisitsHandler.ListSent)))
   	mux.Handle("GET /api/v1/visits/received", requireAuth(http.HandlerFunc(deps.VisitsHandler.ListReceived)))
+  	mux.Handle("GET /api/v1/visits/mutual", requireAuth(http.HandlerFunc(deps.VisitsHandler.ListMutual)))
   }
 
 	// --- Actividad (Fase 16) --------------------------------------------

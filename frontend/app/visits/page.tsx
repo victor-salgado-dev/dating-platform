@@ -13,6 +13,8 @@ interface PhotoItem {
   position: number;
 }
 
+type Tab = 'received' | 'sent' | 'mutual';
+
 function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) {
   const { dictionary } = useI18n();
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -37,7 +39,7 @@ function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) 
 
 export default function VisitsPage() {
   const { dictionary } = useI18n();
-  const [tab, setTab] = useState<'received' | 'sent'>('received');
+  const [tab, setTab] = useState<Tab>('received');
   const [data, setData] = useState<VisitsResponse | null>(null);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
@@ -60,13 +62,24 @@ export default function VisitsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab, page]);
 
-  function changeTab(nextTab: 'received' | 'sent') {
+  function changeTab(nextTab: Tab) {
     setTab(nextTab);
     setPage(1);
   }
 
   const visits = data?.items ?? [];
   const totalPages = data?.total_pages ?? 1;
+
+  const emptyTitle: Record<Tab, string> = {
+    received: dictionary.visits.emptyReceived,
+    sent: dictionary.visits.emptySent,
+    mutual: dictionary.visits.emptyMutual,
+  };
+  const emptySubtitle: Record<Tab, string> = {
+    received: dictionary.visits.emptyReceivedSubtitle,
+    sent: dictionary.visits.emptySentSubtitle,
+    mutual: dictionary.visits.emptyMutualSubtitle,
+  };
 
   return (
     <main className={styles.main}>
@@ -87,6 +100,13 @@ export default function VisitsPage() {
         >
           {dictionary.visits.tabSent}
         </button>
+        <button
+          type="button"
+          className={tab === 'mutual' ? styles.activeTab : styles.tab}
+          onClick={() => changeTab('mutual')}
+        >
+          {dictionary.visits.tabMutual}
+        </button>
       </div>
 
       {loading && <p style={{ textAlign: 'center', padding: '2rem' }}>{dictionary.visits.loading}</p>}
@@ -97,16 +117,8 @@ export default function VisitsPage() {
         <>
           {visits.length === 0 ? (
             <div className={styles.emptyState}>
-              <p className={styles.emptyStateTitle}>
-                {tab === 'received'
-                  ? dictionary.visits.emptyReceived
-                  : dictionary.visits.emptySent}
-              </p>
-              <p className={styles.emptyStateSubtitle}>
-                {tab === 'received'
-                  ? dictionary.visits.emptyReceivedSubtitle
-                  : dictionary.visits.emptySentSubtitle}
-              </p>
+              <p className={styles.emptyStateTitle}>{emptyTitle[tab]}</p>
+              <p className={styles.emptyStateSubtitle}>{emptySubtitle[tab]}</p>
             </div>
           ) : (
             <div className={styles.grid}>

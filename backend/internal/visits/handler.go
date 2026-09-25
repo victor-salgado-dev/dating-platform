@@ -49,10 +49,11 @@ return
 w.WriteHeader(http.StatusNoContent)
 }
 
-func (h *Handler) ListSent(w http.ResponseWriter, r *http.Request)     { h.list(w, r, true) }
-func (h *Handler) ListReceived(w http.ResponseWriter, r *http.Request) { h.list(w, r, false) }
+func (h *Handler) ListSent(w http.ResponseWriter, r *http.Request)     { h.list(w, r, "sent") }
+func (h *Handler) ListReceived(w http.ResponseWriter, r *http.Request) { h.list(w, r, "received") }
+func (h *Handler) ListMutual(w http.ResponseWriter, r *http.Request)   { h.list(w, r, "mutual") }
 
-func (h *Handler) list(w http.ResponseWriter, r *http.Request, sent bool) {
+func (h *Handler) list(w http.ResponseWriter, r *http.Request, mode string) {
 userID, ok := auth.UserIDFromContext(r.Context())
 if !ok {
 httpx.WriteError(w, 401, "unauthenticated", "Inicia sesión para continuar.")
@@ -64,10 +65,13 @@ return
 }
 var result *ListResult
 var err error
-if sent {
+switch mode {
+case "sent":
 result, err = h.svc.ListSent(r.Context(), userID, page, pageSize)
-} else {
+case "received":
 result, err = h.svc.ListReceived(r.Context(), userID, page, pageSize)
+default:
+result, err = h.svc.ListMutual(r.Context(), userID, page, pageSize)
 }
 if err != nil {
 writeError(w, err)

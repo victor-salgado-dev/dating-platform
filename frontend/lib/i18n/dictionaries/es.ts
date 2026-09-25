@@ -924,13 +924,17 @@ export const es = {
     title: 'Visitas',
     tabReceived: 'Quién me ha visitado',
     tabSent: 'Perfiles que visité',
+    tabMutual: 'Mutuas',
     loading: 'Cargando visitas…',
     errorUnauthorized: 'Inicia sesión para ver las visitas a tu perfil.',
     loadError: 'No se pudieron cargar las visitas.',
     emptyReceived: 'Todavía nadie ha visitado tu perfil.',
     emptySent: 'Todavía no has visitado ningún perfil.',
+    emptyMutual: 'Todavía no tienes visitas mutuas.',
     emptyReceivedSubtitle: 'Mantén tu perfil activo para recibir más visitas.',
     emptySentSubtitle: 'Explora perfiles en el inicio para ver a otros usuarios.',
+    emptyMutualSubtitle:
+      'Cuando tú y otra persona os hayáis visitado mutuamente, aparecerá aquí.',
     paginationInfo: 'Página {page} de {totalPages} ({total} visitas)',
   },
   matches: {

@@ -926,13 +926,17 @@ export const en: Dictionary = {
     title: 'Visits',
     tabReceived: 'Who visited me',
     tabSent: 'Profiles I visited',
+    tabMutual: 'Mutual',
     loading: 'Loading visits…',
     errorUnauthorized: 'Log in to see who visited your profile.',
     loadError: 'Visits could not be loaded.',
     emptyReceived: 'No one has visited your profile yet.',
     emptySent: "You haven't visited any profile yet.",
+    emptyMutual: "You don't have any mutual visits yet.",
     emptyReceivedSubtitle: 'Keep your profile active to receive more visits.',
     emptySentSubtitle: 'Browse profiles on the home page to see other users.',
+    emptyMutualSubtitle:
+      'When you and another person have visited each other, they will appear here.',
     paginationInfo: 'Page {page} of {totalPages} ({total} visits)',
   },
   matches: {
