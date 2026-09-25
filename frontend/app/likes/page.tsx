@@ -14,12 +14,6 @@ import {
 import { useI18n } from '@/lib/i18n/context';
 import styles from './page.module.css';
 
-interface PhotoItem {
-  id: string;
-  url: string;
-  position: number;
-}
-
 type Tab = 'sent' | 'received' | 'mutual';
 
 // Forma común de tarjeta: /likes/{sent,received} devuelven LikeItem (con
@@ -33,29 +27,12 @@ interface CardItem {
   country_code: string;
   region: string | null;
   has_photo: boolean;
+  // URL de la foto principal ya armada por el backend (mismo patrón que
+  // discover/search). Puede ser null si el perfil no tiene foto. La
+  // pintamos directamente para que cada tarjeta no dispare su propia
+  // petición de fotos (evita el N+1 en el cliente).
+  photo_url: string | null;
   conversation_id: string | null;
-}
-
-function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) {
-  const { dictionary } = useI18n();
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-
-  useEffect(() => {
-    apiFetch<PhotoItem[]>(`/profiles/${profileId}/photos`)
-      .then((photos) => {
-        if (photos && photos.length > 0) {
-          const firstPhoto = photos[0];
-          setPhotoUrl(firstPhoto.url ?? `/api/v1/profiles/${profileId}/photos/${firstPhoto.id}/file`);
-        }
-      })
-      .catch(() => setPhotoUrl(null));
-  }, [profileId]);
-
-  if (!photoUrl) {
-    return <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>;
-  }
-
-  return <img src={photoUrl} alt={name} className={styles.photoImg} />;
 }
 
 export default function LikesPage() {
@@ -86,6 +63,7 @@ export default function LikesPage() {
           country_code: item.country_code,
           region: item.region,
           has_photo: item.has_photo,
+          photo_url: item.photo_url,
           conversation_id: 'conversation_id' in item ? item.conversation_id ?? null : null,
         }));
 
@@ -166,8 +144,12 @@ export default function LikesPage() {
                 <div key={item.profile_id} className={styles.card}>
                   <Link href={`/profiles/${item.profile_id}`} className={styles.cardLink}>
                     <div className={styles.imageContainer}>
-                      {item.has_photo ? (
-                        <ProfilePhoto profileId={item.profile_id} name={item.display_name} />
+                      {item.photo_url ? (
+                        <img
+                          src={item.photo_url}
+                          alt={item.display_name}
+                          className={styles.photoImg}
+                        />
                       ) : (
                         <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>
                       )}

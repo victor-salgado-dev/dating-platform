@@ -255,6 +255,11 @@ export type LikeItem = {
   region: string | null;
   relationship_goal: string | null;
   has_photo: boolean;
+  // URL de la foto principal ya armada por el backend (mismo patrón que
+  // discover/search), o null si el perfil no tiene ninguna. Viene en la
+  // misma respuesta que la lista, para que cada tarjeta no tenga que
+  // pedir /profiles/{id}/photos por su cuenta (evita el N+1 en el cliente).
+  photo_url: string | null;
   liked_at: string;
 };
 
@@ -291,6 +296,10 @@ export type MatchItem = {
   country_code: string;
   region: string | null;
   has_photo: boolean;
+  // URL de la foto principal ya armada por el backend (mismo patrón que
+  // discover/search). Puede ser null si el perfil no tiene fotos. Así el
+  // cliente no pide la foto de cada match por separado (evita el N+1).
+  photo_url: string | null;
   matched_at: string;
   conversation_id?: string;
 };
