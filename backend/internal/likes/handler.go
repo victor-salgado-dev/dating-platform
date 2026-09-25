@@ -2,6 +2,7 @@ package likes
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strconv"
 	"time"
@@ -27,7 +28,12 @@ type profileResponse struct {
 	RelationshipGoal *string `json:"relationship_goal"`
 	HasPhoto         bool    `json:"has_photo"`
 	PhotoID          *string `json:"photo_id"`
-	LikedAt          string  `json:"liked_at"`
+	// PhotoURL es la URL ya armada de la foto principal, igual que en
+	// discover (search). Se resuelve en el handler a partir del PhotoID
+	// que ya trae la lista, para que el cliente no tenga que pedir la
+	// foto de cada tarjeta por separado (evita el N+1 en el cliente).
+	PhotoURL *string `json:"photo_url"`
+	LikedAt  string  `json:"liked_at"`
 }
 type listResponse struct {
 	Items      []profileResponse `json:"items"`
@@ -37,14 +43,17 @@ type listResponse struct {
 	TotalPages int               `json:"total_pages"`
 }
 type matchResponse struct {
-	ProfileID      string  `json:"profile_id"`
-	DisplayName    string  `json:"display_name"`
-	Age            int     `json:"age"`
-	Gender         string  `json:"gender"`
-	CountryCode    string  `json:"country_code"`
-	Region         *string `json:"region"`
-	HasPhoto       bool    `json:"has_photo"`
-	PhotoID        *string `json:"photo_id"`
+	ProfileID   string  `json:"profile_id"`
+	DisplayName string  `json:"display_name"`
+	Age         int     `json:"age"`
+	Gender      string  `json:"gender"`
+	CountryCode string  `json:"country_code"`
+	Region      *string `json:"region"`
+	HasPhoto    bool    `json:"has_photo"`
+	PhotoID     *string `json:"photo_id"`
+	// PhotoURL es la URL ya armada de la foto principal (misma lógica
+	// que en discover/search) para evitar una petición por tarjeta.
+	PhotoURL       *string `json:"photo_url"`
 	MatchedAt      string  `json:"matched_at"`
 	ConversationID *string `json:"conversation_id,omitempty"`
 }
@@ -144,7 +153,7 @@ func (h *Handler) ListMatches(w http.ResponseWriter, r *http.Request) {
 			v := it.ConversationID.String()
 			conversationID = &v
 		}
-		items = append(items, matchResponse{ProfileID: it.ProfileID.String(), DisplayName: it.DisplayName, Age: it.Age, Gender: string(it.Gender), CountryCode: it.CountryCode, Region: it.Region, HasPhoto: it.HasPhoto, PhotoID: photoIDString(it.PhotoID), MatchedAt: it.MatchedAt.Format(time.RFC3339), ConversationID: conversationID})
+		items = append(items, matchResponse{ProfileID: it.ProfileID.String(), DisplayName: it.DisplayName, Age: it.Age, Gender: string(it.Gender), CountryCode: it.CountryCode, Region: it.Region, HasPhoto: it.HasPhoto, PhotoID: photoIDString(it.PhotoID), PhotoURL: photoURL(it.ProfileID, it.PhotoID), MatchedAt: it.MatchedAt.Format(time.RFC3339), ConversationID: conversationID})
 	}
 	httpx.WriteJSON(w, http.StatusOK, matchesResponse{Items: items, Page: result.Page, PageSize: result.PageSize, Total: result.Total, TotalPages: result.TotalPages})
 }
@@ -196,6 +205,18 @@ func photoIDString(id *uuid.UUID) *string {
 	return &v
 }
 
+// photoURL arma la URL de la foto principal del perfil a partir de su
+// ProfileID y PhotoID, con el mismo formato que usa discover/search:
+// /api/v1/profiles/{profileID}/photos/{photoID}/file
+// Devuelve nil si el perfil no tiene foto.
+func photoURL(profileID uuid.UUID, photoID *uuid.UUID) *string {
+	if photoID == nil {
+		return nil
+	}
+	u := fmt.Sprintf("/api/v1/profiles/%s/photos/%s/file", profileID.String(), photoID.String())
+	return &u
+}
+
 func toListResponse(result *ListResult) listResponse {
 	items := make([]profileResponse, 0, len(result.Items))
 	for _, it := range result.Items {
@@ -204,7 +225,7 @@ func toListResponse(result *ListResult) listResponse {
 			v := string(*it.RelationshipGoal)
 			goal = &v
 		}
-		items = append(items, profileResponse{ProfileID: it.ProfileID.String(), DisplayName: it.DisplayName, Age: it.Age, Gender: string(it.Gender), CountryCode: it.CountryCode, Region: it.Region, RelationshipGoal: goal, HasPhoto: it.HasPhoto, PhotoID: photoIDString(it.PhotoID), LikedAt: it.LikedAt.Format(time.RFC3339)})
+		items = append(items, profileResponse{ProfileID: it.ProfileID.String(), DisplayName: it.DisplayName, Age: it.Age, Gender: string(it.Gender), CountryCode: it.CountryCode, Region: it.Region, RelationshipGoal: goal, HasPhoto: it.HasPhoto, PhotoID: photoIDString(it.PhotoID), PhotoURL: photoURL(it.ProfileID, it.PhotoID), LikedAt: it.LikedAt.Format(time.RFC3339)})
 	}
 	return listResponse{Items: items, Page: result.Page, PageSize: result.PageSize, Total: result.Total, TotalPages: result.TotalPages}
 }
