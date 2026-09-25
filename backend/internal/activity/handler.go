@@ -24,8 +24,10 @@ type itemResponse struct {
 	CountryCode string  `json:"country_code"`
 	Region      *string `json:"region"`
 	HasPhoto    bool    `json:"has_photo"`
+	PhotoURL    *string `json:"photo_url"` // <--- 1. AÑADIDO AL JSON DE RESPUESTA
 	CreatedAt   string  `json:"created_at"`
 }
+
 type listResponse struct {
 	Items      []itemResponse `json:"items"`
 	Page       int            `json:"page"`
@@ -51,9 +53,26 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	}
 	items := make([]itemResponse, 0, len(result.Items))
 	for _, item := range result.Items {
-		items = append(items, itemResponse{EventType: item.EventType, ProfileID: item.ProfileID.String(), DisplayName: item.DisplayName, Age: item.Age, Gender: string(item.Gender), CountryCode: item.CountryCode, Region: item.Region, HasPhoto: item.HasPhoto, CreatedAt: item.CreatedAt.Format(time.RFC3339)})
+		items = append(items, itemResponse{
+			EventType:   item.EventType,
+			ProfileID:   item.ProfileID.String(),
+			DisplayName: item.DisplayName,
+			Age:         item.Age,
+			Gender:      string(item.Gender),
+			CountryCode: item.CountryCode,
+			Region:      item.Region,
+			HasPhoto:    item.HasPhoto,
+			PhotoURL:    item.PhotoURL, // <--- 2. MAPEADO AQUÍ
+			CreatedAt:   item.CreatedAt.Format(time.RFC3339),
+		})
 	}
-	httpx.WriteJSON(w, http.StatusOK, listResponse{Items: items, Page: result.Page, PageSize: result.PageSize, Total: result.Total, TotalPages: result.TotalPages})
+	httpx.WriteJSON(w, http.StatusOK, listResponse{
+		Items:      items,
+		Page:       result.Page,
+		PageSize:   result.PageSize,
+		Total:      result.Total,
+		TotalPages: result.TotalPages,
+	})
 }
 
 func parsePaging(w http.ResponseWriter, r *http.Request) (int, int, bool) {

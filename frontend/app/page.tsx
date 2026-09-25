@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { apiFetch, SearchResponse, LikesResponse, FavoritesResponse } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/context';
@@ -14,8 +14,6 @@ interface ProfileItem {
   country_code: string;
   region: string | null;
   has_photo: boolean;
-  // URL ya armada por el backend de la foto principal, o null si el
-  // perfil no tiene ninguna. Evita que cada tarjeta pida su foto aparte.
   photo_url?: string | null;
 }
 
@@ -25,10 +23,19 @@ interface PhotoItem {
   position: number;
 }
 
+// Caché en memoria para evitar pedir 400 registros cada vez que el usuario navega
+let interactionsCache: {
+  likedIds: Set<string>;
+  favoritedIds: Set<string>;
+  receivedLikeIds: Set<string>;
+  receivedFavIds: Set<string>;
+  loaded: boolean;
+} | null = null;
+
 // -----------------------------------------------------------------------------
 // Componente de la Galería Modal
 // -----------------------------------------------------------------------------
-function PhotoGalleryModal({ profileId, name, onClose }: { profileId: string, name: string, onClose: () => void }) {
+function PhotoGalleryModal({ profileId, name, onClose }: { profileId: string; name: string; onClose: () => void }) {
   const { dictionary } = useI18n();
   const [photos, setPhotos] = useState<PhotoItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -113,6 +120,8 @@ function ProfileCard({
   initialFavorited,
   receivedLike,
   receivedFavorite,
+  onToggleLike,
+  onToggleFavorite,
 }: {
   profile: ProfileItem;
   isPremium: boolean;
@@ -120,15 +129,14 @@ function ProfileCard({
   initialFavorited: boolean;
   receivedLike: boolean;
   receivedFavorite: boolean;
+  onToggleLike: (id: string, liked: boolean) => void;
+  onToggleFavorite: (id: string, favorited: boolean) => void;
 }) {
   const { dictionary } = useI18n();
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
-
-  // El estado arranca con el valor REAL que viene de la base de datos
   const [liked, setLiked] = useState(initialLiked);
   const [favorited, setFavorited] = useState(initialFavorited);
 
-  // Si cambia la información de la base de datos, actualizamos el botón
   useEffect(() => {
     setLiked(initialLiked);
   }, [initialLiked]);
@@ -140,15 +148,19 @@ function ProfileCard({
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    const nextState = !liked;
+    setLiked(nextState);
+    onToggleLike(profile.profile_id, nextState);
+
     try {
-      if (liked) {
+      if (!nextState) {
         await apiFetch(`/likes/${profile.profile_id}`, { method: 'DELETE' });
-        setLiked(false);
       } else {
         await apiFetch(`/likes/${profile.profile_id}`, { method: 'POST' });
-        setLiked(true);
       }
     } catch (err) {
+      setLiked(!nextState);
+      onToggleLike(profile.profile_id, !nextState);
       console.error('Error al procesar like', err);
     }
   };
@@ -156,15 +168,19 @@ function ProfileCard({
   const handleFavorite = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    const nextState = !favorited;
+    setFavorited(nextState);
+    onToggleFavorite(profile.profile_id, nextState);
+
     try {
-      if (favorited) {
+      if (!nextState) {
         await apiFetch(`/favorites/${profile.profile_id}`, { method: 'DELETE' });
-        setFavorited(false);
       } else {
         await apiFetch(`/favorites/${profile.profile_id}`, { method: 'POST' });
-        setFavorited(true);
       }
     } catch (err) {
+      setFavorited(!nextState);
+      onToggleFavorite(profile.profile_id, !nextState);
       console.error('Error al procesar favorito', err);
     }
   };
@@ -185,7 +201,12 @@ function ProfileCard({
       >
         <div className={styles.imageContainer}>
           {profile.photo_url ? (
-            <img src={profile.photo_url} alt={profile.display_name} className={styles.photoImg} />
+            <img
+              src={profile.photo_url}
+              alt={profile.display_name}
+              className={styles.photoImg}
+              loading="lazy" // <--- Descarga escalonada: solo descarga la imagen si entra en la vista
+            />
           ) : (
             <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>
           )}
@@ -226,7 +247,6 @@ function ProfileCard({
                 </button>
               )}
 
-              {/* Botón Like con Datos Reales */}
               <button
                 onClick={handleLike}
                 style={{
@@ -240,7 +260,6 @@ function ProfileCard({
                 {liked ? '❤️' : '🤍'}
               </button>
 
-              {/* Botón Favorito con Datos Reales */}
               <button
                 onClick={handleFavorite}
                 style={{
@@ -278,18 +297,24 @@ export default function HomePage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
 
-  // Listas de perfiles con like/favorito traídas del servidor
-  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
-  const [favoritedIds, setFavoritedIds] = useState<Set<string>>(new Set());
-
-  // Quién te ha dado like / favorito a TI (para el borde + insignia en la tarjeta)
-  const [receivedLikeIds, setReceivedLikeIds] = useState<Set<string>>(new Set());
-  const [receivedFavIds, setReceivedFavIds] = useState<Set<string>>(new Set());
+  const [likedIds, setLikedIds] = useState<Set<string>>(interactionsCache?.likedIds ?? new Set());
+  const [favoritedIds, setFavoritedIds] = useState<Set<string>>(interactionsCache?.favoritedIds ?? new Set());
+  const [receivedLikeIds, setReceivedLikeIds] = useState<Set<string>>(interactionsCache?.receivedLikeIds ?? new Set());
+  const [receivedFavIds, setReceivedFavIds] = useState<Set<string>>(interactionsCache?.receivedFavIds ?? new Set());
 
   const [randomAdIndex, setRandomAdIndex] = useState(-1);
 
-  // 1. Cargar perfiles
+  // Guarda para evitar que React StrictMode dispare la búsqueda dos veces al montar
+  const lastFetchedPage = useRef<number | null>(null);
+
+  // Guarda para evitar pedir los likes/favoritos dos veces
+  const interactionsFetched = useRef(false);
+
+  // 1. Cargar perfiles (con guarda anti-duplicado)
   useEffect(() => {
+    if (lastFetchedPage.current === page) return;
+    lastFetchedPage.current = page;
+
     setRandomAdIndex(Math.floor(Math.random() * 20) + 2);
     setLoading(true);
 
@@ -299,39 +324,56 @@ export default function HomePage() {
       .finally(() => setLoading(false));
   }, [page]);
 
-  // 2. Cargar likes y favoritos reales del usuario autenticado (Solo 2 peticiones)
+  // 2. Cargar likes y favoritos reales (Con Caché y Promise.all agrupado)
   useEffect(() => {
-    // Pedimos los likes enviados
-    apiFetch<LikesResponse>('/likes/sent?page_size=100')
-      .then((res) => {
-        const ids = new Set(res.items.map((item) => item.profile_id));
-        setLikedIds(ids);
-      })
-      .catch(() => {}); // Si no está logueado, silenciosamente no hace nada
+    if (interactionsCache?.loaded || interactionsFetched.current) return;
+    interactionsFetched.current = true;
 
-    // Pedimos los favoritos
-    apiFetch<FavoritesResponse>('/favorites?page_size=100')
-      .then((res) => {
-        const ids = new Set(res.items.map((item) => item.profile_id));
-        setFavoritedIds(ids);
-      })
-      .catch(() => {});
+    Promise.all([
+      apiFetch<LikesResponse>('/likes/sent?page_size=100').catch(() => null),
+      apiFetch<FavoritesResponse>('/favorites?page_size=100').catch(() => null),
+      apiFetch<LikesResponse>('/likes/received?page_size=100').catch(() => null),
+      apiFetch<FavoritesResponse>('/favorites/received?page_size=100').catch(() => null),
+    ]).then(([sentLikes, favs, recLikes, recFavs]) => {
+      const nextLiked = new Set(sentLikes?.items.map((i) => i.profile_id) ?? []);
+      const nextFavs = new Set(favs?.items.map((i) => i.profile_id) ?? []);
+      const nextRecLikes = new Set(recLikes?.items.map((i) => i.profile_id) ?? []);
+      const nextRecFavs = new Set(recFavs?.items.map((i) => i.profile_id) ?? []);
 
-    // Quién te ha dado like / favorito a ti.
-    apiFetch<LikesResponse>('/likes/received?page_size=100')
-      .then((res) => {
-        const ids = new Set(res.items.map((item) => item.profile_id));
-        setReceivedLikeIds(ids);
-      })
-      .catch(() => {});
+      interactionsCache = {
+        likedIds: nextLiked,
+        favoritedIds: nextFavs,
+        receivedLikeIds: nextRecLikes,
+        receivedFavIds: nextRecFavs,
+        loaded: true,
+      };
 
-    apiFetch<FavoritesResponse>('/favorites/received?page_size=100')
-      .then((res) => {
-        const ids = new Set(res.items.map((item) => item.profile_id));
-        setReceivedFavIds(ids);
-      })
-      .catch(() => {});
+      setLikedIds(nextLiked);
+      setFavoritedIds(nextFavs);
+      setReceivedLikeIds(nextRecLikes);
+      setReceivedFavIds(nextRecFavs);
+    });
   }, []);
+
+  const handleToggleLike = (id: string, isLiked: boolean) => {
+    setLikedIds((prev) => {
+      const next = new Set(prev);
+      if (isLiked) next.add(id);
+      else next.delete(id);
+      if (interactionsCache) interactionsCache.likedIds = next;
+      return next;
+    });
+  };
+
+  const handleToggleFavorite = (id: string, isFav: boolean) => {
+    setFavoritedIds((prev) => {
+      const next = new Set(prev);
+      if (isFav) next.add(id);
+      else next.delete(id);
+      if (interactionsCache) interactionsCache.favoritedIds = next;
+      return next;
+    });
+  };
 
   const profiles = data?.items ?? [];
   const totalPages = data?.total_pages ?? 1;
@@ -346,7 +388,6 @@ export default function HomePage() {
           const showAdSquare = index === randomAdIndex;
           const showBannerHorizontal = index === 14;
 
-          // Comprobamos contra la base de datos real
           const isLiked = likedIds.has(profile.profile_id);
           const isFavorited = favoritedIds.has(profile.profile_id);
           const gotLike = receivedLikeIds.has(profile.profile_id);
@@ -364,6 +405,8 @@ export default function HomePage() {
                 initialFavorited={isFavorited}
                 receivedLike={gotLike}
                 receivedFavorite={gotFavorite}
+                onToggleLike={handleToggleLike}
+                onToggleFavorite={handleToggleFavorite}
               />
             </React.Fragment>
           );

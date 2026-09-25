@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 
 import { ActivityItem, ActivityResponse, apiFetch, ApiError } from '@/lib/api';
@@ -9,20 +9,65 @@ import type { Dictionary } from '@/lib/i18n/dictionaries/es';
 import type { Locale } from '@/lib/i18n/config';
 import styles from './page.module.css';
 
-function ProfilePhoto({ profileId, name }: { profileId: string; name: string }) {
+// Caché global de fotos para no volver a pedir la foto del mismo usuario
+const photoCache = new Map<string, string | null>();
+const inFlightPhotoRequests = new Map<string, Promise<string | null>>();
+
+function fetchPhotoOnce(profileId: string): Promise<string | null> {
+  if (photoCache.has(profileId)) {
+    return Promise.resolve(photoCache.get(profileId)!);
+  }
+  if (inFlightPhotoRequests.has(profileId)) {
+    return inFlightPhotoRequests.get(profileId)!;
+  }
+
+  const promise = apiFetch<{ id: string; url: string }[]>(`/profiles/${profileId}/photos`)
+    .then((photos) => {
+      const url = photos[0] ? (photos[0].url ?? `/api/v1/profiles/${profileId}/photos/${photos[0].id}/file`) : null;
+      photoCache.set(profileId, url);
+      return url;
+    })
+    .catch(() => {
+      photoCache.set(profileId, null);
+      return null;
+    })
+    .finally(() => {
+      inFlightPhotoRequests.delete(profileId);
+    });
+
+  inFlightPhotoRequests.set(profileId, promise);
+  return promise;
+}
+
+function ProfilePhoto({
+  profileId,
+  name,
+  initialUrl,
+}: {
+  profileId: string;
+  name: string;
+  initialUrl?: string | null;
+}) {
   const { dictionary } = useI18n();
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoUrl, setPhotoUrl] = useState<string | null>(initialUrl ?? photoCache.get(profileId) ?? null);
 
   useEffect(() => {
-    apiFetch<{ id: string; url: string }[]>(`/profiles/${profileId}/photos`)
-      .then((photos) => {
-        if (photos[0]) setPhotoUrl(photos[0].url ?? `/api/v1/profiles/${profileId}/photos/${photos[0].id}/file`);
-      })
-      .catch(() => setPhotoUrl(null));
-  }, [profileId]);
+    // Si ya viene la foto desde el backend o ya está en caché, no llamamos a la API
+    if (initialUrl) {
+      setPhotoUrl(initialUrl);
+      photoCache.set(profileId, initialUrl);
+      return;
+    }
+    if (photoCache.has(profileId)) {
+      setPhotoUrl(photoCache.get(profileId) ?? null);
+      return;
+    }
+
+    fetchPhotoOnce(profileId).then(setPhotoUrl);
+  }, [profileId, initialUrl]);
 
   return photoUrl ? (
-    <img src={photoUrl} alt={name} className={styles.photo} />
+    <img src={photoUrl} alt={name} className={styles.photo} loading="lazy" />
   ) : (
     <div className={styles.photoPlaceholder}>{dictionary.common.noPhotoLower}</div>
   );
@@ -57,7 +102,13 @@ export default function ActivityPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Guarda para evitar peticiones duplicadas por React Strict Mode
+  const lastFetchedPage = useRef<number | null>(null);
+
   useEffect(() => {
+    if (lastFetchedPage.current === page) return;
+    lastFetchedPage.current = page;
+
     setLoading(true);
     setError(null);
     apiFetch<ActivityResponse>(`/activity?page=${page}`)
@@ -74,6 +125,7 @@ export default function ActivityPage() {
   }, [page]);
 
   const items = data?.items ?? [];
+
   return (
     <main className={styles.main}>
       <h1 className={styles.title}>{dictionary.activity.title}</h1>
@@ -83,31 +135,66 @@ export default function ActivityPage() {
         <div className={styles.empty}>{dictionary.activity.empty}</div>
       ) : (
         <div className={styles.feed}>
-          {items.map((item) => (
-            <Link key={`${item.event_type}-${item.profile_id}-${item.created_at}`} href={`/profiles/${item.profile_id}`} className={styles.item}>
-              <div className={styles.photoFrame}>
-                {item.has_photo ? <ProfilePhoto profileId={item.profile_id} name={item.display_name} /> : <div className={styles.photoPlaceholder}>{dictionary.common.noPhotoLower}</div>}
-              </div>
-              <div className={styles.content}>
-                <strong>{eventLabel(item.event_type, dictionary)}</strong>
-                <span className={styles.name}>{item.display_name}, {item.age}</span>
-                <span className={styles.meta}>{[item.region, item.country_code].filter(Boolean).join(', ')} · {relativeDate(item.created_at, dictionary, locale)}</span>
-              </div>
-              <span className={styles.chevron} aria-hidden="true">›</span>
-            </Link>
-          ))}
+          {items.map((item) => {
+            // Comprobamos si el backend ya envía photo_url en el item
+            const directPhotoUrl = (item as unknown as { photo_url?: string | null }).photo_url;
+
+            return (
+              <Link
+                key={`${item.event_type}-${item.profile_id}-${item.created_at}`}
+                href={`/profiles/${item.profile_id}`}
+                className={styles.item}
+              >
+                <div className={styles.photoFrame}>
+                  {item.has_photo ? (
+                    <ProfilePhoto
+                      profileId={item.profile_id}
+                      name={item.display_name}
+                      initialUrl={directPhotoUrl}
+                    />
+                  ) : (
+                    <div className={styles.photoPlaceholder}>{dictionary.common.noPhotoLower}</div>
+                  )}
+                </div>
+                <div className={styles.content}>
+                  <strong>{eventLabel(item.event_type, dictionary)}</strong>
+                  <span className={styles.name}>{item.display_name}, {item.age}</span>
+                  <span className={styles.meta}>
+                    {[item.region, item.country_code].filter(Boolean).join(', ')} · {relativeDate(item.created_at, dictionary, locale)}
+                  </span>
+                </div>
+                <span className={styles.chevron} aria-hidden="true">›</span>
+              </Link>
+            );
+          })}
         </div>
       ))}
-      {(data?.total_pages ?? 0) > 1 && <div className={styles.pagination}>
-        <button type="button" className={styles.pageButton} disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>{dictionary.common.paginationPrevPlain}</button>
-        <span className={styles.pageInfo}>
-          {dictionary.activity.paginationInfo
-            .replace('{page}', String(data?.page ?? page))
-            .replace('{totalPages}', String(data?.total_pages ?? 0))
-            .replace('{total}', String(data?.total ?? 0))}
-        </span>
-        <button type="button" className={styles.pageButton} disabled={page >= (data?.total_pages ?? 1)} onClick={() => setPage((value) => value + 1)}>{dictionary.common.paginationNextPlain}</button>
-      </div>}
+      {(data?.total_pages ?? 0) > 1 && (
+        <div className={styles.pagination}>
+          <button
+            type="button"
+            className={styles.pageButton}
+            disabled={page <= 1}
+            onClick={() => setPage((value) => value - 1)}
+          >
+            {dictionary.common.paginationPrevPlain}
+          </button>
+          <span className={styles.pageInfo}>
+            {dictionary.activity.paginationInfo
+              .replace('{page}', String(data?.page ?? page))
+              .replace('{totalPages}', String(data?.total_pages ?? 0))
+              .replace('{total}', String(data?.total ?? 0))}
+          </span>
+          <button
+            type="button"
+            className={styles.pageButton}
+            disabled={page >= (data?.total_pages ?? 1)}
+            onClick={() => setPage((value) => value + 1)}
+          >
+            {dictionary.common.paginationNextPlain}
+          </button>
+        </div>
+      )}
     </main>
   );
 }

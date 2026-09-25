@@ -39,6 +39,13 @@ func (r *PostgresRepository) List(ctx context.Context, profileID uuid.UUID, page
         SELECT e.event_type, p.id, p.display_name, p.birth_date, p.gender,
                p.country_code, p.region,
                EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id),
+               (
+                   SELECT '/api/v1/profiles/' || p.id::text || '/photos/' || ph.id::text || '/file'
+                   FROM profile_photos ph
+                   WHERE ph.profile_id = p.id
+                   ORDER BY ph.position ASC, ph.created_at ASC
+                   LIMIT 1
+               ) AS photo_url,
                e.created_at, COUNT(*) OVER()
         FROM events e
         JOIN profiles viewer ON viewer.id = $1::uuid
@@ -67,7 +74,19 @@ func (r *PostgresRepository) List(ctx context.Context, profileID uuid.UUID, page
 		var birthDate time.Time
 		var gender string
 		var totalCount int
-		if err := rows.Scan(&item.EventType, &item.ProfileID, &item.DisplayName, &birthDate, &gender, &item.CountryCode, &item.Region, &item.HasPhoto, &item.CreatedAt, &totalCount); err != nil {
+		if err := rows.Scan(
+			&item.EventType,
+			&item.ProfileID,
+			&item.DisplayName,
+			&birthDate,
+			&gender,
+			&item.CountryCode,
+			&item.Region,
+			&item.HasPhoto,
+			&item.PhotoURL, // <--- Escaneamos la URL directa
+			&item.CreatedAt,
+			&totalCount,
+		); err != nil {
 			return nil, fmt.Errorf("activity: leer actividad: %w", err)
 		}
 		item.Age = profiles.AgeAt(birthDate, now)

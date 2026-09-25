@@ -25,6 +25,7 @@ type Item struct {
 	Gender      profiles.Gender
 	CountryCode string
 	Region      *string
+	PhotoURL    *string         `json:"photo_url"` 
 	HasPhoto    bool
 	CreatedAt   time.Time
 }
