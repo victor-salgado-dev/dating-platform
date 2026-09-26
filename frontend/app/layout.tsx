@@ -42,23 +42,21 @@ export default function RootLayout({
   const locale: Locale = isValidLocale(cookieLocale) ? cookieLocale : DEFAULT_LOCALE;
   const dictionary = getDictionary(locale);
 
+  // Likes y Visits ya no van en el menú principal: ahora viven como pestañas
+  // dentro de Activity (junto con Favorites). Ver activity/page.tsx.
   const navLinks: NavLinkItem[] = [
     { href: '/', label: dictionary.nav.home },
     { href: '/discover', label: dictionary.nav.discover },
     { href: '/activity', label: dictionary.nav.activity },
-    { href: '/likes', label: dictionary.nav.likes },
-    { href: '/visits', label: dictionary.nav.visits },
     { href: '/matches', label: dictionary.nav.matches },
     { href: '/messages', label: dictionary.nav.messages },
   ];
 
-  const filterLinks: FilterLinkItem[] = [
-    { href: '/', label: dictionary.filters.popular, active: true },
-    { href: '/online', label: dictionary.filters.online, online: true },
-    { href: '/new', label: dictionary.filters.newMembers },
-    { href: '/favorites', label: dictionary.filters.favorites },
-    { href: '/search', label: dictionary.filters.advancedSearch },
-  ];
+  // Popular / Online now / New members ahora son pestañas sin recarga dentro
+  // de la propia Home (page.tsx), no rutas distintas, así que ya no hace
+  // falta esta barra global de filtros. Se deja el array vacío en vez de
+  // borrar la prop, por si en el futuro se necesita para otra sección.
+  const filterLinks: FilterLinkItem[] = [];
 
   return (
     <html lang={locale} className={`${fraunces.variable} ${publicSans.variable}`}>

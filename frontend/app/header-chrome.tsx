@@ -236,18 +236,20 @@ export default function HeaderChrome({
           )}
         </div>
 
-        <div className={styles.mobileFilterBar}>
-          {filterLinks.map((f) => (
-            <Link
-              key={f.href + f.label}
-              href={f.href}
-              className={`${styles.filterBtn} ${pathname === f.href ? styles.active : ''}`}
-            >
-              {f.online && <span className={styles.fdot} />}
-              {f.label}
-            </Link>
-          ))}
-        </div>
+        {filterLinks.length > 0 && (
+          <div className={styles.mobileFilterBar}>
+            {filterLinks.map((f) => (
+              <Link
+                key={f.href + f.label}
+                href={f.href}
+                className={`${styles.filterBtn} ${pathname === f.href ? styles.active : ''}`}
+              >
+                {f.online && <span className={styles.fdot} />}
+                {f.label}
+              </Link>
+            ))}
+          </div>
+        )}
 
         <div
           className={`${styles.mobileDropdown} ${mobileNavOpen ? styles.open : ''}`}
@@ -364,32 +366,34 @@ export default function HeaderChrome({
           )}
         </div>
 
-        <nav className={styles.headerBottom} ref={bottomRef}>
-          <div className={styles.navScroller} ref={filterScrollerRef}>
-            <button className={styles.scrollArrow} onClick={() => scrollTrackBy(filterTrackRef, -160)} aria-label={dictionary.header.prev}>
-              ‹
-            </button>
-            <div className={`${styles.filterTrack} ${styles.navTrack}`} ref={filterTrackRef}>
-              {filterLinks.map((f) => (
-                <Link
-                  key={f.href + f.label}
-                  href={f.href}
-                  className={`${styles.filterBtn} ${pathname === f.href ? styles.active : ''}`}
-                >
-                  {f.online && <span className={styles.fdot} />}
-                  {f.label}
-                </Link>
-              ))}
+        {filterLinks.length > 0 && (
+          <nav className={styles.headerBottom} ref={bottomRef}>
+            <div className={styles.navScroller} ref={filterScrollerRef}>
+              <button className={styles.scrollArrow} onClick={() => scrollTrackBy(filterTrackRef, -160)} aria-label={dictionary.header.prev}>
+                ‹
+              </button>
+              <div className={`${styles.filterTrack} ${styles.navTrack}`} ref={filterTrackRef}>
+                {filterLinks.map((f) => (
+                  <Link
+                    key={f.href + f.label}
+                    href={f.href}
+                    className={`${styles.filterBtn} ${pathname === f.href ? styles.active : ''}`}
+                  >
+                    {f.online && <span className={styles.fdot} />}
+                    {f.label}
+                  </Link>
+                ))}
+              </div>
+              <button
+                className={`${styles.scrollArrow} ${styles.right}`}
+                onClick={() => scrollTrackBy(filterTrackRef, 160)}
+                aria-label={dictionary.header.next}
+              >
+                ›
+              </button>
             </div>
-            <button
-              className={`${styles.scrollArrow} ${styles.right}`}
-              onClick={() => scrollTrackBy(filterTrackRef, 160)}
-              aria-label={dictionary.header.next}
-            >
-              ›
-            </button>
-          </div>
-        </nav>
+          </nav>
+        )}
       </div>
     </>
   );

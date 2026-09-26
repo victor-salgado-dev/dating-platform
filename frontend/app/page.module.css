@@ -7,221 +7,15 @@
   box-sizing: border-box;
 }
 
-/* Grilla con perfiles */
+/* Grilla con perfiles. Las clases de la propia tarjeta (.card, .cardInfo,
+   .imageContainer...) viven ahora en components/ProfileCard.module.css,
+   compartidas con Discover, Likes, Visits, Favorites y Activity. */
 .grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
   grid-auto-flow: dense;
   gap: 20px;
   align-items: stretch;
-}
-
-/* Tarjeta estándar */
-.card {
-  background: var(--surface);
-  border-radius: var(--radius-card);
-  overflow: hidden;
-  border: 1px solid var(--line);
-  display: flex;
-  flex-direction: column;
-  transition: border-color 0.2s ease, transform 0.2s ease;
-  position: relative;
-}
-
-.card:hover {
-  transform: translateY(-4px);
-  border-color: var(--brand-primary);
-}
-
-/* ---------- Te han dado like / favorito: borde + insignia ---------- */
-.receivedLike {
-  box-shadow: 0 0 0 3px var(--received-like);
-}
-.receivedFav {
-  box-shadow: 0 0 0 3px var(--received-fav);
-}
-.receivedBoth {
-  background-image: linear-gradient(var(--surface), var(--surface)),
-    linear-gradient(135deg, var(--received-like), var(--received-fav));
-  background-origin: border-box;
-  background-clip: padding-box, border-box;
-  border: 3px solid transparent;
-  box-shadow: none;
-}
-.receivedBadges {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  display: flex;
-  gap: 5px;
-  z-index: 2;
-}
-.receivedBadges span {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  color: white;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.18);
-}
-.badgeLike {
-  background: var(--received-like);
-}
-.badgeFav {
-  background: var(--received-fav);
-}
-
-/* Tarjeta destacada: foto ancha en vertical + texto al lado (no fuerza
-   panorámico, ya que las fotos de perfil casi siempre son retrato) */
-.cardPremium {
-  grid-column: span 2;
-  flex-direction: row;
-  align-items: stretch;
-}
-.cardPremium .imageContainer {
-  width: 62%;
-  flex-shrink: 0;
-  aspect-ratio: auto;
-  height: auto;
-}
-.cardPremium .cardInfo {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  padding: 20px 22px;
-}
-.cardPremium .name {
-  font-size: 1.25rem;
-}
-.cardPremium .details {
-  font-size: 0.92rem;
-  margin-top: 6px;
-}
-.cardPremium .actions {
-  margin-top: 16px;
-}
-
-/* Contenedor de la foto (proporción 3:4, retrato) */
-.imageContainer {
-  position: relative;
-  width: 100%;
-  aspect-ratio: 3 / 4;
-  overflow: hidden;
-  background: linear-gradient(160deg, var(--brand-primary-tint), var(--accent-tint));
-}
-
-.photoImg {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  transition: transform 0.5s ease;
-}
-.card:hover .photoImg {
-  transform: scale(1.05);
-}
-
-.photoPlaceholder {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--brand-primary-dark);
-  opacity: 0.55;
-  font-family: var(--font-voice, Georgia), serif;
-  font-size: 2rem;
-}
-
-.badge {
-  position: absolute;
-  top: 12px;
-  left: 12px;
-  background: var(--surface);
-  color: var(--success);
-  font-size: 0.75rem;
-  font-weight: 600;
-  padding: 4px 10px;
-  border-radius: var(--radius-pill);
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-.fdot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--success);
-}
-
-/* Información del perfil */
-.cardInfo {
-  padding: 14px 16px 16px;
-  background: var(--surface);
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 10px;
-}
-
-.name {
-  font-size: 1.05rem;
-  font-weight: 700;
-  color: var(--ink);
-  margin: 0;
-  display: flex;
-  align-items: baseline;
-  gap: 5px;
-}
-.name span {
-  font-weight: 400;
-  color: var(--muted);
-}
-
-.details {
-  font-size: 0.85rem;
-  color: var(--muted);
-  margin: 3px 0 0;
-}
-
-.actions {
-  display: flex;
-  gap: 8px;
-  flex-shrink: 0;
-}
-
-.iconBtn {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 1px solid var(--line);
-  background: var(--bg-main);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--ink-soft);
-  transition: all 0.15s ease;
-}
-.iconBtn:hover {
-  border-color: var(--brand-primary);
-  color: var(--brand-primary);
-}
-.iconBtn.liked {
-  background: var(--brand-primary);
-  border-color: var(--brand-primary);
-  color: white;
-  box-shadow: 0 0 10px rgba(166, 57, 94, 0.4);
-}
-.iconBtn.favorited {
-  background: var(--accent);
-  border-color: var(--accent);
-  color: white;
-  box-shadow: 0 0 10px rgba(232, 168, 124, 0.5);
 }
 
 /* --- PUBLICIDAD --- */
@@ -261,27 +55,10 @@
 }
 
 @media (max-width: 640px) {
-  /* Una sola columna: un perfil a la vez, sin tratamiento "destacado" */
   .grid {
     grid-template-columns: 1fr;
     gap: 14px;
   }
-  .cardPremium {
-    grid-column: span 1;
-    flex-direction: column;
-  }
-  .cardPremium .imageContainer {
-    width: 100%;
-    aspect-ratio: 3 / 4;
-  }
-  .cardPremium .name {
-    font-size: 1.05rem;
-  }
-  .cardPremium .details {
-    font-size: 0.85rem;
-  }
-
-  /* Anuncios: mismo tamaño/forma que una tarjeta de perfil, sin destacar de más */
   .adSquare,
   .adBanner {
     grid-column: span 1;

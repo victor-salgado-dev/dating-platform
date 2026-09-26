@@ -1,0 +1,16 @@
+.details {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.25rem 1rem;
+  margin-top: 1.5rem;
+}
+.details dt {
+  color: #666;
+  font-weight: 600;
+}
+.details dd {
+  margin: 0;
+}
+.bio {
+  white-space: pre-wrap;
+}
