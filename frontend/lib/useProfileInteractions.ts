@@ -6,7 +6,7 @@
 // que Home, Likes, Visits, Favorites y Activity compartan un único caché en
 // memoria (y una sola tanda de peticiones) durante la sesión de navegación.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { apiFetch, LikesResponse, FavoritesResponse } from '@/lib/api';
 
 interface InteractionsCache {
@@ -17,59 +17,88 @@ interface InteractionsCache {
   loaded: boolean;
 }
 
+const emptyCache: InteractionsCache = {
+  likedIds: new Set(),
+  favoritedIds: new Set(),
+  receivedLikeIds: new Set(),
+  receivedFavIds: new Set(),
+  loaded: false,
+};
+
 let cache: InteractionsCache | null = null;
+let inFlight: Promise<InteractionsCache> | null = null;
+const listeners = new Set<() => void>();
+
+function emitChange() {
+  listeners.forEach((listener) => listener());
+}
+
+function getSnapshot(): InteractionsCache {
+  return cache ?? emptyCache;
+}
+
+function subscribe(listener: () => void): () => void {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+function loadInteractions(): Promise<InteractionsCache> {
+  if (cache?.loaded) return Promise.resolve(cache);
+  if (inFlight) return inFlight;
+
+  inFlight = Promise.all([
+    apiFetch<LikesResponse>('/likes/sent?page_size=100').catch(() => null),
+    apiFetch<FavoritesResponse>('/favorites?page_size=100').catch(() => null),
+    apiFetch<LikesResponse>('/likes/received?page_size=100').catch(() => null),
+    apiFetch<FavoritesResponse>('/favorites/received?page_size=100').catch(() => null),
+  ]).then(([sentLikes, favs, recLikes, recFavs]) => {
+    const next: InteractionsCache = {
+      likedIds: new Set(sentLikes?.items.map((i) => i.profile_id) ?? []),
+      favoritedIds: new Set(favs?.items.map((i) => i.profile_id) ?? []),
+      receivedLikeIds: new Set(recLikes?.items.map((i) => i.profile_id) ?? []),
+      receivedFavIds: new Set(recFavs?.items.map((i) => i.profile_id) ?? []),
+      loaded: true,
+    };
+    cache = next;
+    inFlight = null;
+    emitChange();
+    return next;
+  });
+
+  return inFlight;
+}
 
 export function useProfileInteractions() {
-  const [likedIds, setLikedIds] = useState<Set<string>>(cache?.likedIds ?? new Set());
-  const [favoritedIds, setFavoritedIds] = useState<Set<string>>(cache?.favoritedIds ?? new Set());
-  const [receivedLikeIds, setReceivedLikeIds] = useState<Set<string>>(cache?.receivedLikeIds ?? new Set());
-  const [receivedFavIds, setReceivedFavIds] = useState<Set<string>>(cache?.receivedFavIds ?? new Set());
-
-  const fetched = useRef(false);
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot);
 
   useEffect(() => {
-    if (cache?.loaded || fetched.current) return;
-    fetched.current = true;
-
-    Promise.all([
-      apiFetch<LikesResponse>('/likes/sent?page_size=100').catch(() => null),
-      apiFetch<FavoritesResponse>('/favorites?page_size=100').catch(() => null),
-      apiFetch<LikesResponse>('/likes/received?page_size=100').catch(() => null),
-      apiFetch<FavoritesResponse>('/favorites/received?page_size=100').catch(() => null),
-    ]).then(([sentLikes, favs, recLikes, recFavs]) => {
-      const nextLiked = new Set(sentLikes?.items.map((i) => i.profile_id) ?? []);
-      const nextFavs = new Set(favs?.items.map((i) => i.profile_id) ?? []);
-      const nextRecLikes = new Set(recLikes?.items.map((i) => i.profile_id) ?? []);
-      const nextRecFavs = new Set(recFavs?.items.map((i) => i.profile_id) ?? []);
-
-      cache = { likedIds: nextLiked, favoritedIds: nextFavs, receivedLikeIds: nextRecLikes, receivedFavIds: nextRecFavs, loaded: true };
-
-      setLikedIds(nextLiked);
-      setFavoritedIds(nextFavs);
-      setReceivedLikeIds(nextRecLikes);
-      setReceivedFavIds(nextRecFavs);
-    });
+    loadInteractions();
   }, []);
 
   function toggleLike(id: string, isLiked: boolean) {
-    setLikedIds((prev) => {
-      const next = new Set(prev);
-      if (isLiked) next.add(id);
-      else next.delete(id);
-      if (cache) cache.likedIds = next;
-      return next;
-    });
+    if (!cache) return;
+    const next = new Set(cache.likedIds);
+    if (isLiked) next.add(id);
+    else next.delete(id);
+    cache = { ...cache, likedIds: next };
+    emitChange();
   }
 
   function toggleFavorite(id: string, isFav: boolean) {
-    setFavoritedIds((prev) => {
-      const next = new Set(prev);
-      if (isFav) next.add(id);
-      else next.delete(id);
-      if (cache) cache.favoritedIds = next;
-      return next;
-    });
+    if (!cache) return;
+    const next = new Set(cache.favoritedIds);
+    if (isFav) next.add(id);
+    else next.delete(id);
+    cache = { ...cache, favoritedIds: next };
+    emitChange();
   }
 
-  return { likedIds, favoritedIds, receivedLikeIds, receivedFavIds, toggleLike, toggleFavorite };
+  return {
+    likedIds: snapshot.likedIds,
+    favoritedIds: snapshot.favoritedIds,
+    receivedLikeIds: snapshot.receivedLikeIds,
+    receivedFavIds: snapshot.receivedFavIds,
+    toggleLike,
+    toggleFavorite,
+  };
 }

@@ -22,6 +22,10 @@ let interestCatalogCache: InterestDefinition[] | null = null;
 // las 6 peticiones en paralelo.
 const profileDataCache = new Map<string, Omit<FullProfileData, 'loading'>>();
 
+// Promesas en vuelo por perfil. Evita que dos componentes pidan el mismo
+// perfil a la vez y lancen una segunda tanda de peticiones.
+const profileDataPromises = new Map<string, Promise<Omit<FullProfileData, 'loading'>>>();
+
 export interface FullProfileData {
   profile: PublicProfile | null;
   photos: ProfilePhoto[];
@@ -49,6 +53,12 @@ const EMPTY: FullProfileData = {
 };
 
 function fetchFullProfile(id: string): Promise<Omit<FullProfileData, 'loading'>> {
+  // Si ya hay una petición en curso para este id, devolvemos esa misma
+  // promesa. Así, si dos componentes se montan al mismo tiempo, solo se
+  // hará una única carga.
+  const existing = profileDataPromises.get(id);
+  if (existing) return existing;
+
   const catalogPromise = interestCatalogCache
     ? Promise.resolve(interestCatalogCache)
     : apiFetch<InterestDefinition[]>('/catalog/interests')
@@ -58,30 +68,42 @@ function fetchFullProfile(id: string): Promise<Omit<FullProfileData, 'loading'>>
         })
         .catch(() => [] as InterestDefinition[]);
 
-  return apiFetch<PublicProfile>(`/profiles/${id}`).then(async (profile) => {
-    const [photos, languages, theirInterests, personality, partnerPrefs, interestCatalog] = await Promise.all([
-      apiFetch<ProfilePhoto[]>(`/profiles/${id}/photos`).catch(() => []),
-      apiFetch<ProfileLanguage[]>(`/profiles/${id}/languages`).catch(() => []),
-      apiFetch<ProfileInterest[]>(`/profiles/${id}/interests`).catch(() => []),
-      apiFetch<PersonalityResponse>(`/profiles/${id}/personality`).catch(() => null),
-      apiFetch<PartnerPreferences>(`/profiles/${id}/partner-preferences`).catch(() => null),
-      catalogPromise,
-    ]);
+  const promise = apiFetch<PublicProfile>(`/profiles/${id}`)
+    .then(async (profile) => {
+      const [photos, languages, theirInterests, personality, partnerPrefs, interestCatalog] = await Promise.all([
+        apiFetch<ProfilePhoto[]>(`/profiles/${id}/photos`).catch(() => []),
+        apiFetch<ProfileLanguage[]>(`/profiles/${id}/languages`).catch(() => []),
+        apiFetch<ProfileInterest[]>(`/profiles/${id}/interests`).catch(() => []),
+        apiFetch<PersonalityResponse>(`/profiles/${id}/personality`).catch(() => null),
+        apiFetch<PartnerPreferences>(`/profiles/${id}/partner-preferences`).catch(() => null),
+        catalogPromise,
+      ]);
 
-    const resolved: Omit<FullProfileData, 'loading'> = {
-      profile,
-      photos,
-      languages,
-      interestCatalog,
-      theirInterests,
-      personality,
-      partnerPrefs,
-      notFound: false,
-      unauthorized: false,
-    };
-    profileDataCache.set(id, resolved);
-    return resolved;
-  });
+      const resolved: Omit<FullProfileData, 'loading'> = {
+        profile,
+        photos,
+        languages,
+        interestCatalog,
+        theirInterests,
+        personality,
+        partnerPrefs,
+        notFound: false,
+        unauthorized: false,
+      };
+      profileDataCache.set(id, resolved);
+      return resolved;
+    })
+    .catch((err) => {
+      // Rechazamos la promesa para que el llamador pueda manejar el error.
+      // El `finally` de abajo se encargará de limpiar el mapa de promesas.
+      throw err;
+    })
+    .finally(() => {
+      profileDataPromises.delete(id);
+    });
+
+  profileDataPromises.set(id, promise);
+  return promise;
 }
 
 // Lanza la carga de un perfil sin engancharse a ningún componente ni
