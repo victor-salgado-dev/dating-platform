@@ -70,12 +70,11 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		)`, f.Languages)
 	}
 
-	// Intereses: viven en la tabla profile_interests
-	if len(f.Interests) > 0 {
-		add(`EXISTS (
-			SELECT 1 FROM profile_interests pi
-			WHERE pi.profile_id = p.id AND pi.interest_key = ANY($%d)
-		)`, f.Interests)
+	// Intereses: viven en la tabla profile_interests. Cada filtro es
+	// pertenencia simple, o pertenencia + rango de nivel si trae
+	// Min/Max (solo tiene sentido para intereses con has_level=true).
+	for _, itf := range f.Interests {
+		where = append(where, interestExistsClause(itf, &args))
 	}
 
 	// RelationshipGoals: ahora es una columna text[] llamada relationship_goals
@@ -281,6 +280,28 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		PageSize:   params.PageSize,
 		TotalPages: totalPages,
 	}, nil
+}
+
+func interestExistsClause(itf InterestFilter, args *[]any) string {
+	*args = append(*args, itf.Key)
+	keyArg := len(*args)
+
+	var b strings.Builder
+	fmt.Fprintf(&b, `EXISTS (
+		SELECT 1 FROM profile_interests pi
+		WHERE pi.profile_id = p.id AND pi.interest_key = $%d`, keyArg)
+
+	if itf.Min != nil {
+		*args = append(*args, *itf.Min)
+		fmt.Fprintf(&b, " AND pi.level >= $%d", len(*args))
+	}
+	if itf.Max != nil {
+		*args = append(*args, *itf.Max)
+		fmt.Fprintf(&b, " AND pi.level <= $%d", len(*args))
+	}
+	b.WriteString(")")
+
+	return b.String()
 }
 
 func personalityExistsClause(pf PersonalityFilter, args *[]any) string {

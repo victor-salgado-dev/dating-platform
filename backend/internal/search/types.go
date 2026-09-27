@@ -29,6 +29,14 @@ const (
 	MaxPageSize     = 50
 	MinSearchAge    = 18 // V1 es solo para mayores de edad (sección 1)
 	MaxSearchAge    = 120
+
+	// MinInterestLevel/MaxInterestLevel acotan el nivel de un interés con
+	// has_level=true (profile_interests.level). Se asume la misma escala
+	// 1-5 que ya usan hobbies (antes de fusionarse en intereses) y
+	// personalidad — si el CHECK de la base de datos usa otro rango,
+	// ajustar aquí.
+	MinInterestLevel = 1
+	MaxInterestLevel = 5
 )
 
 // PersonalityFilter exige que la media de un rasgo de personalidad
@@ -46,10 +54,26 @@ type PersonalityFilter struct {
 	Max      *float64
 }
 
+// InterestFilter exige que el perfil tenga marcado un interés concreto
+// del catálogo (tabla profile_interests). Si Min y/o Max no son nil,
+// además exige que profile_interests.level caiga en ese rango (ambos
+// límites inclusive) — solo tiene sentido para intereses cuya
+// definición trae has_level=true; para el resto basta con Min=Max=nil
+// (solo pertenencia, "le gusta/tiene marcado").
+//
+// Un perfil que no marcó ese interés, o que lo marcó sin nivel cuando
+// el filtro exige un rango, nunca cumple este filtro: misma REGLA DE
+// LOS DATOS FALTANTES del resto de Filters.
+type InterestFilter struct {
+	Key string
+	Min *int
+	Max *int
+}
+
 // RawBounds son los límites min/max de un filtro con clave dinámica
-// (un rasgo de personalidad concreto), todavía sin parsear ni
-// validar: llegan como texto desde la query string
-// (?trait_openness_max=3...).
+// (un interés o un rasgo de personalidad concretos), todavía sin
+// parsear ni validar: llegan como texto desde la query string
+// (?interest_travel_min=4, ?trait_openness_max=3...).
 type RawBounds struct {
 	Min string
 	Max string
@@ -69,7 +93,10 @@ type Filters struct {
 	// Cambiados de *bool a *string
 	HasChildren   *string
 	WantsChildren *string
-	Interests     []string
+	// Interests: varios filtros se combinan con AND (el perfil tiene que
+	// cumplir TODOS los intereses que se pidan). Cada uno es pertenencia
+	// simple, o pertenencia + rango de nivel si trae Min/Max.
+	Interests []InterestFilter
 
 	// --- Físico y Apariencia ---
 	MinHeight        *int

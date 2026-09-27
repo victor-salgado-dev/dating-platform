@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { apiFetch, InterestDefinition } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/context';
 import type { Dictionary } from '@/lib/i18n/dictionaries/es';
+import { sortedCountryOptions } from '@/lib/countryOptions';
 import {
   HAS_CHILDREN_OPTIONS,
   WANTS_CHILDREN_OPTIONS,
@@ -46,15 +47,43 @@ import styles from './page.module.css';
 // CHECK con lista fija en ese archivo) — se deja aquí como única excepción.
 const GENDER_OPTIONS = ['female', 'male', 'non_binary', 'other'];
 
-type Comparator = 'gte' | 'lte' | 'eq' | 'any';
+// Rangos numéricos del formulario. Todos son <select>, nunca <input>: el
+// backend admite rangos más amplios (edad 18-120, altura 50-300cm, peso
+// 20-400kg — ver search/types.go), pero para un desplegable seleccionable
+// tiene más sentido acotar a un rango realista. Si algún caso real cae
+// fuera de esto, se amplía aquí sin tocar nada más.
+const MIN_SEARCH_AGE_UI = 18;
+const MAX_SEARCH_AGE_UI = 99;
+const MIN_HEIGHT_CM = 140;
+const MAX_HEIGHT_CM = 210;
+const MIN_WEIGHT_KG = 40;
+const MAX_WEIGHT_KG = 150;
+const MAX_CHILDREN_UI = 10;
 
-interface HobbyRow {
-  key: string;
-  comparator: Comparator;
-  value: string;
+// Nivel de interés/rasgo de personalidad: mismo 1-5 que valida el backend
+// (search.MinInterestLevel/MaxInterestLevel, profiles.MinPersonalityScore/
+// MaxPersonalityScore). La personalidad admite medios puntos (es la media
+// de varias respuestas 1-5); el nivel de interés es un entero.
+const INTEREST_LEVEL_OPTIONS = ['1', '2', '3', '4', '5'];
+const PERSONALITY_SCORE_OPTIONS = ['1', '1.5', '2', '2.5', '3', '3.5', '4', '4.5', '5'];
+
+function integerRange(start: number, end: number): string[] {
+  const out: string[] = [];
+  for (let n = start; n <= end; n += 1) out.push(String(n));
+  return out;
 }
 
-interface PersonalityRow {
+const AGE_OPTIONS = integerRange(MIN_SEARCH_AGE_UI, MAX_SEARCH_AGE_UI);
+const HEIGHT_OPTIONS = integerRange(MIN_HEIGHT_CM, MAX_HEIGHT_CM);
+const WEIGHT_OPTIONS = integerRange(MIN_WEIGHT_KG, MAX_WEIGHT_KG);
+const MAX_CHILDREN_OPTIONS = integerRange(0, MAX_CHILDREN_UI);
+
+type Comparator = 'gte' | 'lte' | 'eq' | 'any';
+
+// Fila de comparador reutilizada por Intereses-con-nivel y Personalidad:
+// "campo" >= / <= / = "valor" (o "any" = solo pertenencia, sin exigir
+// valor — solo tiene sentido para intereses, no para personalidad).
+interface ComparatorRow {
   comparator: Comparator | 'none';
   value: string;
 }
@@ -127,48 +156,54 @@ function ChipGroup({
   );
 }
 
-function RangeField({
+// Selector de rango con dos <select> (mín. / máx.) en vez de dos <input
+// type="number">: mismo layout que antes (.rangeRow / .rangeSep), pero
+// 100% seleccionable, nada de escritura.
+function RangeSelect({
   label,
   minValue,
   maxValue,
   onMinChange,
   onMaxChange,
-  placeholderMin,
-  placeholderMax,
+  options,
+  anyLabel,
 }: {
   label: string;
   minValue: string;
   maxValue: string;
   onMinChange: (v: string) => void;
   onMaxChange: (v: string) => void;
-  placeholderMin: string;
-  placeholderMax: string;
+  options: string[];
+  anyLabel: string;
 }) {
   return (
     <div className={styles.field}>
       <label className={styles.label}>{label}</label>
       <div className={styles.rangeRow}>
-        <input
-          type="number"
-          className={styles.input}
-          placeholder={placeholderMin}
-          value={minValue}
-          onChange={(e) => onMinChange(e.target.value)}
-        />
+        <select className={styles.select} value={minValue} onChange={(e) => onMinChange(e.target.value)}>
+          <option value="">{anyLabel}</option>
+          {options.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
         <span className={styles.rangeSep}>–</span>
-        <input
-          type="number"
-          className={styles.input}
-          placeholder={placeholderMax}
-          value={maxValue}
-          onChange={(e) => onMaxChange(e.target.value)}
-        />
+        <select className={styles.select} value={maxValue} onChange={(e) => onMaxChange(e.target.value)}>
+          <option value="">{anyLabel}</option>
+          {options.map((opt) => (
+            <option key={opt} value={opt}>
+              {opt}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );
 }
 
-// Fila de comparador (usada para Hobbies e Personalidad): "campo" >= / <= / = "valor"
+// Fila de comparador (usada para Intereses-con-nivel y Personalidad):
+// "campo" >= / <= / = "valor"
 function ComparatorSelect({
   value,
   onChange,
@@ -196,9 +231,9 @@ function ComparatorSelect({
 // -----------------------------------------------------------------------------
 export default function SearchPage() {
   const router = useRouter();
-  const { dictionary } = useI18n();
+  const { dictionary, locale } = useI18n();
 
-  // --- Campos simples (texto/número) ---
+  // --- Rangos numéricos (todo <select>, ver constantes arriba) ---
   const [minAge, setMinAge] = useState('');
   const [maxAge, setMaxAge] = useState('');
   const [country, setCountry] = useState('');
@@ -246,41 +281,66 @@ export default function SearchPage() {
   const [vacationActivities, setVacationActivities] = useState<string[]>([]);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
 
-  // --- Catálogo de intereses (endpoint asumido: GET /interests) ---
+  // --- País / nacionalidad: <select> de códigos ISO, nada de escribirlos ---
+  const countryOptions = useMemo(() => sortedCountryOptions(locale), [locale]);
+
+  // --- Catálogo de intereses (GET /interests) ---
   const [interests, setInterests] = useState<InterestDefinition[]>([]);
   const [interestsError, setInterestsError] = useState(false);
 
+  // --- Nivel de interés, solo para los del catálogo con has_level=true.
+  // Se siembra en cuanto llega el catálogo (una fila "sin filtrar" por
+  // cada clave con nivel). El resto de intereses (has_level=false) siguen
+  // siendo un simple chip on/off en selectedInterests. ---
+  const [interestLevels, setInterestLevels] = useState<Record<string, ComparatorRow>>({});
+
   useEffect(() => {
     apiFetch<InterestDefinition[]>('/interests')
-      .then(setInterests)
+      .then((data) => {
+        setInterests(data);
+        setInterestLevels(
+          Object.fromEntries(
+            data.filter((d) => d.has_level).map((d) => [d.key, { comparator: 'none', value: '' } as ComparatorRow]),
+          ),
+        );
+      })
       .catch(() => setInterestsError(true));
   }, []);
 
-  // --- Hobbies (dinámico, con comparador — no hay catálogo confirmado
-  // todavía, así que la clave es texto libre por ahora) ---
-  const [hobbies, setHobbies] = useState<HobbyRow[]>([]);
-
   // --- Personalidad (5 rasgos fijos, cada uno con su comparador) ---
-  const [personality, setPersonality] = useState<Record<string, PersonalityRow>>(
-    Object.fromEntries(PERSONALITY_TRAIT_KEYS.map((k) => [k, { comparator: 'none', value: '' }]))
+  const [personality, setPersonality] = useState<Record<string, ComparatorRow>>(
+    Object.fromEntries(PERSONALITY_TRAIT_KEYS.map((k) => [k, { comparator: 'none', value: '' }])),
   );
 
   function toggleValue(list: string[], setList: (v: string[]) => void, value: string) {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   }
 
-  function addHobbyRow() {
-    setHobbies((rows) => [...rows, { key: '', comparator: 'any', value: '' }]);
-  }
-  function updateHobbyRow(index: number, patch: Partial<HobbyRow>) {
-    setHobbies((rows) => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
-  }
-  function removeHobbyRow(index: number) {
-    setHobbies((rows) => rows.filter((_, i) => i !== index));
+  // Al elegir un comparador que necesita valor (gte/lte/eq) y todavía no
+  // hay ninguno seleccionado, arrancamos en el punto medio de la escala:
+  // así la fila sigue siendo "solo elegir", nunca hace falta escribir.
+  function updateComparatorRow(
+    setRows: React.Dispatch<React.SetStateAction<Record<string, ComparatorRow>>>,
+    key: string,
+    patch: Partial<ComparatorRow>,
+    midpoint: string,
+  ) {
+    setRows((prev) => {
+      const current = prev[key] ?? { comparator: 'none', value: '' };
+      const next: ComparatorRow = { ...current, ...patch };
+      if ((next.comparator === 'gte' || next.comparator === 'lte' || next.comparator === 'eq') && next.value === '') {
+        next.value = midpoint;
+      }
+      return { ...prev, [key]: next };
+    });
   }
 
-  function updatePersonality(trait: string, patch: Partial<PersonalityRow>) {
-    setPersonality((prev) => ({ ...prev, [trait]: { ...prev[trait], ...patch } }));
+  function updateInterestLevel(key: string, patch: Partial<ComparatorRow>) {
+    updateComparatorRow(setInterestLevels, key, patch, '3');
+  }
+
+  function updatePersonality(trait: string, patch: Partial<ComparatorRow>) {
+    updateComparatorRow(setPersonality, trait, patch, '3');
   }
 
   function buildParams(): URLSearchParams {
@@ -295,12 +355,11 @@ export default function SearchPage() {
     setMulti('gender', genders);
     setIf('min_age', minAge);
     setIf('max_age', maxAge);
-    setIf('country', country.toUpperCase());
+    setIf('country', country);
     setMulti('language', languages);
     setMulti('relationship_goals', relationshipGoals);
     setIf('has_children', hasChildren);
     setIf('wants_children', wantsChildren);
-    setMulti('interests', selectedInterests);
 
     setIf('min_height', minHeight);
     setIf('max_height', maxHeight);
@@ -323,7 +382,7 @@ export default function SearchPage() {
     setIf('income_level', incomeLevel);
     setIf('living_situation', livingSituation);
 
-    setIf('nationality', nationality.toUpperCase());
+    setIf('nationality', nationality);
     setIf('education_level', educationLevel);
     setIf('english_ability', englishAbility);
     setIf('religion', religion);
@@ -338,23 +397,24 @@ export default function SearchPage() {
     setMulti('ideal_vacation_style', idealVacationStyle);
     setMulti('vacation_activities', vacationActivities);
 
-    // Hobbies: clave suelta (solo "le gusta") o con límites de intensidad.
-    // "any" -> ?hobby=key ; gte/lte/eq -> ?hobby_{key}_min / _max
-    const bareHobbies: string[] = [];
-    hobbies.forEach((row) => {
-      const key = row.key.trim();
-      if (!key) return;
+    // Intereses: los que no llevan nivel (has_level=false) son pertenencia
+    // simple, igual que antes. Los que sí llevan nivel se pliegan también
+    // en "interests" cuando el comparador es "any" (solo que le guste, sin
+    // exigir nivel); si el comparador exige valor (gte/lte/eq) generan
+    // ?interest_{key}_min / _max en su lugar, igual que trait_{key}_*.
+    const bareInterests = [...selectedInterests];
+    Object.entries(interestLevels).forEach(([key, row]) => {
       if (row.comparator === 'any') {
-        bareHobbies.push(key);
-      } else if (row.value.trim() !== '') {
-        if (row.comparator === 'gte' || row.comparator === 'eq') params.set(`hobby_${key}_min`, row.value.trim());
-        if (row.comparator === 'lte' || row.comparator === 'eq') params.set(`hobby_${key}_max`, row.value.trim());
+        bareInterests.push(key);
+      } else if (row.comparator !== 'none' && row.value.trim() !== '') {
+        if (row.comparator === 'gte' || row.comparator === 'eq') params.set(`interest_${key}_min`, row.value.trim());
+        if (row.comparator === 'lte' || row.comparator === 'eq') params.set(`interest_${key}_max`, row.value.trim());
       }
     });
-    setMulti('hobby', bareHobbies);
+    setMulti('interests', bareInterests);
 
-    // Personalidad: mismo patrón que hobbies, sin la opción "any" (no tiene
-    // sentido pedir un rasgo sin ningún límite).
+    // Personalidad: mismo patrón, sin la opción "any" (no tiene sentido
+    // pedir un rasgo sin ningún límite).
     PERSONALITY_TRAIT_KEYS.forEach((trait) => {
       const row = personality[trait];
       if (!row || row.comparator === 'none' || row.value.trim() === '') return;
@@ -383,7 +443,7 @@ export default function SearchPage() {
     setGenders([]); setRelationshipGoals([]); setLanguages([]); setBodyArt([]);
     setRelocationWillingness([]); setFutureVision([]); setSports([]); setPetsOwned([]);
     setIdealVacationStyle([]); setVacationActivities([]); setSelectedInterests([]);
-    setHobbies([]);
+    setInterestLevels((prev) => Object.fromEntries(Object.keys(prev).map((k) => [k, { comparator: 'none', value: '' }])));
     setPersonality(Object.fromEntries(PERSONALITY_TRAIT_KEYS.map((k) => [k, { comparator: 'none', value: '' }])));
   }
 
@@ -403,25 +463,25 @@ export default function SearchPage() {
           <h2 className={styles.sectionTitle}>{dictionary.search.sectionBasic}</h2>
           <div className={styles.fieldGrid}>
             <ChipGroup label={dictionary.search.labelGender} values={genders} onToggle={(v) => toggleValue(genders, setGenders, v)} options={GENDER_OPTIONS} labels={dictionary.options.gender} />
-            <RangeField
+            <RangeSelect
               label={dictionary.search.labelAge}
               minValue={minAge}
               maxValue={maxAge}
               onMinChange={setMinAge}
               onMaxChange={setMaxAge}
-              placeholderMin={dictionary.search.placeholderAgeMin}
-              placeholderMax={dictionary.search.placeholderAgeMax}
+              options={AGE_OPTIONS}
+              anyLabel={dictionary.search.any}
             />
             <div className={styles.field}>
               <label className={styles.label}>{dictionary.search.labelCountry}</label>
-              <input
-                type="text"
-                className={styles.input}
-                placeholder={dictionary.search.placeholderCountry}
-                maxLength={2}
-                value={country}
-                onChange={(e) => setCountry(e.target.value.toUpperCase())}
-              />
+              <select className={styles.select} value={country} onChange={(e) => setCountry(e.target.value)}>
+                <option value="">{dictionary.search.any}</option>
+                {countryOptions.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <ChipGroup label={dictionary.search.labelRelationshipGoal} values={relationshipGoals} onToggle={(v) => toggleValue(relationshipGoals, setRelationshipGoals, v)} options={RELATIONSHIP_GOAL_OPTIONS} labels={dictionary.options.relationshipGoal} />
             <SelectField label={dictionary.search.labelHasChildren} value={hasChildren} onChange={setHasChildren} options={HAS_CHILDREN_OPTIONS} labels={dictionary.options.hasChildren} anyLabel={dictionary.search.any} />
@@ -444,8 +504,8 @@ export default function SearchPage() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>{dictionary.search.sectionPhysical}</h2>
           <div className={styles.fieldGrid}>
-            <RangeField label={dictionary.search.labelHeight} minValue={minHeight} maxValue={maxHeight} onMinChange={setMinHeight} onMaxChange={setMaxHeight} placeholderMin="cm" placeholderMax="cm" />
-            <RangeField label={dictionary.search.labelWeight} minValue={minWeight} maxValue={maxWeight} onMinChange={setMinWeight} onMaxChange={setMaxWeight} placeholderMin="kg" placeholderMax="kg" />
+            <RangeSelect label={dictionary.search.labelHeight} minValue={minHeight} maxValue={maxHeight} onMinChange={setMinHeight} onMaxChange={setMaxHeight} options={HEIGHT_OPTIONS} anyLabel={dictionary.search.any} />
+            <RangeSelect label={dictionary.search.labelWeight} minValue={minWeight} maxValue={maxWeight} onMinChange={setMinWeight} onMaxChange={setMaxWeight} options={WEIGHT_OPTIONS} anyLabel={dictionary.search.any} />
             <SelectField label={dictionary.search.labelBodyType} value={bodyType} onChange={setBodyType} options={BODY_TYPE_OPTIONS} labels={dictionary.options.bodyType} anyLabel={dictionary.search.any} />
             <SelectField label={dictionary.search.labelEthnicity} value={ethnicity} onChange={setEthnicity} options={ETHNICITY_OPTIONS} labels={dictionary.options.ethnicity} anyLabel={dictionary.search.any} />
             <SelectField label={dictionary.search.labelAppearance} value={appearanceRating} onChange={setAppearanceRating} options={APPEARANCE_RATING_OPTIONS} labels={dictionary.options.appearanceRating} anyLabel={dictionary.search.any} />
@@ -465,7 +525,14 @@ export default function SearchPage() {
             <SelectField label={dictionary.search.labelMaritalStatus} value={maritalStatus} onChange={setMaritalStatus} options={MARITAL_STATUS_OPTIONS} labels={dictionary.options.maritalStatus} anyLabel={dictionary.search.any} />
             <div className={styles.field}>
               <label className={styles.label}>{dictionary.search.labelMaxChildren}</label>
-              <input type="number" min={0} className={styles.input} value={maxChildren} onChange={(e) => setMaxChildren(e.target.value)} />
+              <select className={styles.select} value={maxChildren} onChange={(e) => setMaxChildren(e.target.value)}>
+                <option value="">{dictionary.search.any}</option>
+                {MAX_CHILDREN_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
             </div>
             <SelectField label={dictionary.search.labelOccupation} value={occupation} onChange={setOccupation} options={OCCUPATION_OPTIONS} labels={dictionary.options.occupation} anyLabel={dictionary.search.any} />
             <SelectField label={dictionary.search.labelEmploymentStatus} value={employmentStatus} onChange={setEmploymentStatus} options={EMPLOYMENT_STATUS_OPTIONS} labels={dictionary.options.employmentStatus} anyLabel={dictionary.search.any} />
@@ -480,7 +547,14 @@ export default function SearchPage() {
           <div className={styles.fieldGrid}>
             <div className={styles.field}>
               <label className={styles.label}>{dictionary.search.labelNationality}</label>
-              <input type="text" className={styles.input} maxLength={2} placeholder={dictionary.search.placeholderCountry} value={nationality} onChange={(e) => setNationality(e.target.value.toUpperCase())} />
+              <select className={styles.select} value={nationality} onChange={(e) => setNationality(e.target.value)}>
+                <option value="">{dictionary.search.any}</option>
+                {countryOptions.map((c) => (
+                  <option key={c.code} value={c.code}>
+                    {c.label}
+                  </option>
+                ))}
+              </select>
             </div>
             <SelectField label={dictionary.search.labelEducationLevel} value={educationLevel} onChange={setEducationLevel} options={EDUCATION_LEVEL_OPTIONS} labels={dictionary.options.educationLevel} anyLabel={dictionary.search.any} />
             <SelectField label={dictionary.search.labelEnglishAbility} value={englishAbility} onChange={setEnglishAbility} options={ENGLISH_ABILITY_OPTIONS} labels={dictionary.options.englishAbility} anyLabel={dictionary.search.any} />
@@ -504,91 +578,108 @@ export default function SearchPage() {
           </div>
         </section>
 
-        {/* --- Intereses --- */}
+        {/* --- Intereses (pertenencia; y comparador </o> de nivel para los
+             que el catálogo marca con has_level=true, p.ej. "viajes >4" o
+             "deportes <3") --- */}
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>{dictionary.search.sectionInterests}</h2>
           {interestsError && <p className={styles.freeTextWarning}>{dictionary.search.interestsLoadError}</p>}
-          {interestsByCategory.map((group) => (
-            <div key={group.key}>
-              <p className={styles.categoryLabel}>{dictionary.options.interestCategories?.[group.key as keyof typeof dictionary.options.interestCategories] ?? group.key}</p>
-              <div className={styles.chipGroup}>
-                {group.items.map((item) => {
-                  const active = selectedInterests.includes(item.key);
+          {interestsByCategory.map((group) => {
+            const simpleItems = group.items.filter((i) => !i.has_level);
+            const leveledItems = group.items.filter((i) => i.has_level);
+            return (
+              <div key={group.key}>
+                <p className={styles.categoryLabel}>{dictionary.options.interestCategories?.[group.key as keyof typeof dictionary.options.interestCategories] ?? group.key}</p>
+
+                {simpleItems.length > 0 && (
+                  <div className={styles.chipGroup}>
+                    {simpleItems.map((item) => {
+                      const active = selectedInterests.includes(item.key);
+                      return (
+                        <button
+                          type="button"
+                          key={item.key}
+                          className={active ? `${styles.chip} ${styles.chipActive}` : styles.chip}
+                          onClick={() => toggleValue(selectedInterests, setSelectedInterests, item.key)}
+                        >
+                          {item.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+
+                {leveledItems.map((item) => {
+                  const row = interestLevels[item.key] ?? { comparator: 'none', value: '' };
+                  const needsValue = row.comparator === 'gte' || row.comparator === 'lte' || row.comparator === 'eq';
                   return (
-                    <button
-                      type="button"
-                      key={item.key}
-                      className={active ? `${styles.chip} ${styles.chipActive}` : styles.chip}
-                      onClick={() => toggleValue(selectedInterests, setSelectedInterests, item.key)}
-                    >
-                      {item.label}
-                    </button>
+                    <div key={item.key} className={styles.comparatorRow}>
+                      <span className={styles.label}>{item.label}</span>
+                      <ComparatorSelect
+                        value={row.comparator}
+                        onChange={(c) => updateInterestLevel(item.key, { comparator: c })}
+                        dictionary={dictionary}
+                        includeAny
+                      />
+                      {needsValue ? (
+                        <select
+                          className={styles.select}
+                          aria-label={dictionary.search.interestLevelAriaLabel}
+                          value={row.value}
+                          onChange={(e) => updateInterestLevel(item.key, { value: e.target.value })}
+                        >
+                          {INTEREST_LEVEL_OPTIONS.map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <span />
+                      )}
+                      <span />
+                    </div>
                   );
                 })}
               </div>
-            </div>
-          ))}
-        </section>
-
-        {/* --- Hobbies (comparador, catálogo sin confirmar) --- */}
-        <section className={styles.section}>
-          <h2 className={styles.sectionTitle}>{dictionary.search.sectionHobbies}</h2>
-          <p className={styles.freeTextWarning}>{dictionary.search.hobbiesFreeTextWarning}</p>
-          {hobbies.map((row, index) => (
-            <div key={index} className={styles.comparatorRow}>
-              <input
-                type="text"
-                className={styles.input}
-                placeholder={dictionary.search.hobbyKeyPlaceholder}
-                value={row.key}
-                onChange={(e) => updateHobbyRow(index, { key: e.target.value })}
-              />
-              <ComparatorSelect value={row.comparator} onChange={(c) => updateHobbyRow(index, { comparator: c as Comparator })} dictionary={dictionary} includeAny />
-              {row.comparator !== 'any' && (
-                <input
-                  type="number"
-                  className={styles.input}
-                  placeholder={dictionary.search.intensityPlaceholder}
-                  value={row.value}
-                  onChange={(e) => updateHobbyRow(index, { value: e.target.value })}
-                />
-              )}
-              {row.comparator === 'any' && <span />}
-              <button type="button" className={styles.removeBtn} onClick={() => removeHobbyRow(index)} title={dictionary.search.removeRow}>
-                ✕
-              </button>
-            </div>
-          ))}
-          <button type="button" className={styles.addBtn} onClick={addHobbyRow}>
-            + {dictionary.search.addHobby}
-          </button>
+            );
+          })}
         </section>
 
         {/* --- Personalidad (Big Five, comparador) --- */}
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>{dictionary.search.sectionPersonality}</h2>
-          {PERSONALITY_TRAIT_KEYS.map((trait) => (
-            <div key={trait} className={styles.comparatorRow}>
-              <span className={styles.label}>{dictionary.options.personalityTraits?.[trait as keyof typeof dictionary.options.personalityTraits] ?? trait}</span>
-              <ComparatorSelect
-                value={personality[trait]?.comparator ?? 'none'}
-                onChange={(c) => updatePersonality(trait, { comparator: c })}
-                dictionary={dictionary}
-                includeAny={false}
-              />
-              {personality[trait]?.comparator !== 'none' && (
-                <input
-                  type="number"
-                  className={styles.input}
-                  placeholder={dictionary.search.scorePlaceholder}
-                  value={personality[trait]?.value ?? ''}
-                  onChange={(e) => updatePersonality(trait, { value: e.target.value })}
+          {PERSONALITY_TRAIT_KEYS.map((trait) => {
+            const row = personality[trait] ?? { comparator: 'none', value: '' };
+            const needsValue = row.comparator === 'gte' || row.comparator === 'lte' || row.comparator === 'eq';
+            return (
+              <div key={trait} className={styles.comparatorRow}>
+                <span className={styles.label}>{dictionary.options.personalityTraits?.[trait as keyof typeof dictionary.options.personalityTraits] ?? trait}</span>
+                <ComparatorSelect
+                  value={row.comparator}
+                  onChange={(c) => updatePersonality(trait, { comparator: c })}
+                  dictionary={dictionary}
+                  includeAny={false}
                 />
-              )}
-              {personality[trait]?.comparator === 'none' && <span />}
-              <span />
-            </div>
-          ))}
+                {needsValue ? (
+                  <select
+                    className={styles.select}
+                    value={row.value}
+                    onChange={(e) => updatePersonality(trait, { value: e.target.value })}
+                  >
+                    {PERSONALITY_SCORE_OPTIONS.map((n) => (
+                      <option key={n} value={n}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <span />
+                )}
+                <span />
+              </div>
+            );
+          })}
         </section>
 
         {/* --- Orden --- */}

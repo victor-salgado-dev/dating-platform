@@ -77,7 +77,8 @@
   align-items: center;
   gap: 0.5rem;
 }
-.rangeRow .input {
+.rangeRow .input,
+.rangeRow .select {
   flex: 1;
   min-width: 0;
 }

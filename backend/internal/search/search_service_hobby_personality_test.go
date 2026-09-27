@@ -8,6 +8,104 @@ import (
 )
 
 // =====================================================================
+// buildParams: nivel de intereses (has_level=true)
+// =====================================================================
+
+func TestBuildParamsInterestBareKeyMeansMembershipAnyLevel(t *testing.T) {
+	params, err := buildParams(uuid.New(), RawQuery{Interests: []string{"travel", "gardening"}})
+	if err != nil {
+		t.Fatalf("no se esperaba error: %v", err)
+	}
+	if len(params.Filters.Interests) != 2 {
+		t.Fatalf("se esperaban 2 filtros de interés, hay %d", len(params.Filters.Interests))
+	}
+	for _, itf := range params.Filters.Interests {
+		if itf.Min != nil || itf.Max != nil {
+			t.Errorf("interés %q sin bounds debería tener Min/Max nil, tiene %+v", itf.Key, itf)
+		}
+	}
+}
+
+func TestBuildParamsInterestBoundsCreateFilter(t *testing.T) {
+	params, err := buildParams(uuid.New(), RawQuery{
+		InterestBounds: map[string]RawBounds{"travel": {Min: "4"}},
+	})
+	if err != nil {
+		t.Fatalf("no se esperaba error: %v", err)
+	}
+	if len(params.Filters.Interests) != 1 {
+		t.Fatalf("se esperaba 1 filtro de interés, hay %d", len(params.Filters.Interests))
+	}
+	itf := params.Filters.Interests[0]
+	if itf.Key != "travel" || itf.Min == nil || *itf.Min != 4 || itf.Max != nil {
+		t.Errorf("filtro construido incorrectamente: %+v", itf)
+	}
+}
+
+func TestBuildParamsInterestMergesBareAndBounds(t *testing.T) {
+	params, err := buildParams(uuid.New(), RawQuery{
+		Interests:      []string{"travel"},
+		InterestBounds: map[string]RawBounds{"travel": {Min: "3"}},
+	})
+	if err != nil {
+		t.Fatalf("no se esperaba error: %v", err)
+	}
+	if len(params.Filters.Interests) != 1 {
+		t.Fatalf("la misma clave en ambas fuentes no debería duplicar el filtro, hay %d", len(params.Filters.Interests))
+	}
+	if params.Filters.Interests[0].Min == nil || *params.Filters.Interests[0].Min != 3 {
+		t.Errorf("el límite de InterestBounds debería haberse aplicado: %+v", params.Filters.Interests[0])
+	}
+}
+
+func TestBuildParamsMultipleInterestFiltersAreOrderedDeterministically(t *testing.T) {
+	params, err := buildParams(uuid.New(), RawQuery{
+		InterestBounds: map[string]RawBounds{
+			"travel":    {Min: "3"},
+			"gardening": {Max: "3"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("no se esperaba error: %v", err)
+	}
+	if len(params.Filters.Interests) != 2 {
+		t.Fatalf("se esperaban 2 filtros, hay %d", len(params.Filters.Interests))
+	}
+	if params.Filters.Interests[0].Key != "gardening" || params.Filters.Interests[1].Key != "travel" {
+		t.Errorf("se esperaba orden alfabético (gardening, travel), se obtuvo: %+v", params.Filters.Interests)
+	}
+}
+
+func TestBuildParamsRejectsInterestLevelOutOfRange(t *testing.T) {
+	for _, bad := range []string{"0", "6", "-1"} {
+		_, err := buildParams(uuid.New(), RawQuery{
+			InterestBounds: map[string]RawBounds{"travel": {Min: bad}},
+		})
+		if err == nil {
+			t.Errorf("nivel %q fuera de 1-5 debería rechazarse", bad)
+		}
+	}
+}
+
+func TestBuildParamsRejectsInterestMinGreaterThanMax(t *testing.T) {
+	_, err := buildParams(uuid.New(), RawQuery{
+		InterestBounds: map[string]RawBounds{"travel": {Min: "4", Max: "2"}},
+	})
+	if err == nil {
+		t.Error("interest_travel_min > interest_travel_max debería rechazarse")
+	}
+}
+
+func TestBuildParamsRejectsNonNumericInterestBound(t *testing.T) {
+	_, err := buildParams(uuid.New(), RawQuery{
+		InterestBounds: map[string]RawBounds{"travel": {Min: "mucho"}},
+	})
+	if err == nil {
+		t.Error("un límite de interés no numérico debería rechazarse")
+	}
+}
+
+// =====================================================================
 // buildParams: personalidad
 // =====================================================================
 

@@ -15,10 +15,11 @@ import (
 )
 
 // Los tests de filtrado por hobbies que vivían aquí se adaptaron a la
-// API nueva de intereses (Fase 2 -> profile_interests). El filtro de
-// search ya no expone Min/Max sobre intensity; ahora filtra por
-// pertenencia ("tiene alguno de estos intereses"), así que el test
-// comprueba justo eso.
+// API nueva de intereses (Fase 2 -> profile_interests): pertenencia
+// simple (TestIntegration_Search_InterestFilter) y, para intereses con
+// has_level=true, pertenencia + rango de nivel
+// (TestIntegration_Search_InterestLevelFilter_MissingDataRule) — mismo
+// comparador </o> que antes tenían los hobbies.
 
 func TestIntegration_Search_InterestFilter(t *testing.T) {
 	pool := testutil.RequireDB(t)
@@ -71,7 +72,7 @@ func TestIntegration_Search_InterestFilter(t *testing.T) {
 
 	result, err := searchRepo.Search(ctx, search.Params{
 		ExcludeUserID: searcher.ID, Sort: search.SortRecent, Page: 1, PageSize: 50,
-		Filters: search.Filters{Interests: []string{interestA}},
+		Filters: search.Filters{Interests: []search.InterestFilter{{Key: interestA}}},
 	})
 	if err != nil {
 		t.Fatalf("Search: %v", err)
@@ -88,6 +89,77 @@ func TestIntegration_Search_InterestFilter(t *testing.T) {
 	}
 	if containsProfile(result.Items, noInterest) {
 		t.Error("REGLA DE DATOS FALTANTES: un perfil sin ese interés no debería aparecer al filtrar")
+	}
+}
+
+// TestIntegration_Search_InterestLevelFilter_MissingDataRule prueba el
+// filtro de nivel (?interest_x_min=/_max=) que usan los intereses con
+// has_level=true: además de tener el interés marcado, level tiene que
+// caer en el rango pedido. Un perfil con el interés pero sin level
+// (NULL) nunca cumple un filtro con rango — regla de datos faltantes.
+func TestIntegration_Search_InterestLevelFilter_MissingDataRule(t *testing.T) {
+	pool := testutil.RequireDB(t)
+	ctx := context.Background()
+
+	usersRepo := users.NewPostgresRepository(pool)
+	profilesRepo := profiles.NewPostgresRepository(pool)
+	searchRepo := search.NewPostgresRepository(pool)
+
+	defs, err := profilesRepo.ListInterestDefinitions(ctx)
+	if err != nil {
+		t.Fatalf("listar catálogo de intereses: %v", err)
+	}
+	var leveled *profiles.InterestDefinition
+	for i := range defs {
+		if defs[i].HasLevel {
+			leveled = &defs[i]
+			break
+		}
+	}
+	if leveled == nil {
+		t.Skip("el catálogo de intereses no tiene ninguna entrada con has_level=true todavía")
+	}
+
+	searcher := &users.User{Email: testutil.UniqueEmail(), PasswordHash: "x"}
+	if err := usersRepo.Create(ctx, searcher); err != nil {
+		t.Fatalf("crear usuario buscador: %v", err)
+	}
+
+	highLevel := createUserWithProfile(t, ctx, usersRepo, profilesRepo, nil)
+	five := 5
+	if _, err := profilesRepo.UpsertProfileInterest(ctx, highLevel, leveled.Key, &five); err != nil {
+		t.Fatalf("añadir interés con nivel 5: %v", err)
+	}
+
+	lowLevel := createUserWithProfile(t, ctx, usersRepo, profilesRepo, nil)
+	one := 1
+	if _, err := profilesRepo.UpsertProfileInterest(ctx, lowLevel, leveled.Key, &one); err != nil {
+		t.Fatalf("añadir interés con nivel 1: %v", err)
+	}
+
+	// noLevel tiene el interés marcado pero sin nivel (NULL).
+	noLevel := createUserWithProfile(t, ctx, usersRepo, profilesRepo, nil)
+	if _, err := profilesRepo.UpsertProfileInterest(ctx, noLevel, leveled.Key, nil); err != nil {
+		t.Fatalf("añadir interés sin nivel: %v", err)
+	}
+
+	four := 4
+	result, err := searchRepo.Search(ctx, search.Params{
+		ExcludeUserID: searcher.ID, Sort: search.SortRecent, Page: 1, PageSize: 50,
+		Filters: search.Filters{Interests: []search.InterestFilter{{Key: leveled.Key, Min: &four}}},
+	})
+	if err != nil {
+		t.Fatalf("Search: %v", err)
+	}
+
+	if !containsProfile(result.Items, highLevel) {
+		t.Error("un perfil con nivel 5 debería aparecer al filtrar por nivel >=4")
+	}
+	if containsProfile(result.Items, lowLevel) {
+		t.Error("un perfil con nivel 1 NO debería aparecer al filtrar por nivel >=4")
+	}
+	if containsProfile(result.Items, noLevel) {
+		t.Error("REGLA DE DATOS FALTANTES: un perfil con el interés marcado pero sin nivel no debería aparecer al filtrar por nivel")
 	}
 }
 

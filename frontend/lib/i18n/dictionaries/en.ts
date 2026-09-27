@@ -1011,7 +1011,6 @@ export const en: Dictionary = {
     sectionBackground: 'Background, culture and values',
     sectionLifestyleExtra: 'More lifestyle',
     sectionInterests: 'Interests',
-    sectionHobbies: 'Hobbies',
     sectionPersonality: 'Personality',
     sectionSort: 'Sort',
 
@@ -1022,8 +1021,7 @@ export const en: Dictionary = {
     placeholderAgeMin: 'Min.',
     placeholderAgeMax: 'Max.',
     labelRelationshipGoal: 'Relationship type',
-    labelCountry: 'Country (2-letter code)',
-    placeholderCountry: 'e.g. ES, MX, AR...',
+    labelCountry: 'Country',
     labelHasChildren: 'Has children',
     labelWantsChildren: 'Wants children',
     labelLanguages: 'Languages',
@@ -1047,7 +1045,7 @@ export const en: Dictionary = {
     labelIncomeLevel: 'Income level',
     labelLivingSituation: 'Living situation',
 
-    labelNationality: 'Nationality (2-letter code)',
+    labelNationality: 'Nationality',
     labelEducationLevel: 'Education level',
     labelEnglishAbility: 'English level',
     labelReligion: 'Religion',
@@ -1063,13 +1061,7 @@ export const en: Dictionary = {
     labelVacationActivities: 'Vacation activities',
 
     interestsLoadError: 'Could not load the interests catalog.',
-
-    hobbiesFreeTextWarning: "The hobby key is typed by hand for now (there's no confirmed catalog on the backend yet); a typo means the filter will match nothing.",
-    hobbyKeyPlaceholder: 'Hobby key (e.g. travelling)',
-    intensityPlaceholder: 'Intensity',
-    scorePlaceholder: 'Score',
-    removeRow: 'Remove',
-    addHobby: 'Add hobby',
+    interestLevelAriaLabel: 'Interest level',
 
     comparatorAny: 'Any (just likes it)',
     comparatorNone: 'Not filtered',

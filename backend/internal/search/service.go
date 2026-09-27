@@ -63,6 +63,9 @@ type RawQuery struct {
 	IdealVacationStyle []string
 	VacationActivities []string
 
+	// --- NUEVO: nivel de intereses (has_level=true) ---------------------
+	InterestBounds map[string]RawBounds
+
 	// --- NUEVO: Personalidad (Fase 2) -----------------------------------
 	PersonalityTraitBounds map[string]RawBounds
 }
@@ -150,13 +153,6 @@ func buildParams(excludeUserID uuid.UUID, raw RawQuery) (Params, error) {
 
 	f.HasChildren = nonEmptyPtr(raw.HasChildren)
 	f.WantsChildren = nonEmptyPtr(raw.WantsChildren)
-
-	for _, i := range raw.Interests {
-		i = strings.TrimSpace(i)
-		if i != "" {
-			f.Interests = append(f.Interests, i)
-		}
-	}
 
 	// --- Validación de números (Alturas, Pesos, Hijos) ---
 	parseInt := func(field, raw string, min, max int) (*int, error) {
@@ -259,6 +255,50 @@ func buildParams(excludeUserID uuid.UUID, raw RawQuery) (Params, error) {
 	f.FavoriteSeason = nonEmptyPtr(raw.FavoriteSeason)
 	f.IdealVacationStyle = cleanSlice(raw.IdealVacationStyle)
 	f.VacationActivities = cleanSlice(raw.VacationActivities)
+
+	// --- NUEVO: Intereses (pertenencia, con nivel opcional) -------------
+	// Mismo patrón que tenían los hobbies: una clave suelta en
+	// raw.Interests significa "lo tiene marcado, sin importar el nivel";
+	// una clave en raw.InterestBounds además exige que el nivel caiga en
+	// ese rango. Si una clave aparece en ambas fuentes, se funden en un
+	// único filtro.
+	interestFilters := map[string]InterestFilter{}
+	for _, key := range raw.Interests {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		if _, exists := interestFilters[key]; !exists {
+			interestFilters[key] = InterestFilter{Key: key}
+		}
+	}
+	for key, bounds := range raw.InterestBounds {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			continue
+		}
+		itf := interestFilters[key]
+		itf.Key = key
+
+		if itf.Min, err = parseInt(fmt.Sprintf("interest_%s_min", key), bounds.Min, MinInterestLevel, MaxInterestLevel); err != nil {
+			return Params{}, err
+		}
+		if itf.Max, err = parseInt(fmt.Sprintf("interest_%s_max", key), bounds.Max, MinInterestLevel, MaxInterestLevel); err != nil {
+			return Params{}, err
+		}
+		if itf.Min != nil && itf.Max != nil && *itf.Min > *itf.Max {
+			return Params{}, invalidParam(fmt.Sprintf("interest_%s_min", key), "no puede ser mayor que el máximo")
+		}
+		interestFilters[key] = itf
+	}
+	interestKeys := make([]string, 0, len(interestFilters))
+	for key := range interestFilters {
+		interestKeys = append(interestKeys, key)
+	}
+	sort.Strings(interestKeys)
+	for _, key := range interestKeys {
+		f.Interests = append(f.Interests, interestFilters[key])
+	}
 
 	// --- NUEVO: Personalidad -------------------------------------------
 	traitKeys := make([]string, 0, len(raw.PersonalityTraitBounds))

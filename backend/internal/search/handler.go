@@ -104,6 +104,9 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 		IdealVacationStyle: splitMulti(q["ideal_vacation_style"]),
 		VacationActivities: splitMulti(q["vacation_activities"]),
 
+		// --- Nivel de intereses (has_level=true) ---
+		InterestBounds: parseKeyedBounds(q, "interest_"),
+
 		// --- Personalidad (Fase 2) ---
 		PersonalityTraitBounds: parseKeyedBounds(q, "trait_"),
 	}

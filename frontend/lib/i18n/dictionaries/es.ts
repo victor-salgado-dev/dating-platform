@@ -1011,7 +1011,6 @@ export const es = {
     sectionBackground: 'Fondo, cultura y valores',
     sectionLifestyleExtra: 'Estilo de vida adicional',
     sectionInterests: 'Intereses',
-    sectionHobbies: 'Aficiones',
     sectionPersonality: 'Personalidad',
     sectionSort: 'Orden',
 
@@ -1022,8 +1021,7 @@ export const es = {
     placeholderAgeMin: 'Mín.',
     placeholderAgeMax: 'Máx.',
     labelRelationshipGoal: 'Tipo de relación',
-    labelCountry: 'País (código de 2 letras)',
-    placeholderCountry: 'Ej: ES, MX, AR...',
+    labelCountry: 'País',
     labelHasChildren: 'Tiene hijos',
     labelWantsChildren: 'Quiere tener hijos',
     labelLanguages: 'Idiomas',
@@ -1047,7 +1045,7 @@ export const es = {
     labelIncomeLevel: 'Nivel de ingresos',
     labelLivingSituation: 'Situación de convivencia',
 
-    labelNationality: 'Nacionalidad (código de 2 letras)',
+    labelNationality: 'Nacionalidad',
     labelEducationLevel: 'Nivel educativo',
     labelEnglishAbility: 'Nivel de inglés',
     labelReligion: 'Religión',
@@ -1063,13 +1061,7 @@ export const es = {
     labelVacationActivities: 'Actividades de vacaciones',
 
     interestsLoadError: 'No se pudo cargar el catálogo de intereses.',
-
-    hobbiesFreeTextWarning: 'La clave de la afición se escribe a mano por ahora (todavía no hay un catálogo confirmado en el backend); si la escribes mal, el filtro no encontrará nada.',
-    hobbyKeyPlaceholder: 'Clave de la afición (ej: travelling)',
-    intensityPlaceholder: 'Intensidad',
-    scorePlaceholder: 'Puntuación',
-    removeRow: 'Quitar',
-    addHobby: 'Añadir afición',
+    interestLevelAriaLabel: 'Nivel del interés',
 
     comparatorAny: 'Cualquiera (solo que le guste)',
     comparatorNone: 'Sin filtrar',
