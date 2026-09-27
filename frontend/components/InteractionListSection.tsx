@@ -49,6 +49,22 @@ export interface InteractionListSectionProps<T extends string> {
   openConversationLabel?: string;
 }
 
+type PageFetchResult = {
+  items: InteractionCardItem[];
+  page: number;
+  total_pages: number;
+  total: number;
+};
+
+// Caché en memoria de páginas ya pedidas. Vive durante la sesión de
+// navegación y se limpia con cada like/favorito para volver a pedir datos
+// actualizados la próxima vez que se entre a la pestaña/página.
+const interactionListCache = new Map<string, Map<number, PageFetchResult>>();
+
+function clearInteractionListCache() {
+  interactionListCache.clear();
+}
+
 export function InteractionListSection<T extends string>({
   tabs,
   defaultTab,
@@ -72,13 +88,45 @@ export function InteractionListSection<T extends string>({
   const [error, setError] = useState<string | null>(null);
   const [sortDesc, setSortDesc] = useState(true);
 
-  const { likedIds, favoritedIds, receivedLikeIds, receivedFavIds, toggleLike, toggleFavorite } =
-    useProfileInteractions();
+  const {
+    likedIds,
+    favoritedIds,
+    receivedLikeIds,
+    receivedFavIds,
+    toggleLike: baseToggleLike,
+    toggleFavorite: baseToggleFavorite,
+  } = useProfileInteractions();
 
   const activeConfig = tabs.find((t) => t.key === tab) ?? tabs[0];
 
+  function handleToggleLike(id: string, isLiked: boolean) {
+    clearInteractionListCache();
+    baseToggleLike(id, isLiked);
+  }
+
+  function handleToggleFavorite(id: string, isFav: boolean) {
+    clearInteractionListCache();
+    baseToggleFavorite(id, isFav);
+  }
+
   useEffect(() => {
     let active = true;
+    const cacheKey = activeConfig.key;
+    const pageCache = interactionListCache.get(cacheKey) ?? new Map<number, PageFetchResult>();
+    const cachedPage = pageCache.get(page);
+
+    if (cachedPage) {
+      setItems(cachedPage.items);
+      setMeta({
+        page: cachedPage.page,
+        total_pages: cachedPage.total_pages,
+        total: cachedPage.total,
+      });
+      setLoading(false);
+      setError(null);
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -86,8 +134,24 @@ export function InteractionListSection<T extends string>({
       .fetchPage(page)
       .then((data) => {
         if (!active) return;
-        setItems(data.items);
-        setMeta({ page: data.page, total_pages: data.total_pages, total: data.total });
+
+        const result: PageFetchResult = {
+          items: data.items,
+          page: data.page,
+          total_pages: data.total_pages,
+          total: data.total,
+        };
+
+        const currentPageCache = interactionListCache.get(cacheKey) ?? new Map<number, PageFetchResult>();
+        currentPageCache.set(page, result);
+        interactionListCache.set(cacheKey, currentPageCache);
+
+        setItems(result.items);
+        setMeta({
+          page: result.page,
+          total_pages: result.total_pages,
+          total: result.total,
+        });
       })
       .catch((err: unknown) => {
         if (!active) return;
@@ -167,8 +231,8 @@ export function InteractionListSection<T extends string>({
                     initialFavorited={favoritedIds.has(item.profile_id)}
                     receivedLike={receivedLikeIds.has(item.profile_id)}
                     receivedFavorite={receivedFavIds.has(item.profile_id)}
-                    onToggleLike={toggleLike}
-                    onToggleFavorite={toggleFavorite}
+                    onToggleLike={handleToggleLike}
+                    onToggleFavorite={handleToggleFavorite}
                   />
                 );
 

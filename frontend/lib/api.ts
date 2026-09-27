@@ -16,7 +16,12 @@ export class ApiError extends Error {
   }
 }
 
-export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+// Deduplicación de peticiones GET idénticas que están en curso.
+// Si dos componentes intentan hacer la misma llamada al mismo tiempo,
+// solo se enviará una request al backend.
+const inFlightRequests = new Map<string, Promise<unknown>>();
+
+async function doApiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const isFormData = typeof FormData !== 'undefined' && init?.body instanceof FormData;
   const res = await fetch(`${API_BASE}${path}`, {
     ...init,
@@ -44,6 +49,27 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     return undefined as T;
   }
   return (await res.json()) as T;
+}
+
+export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
+  const method = (init?.method ?? 'GET').toUpperCase();
+
+  if (method === 'GET') {
+    const key = `GET ${path}`;
+    const existing = inFlightRequests.get(key);
+    if (existing) return existing as Promise<T>;
+
+    const promise = doApiFetch<T>(path, init);
+    inFlightRequests.set(key, promise);
+
+    try {
+      return await promise;
+    } finally {
+      inFlightRequests.delete(key);
+    }
+  }
+
+  return doApiFetch<T>(path, init);
 }
 
 // --- Tipos que reflejan las respuestas del backend (Fases 5 y 6) ---------
