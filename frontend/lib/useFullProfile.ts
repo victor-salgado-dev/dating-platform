@@ -12,6 +12,22 @@ import type {
   PartnerPreferences,
 } from '@/lib/api';
 
+// Envelope devuelto por GET /profiles/{id}/full (backend: Handler.GetPublicFull
+// en internal/profiles/handler.go). Sustituye a las 6 peticiones
+// separadas que hacía este archivo antes (profile, photos, languages,
+// interests, personality, partner-preferences): ahora es una sola
+// llamada HTTP. El catálogo de intereses NO viene en este envelope a
+// propósito — no depende del perfil visitado, así que se sigue
+// pidiendo y cacheando aparte más abajo (interestCatalogCache).
+type FullProfileEnvelope = {
+  profile: PublicProfile;
+  photos: ProfilePhoto[];
+  languages: ProfileLanguage[];
+  interests: ProfileInterest[];
+  personality: PersonalityResponse;
+  partner_preferences: PartnerPreferences;
+};
+
 // Catálogo de intereses: no depende del id visitado, se pide una sola vez
 // y se comparte entre tarjetas (evita re-pedirlo en cada swipe de Quick Match).
 let interestCatalogCache: InterestDefinition[] | null = null;
@@ -19,7 +35,7 @@ let interestCatalogCache: InterestDefinition[] | null = null;
 // Caché en memoria por perfil visitado. Vive durante la sesión de
 // navegación (igual que useProfileInteractions), así que volver a un
 // perfil ya visto -p.ej. "Anterior" en Quick Match- no vuelve a lanzar
-// las 6 peticiones en paralelo.
+// la petición.
 const profileDataCache = new Map<string, Omit<FullProfileData, 'loading'>>();
 
 // Promesas en vuelo por perfil. Evita que dos componentes pidan el mismo
@@ -68,25 +84,18 @@ function fetchFullProfile(id: string): Promise<Omit<FullProfileData, 'loading'>>
         })
         .catch(() => [] as InterestDefinition[]);
 
-  const promise = apiFetch<PublicProfile>(`/profiles/${id}`)
-    .then(async (profile) => {
-      const [photos, languages, theirInterests, personality, partnerPrefs, interestCatalog] = await Promise.all([
-        apiFetch<ProfilePhoto[]>(`/profiles/${id}/photos`).catch(() => []),
-        apiFetch<ProfileLanguage[]>(`/profiles/${id}/languages`).catch(() => []),
-        apiFetch<ProfileInterest[]>(`/profiles/${id}/interests`).catch(() => []),
-        apiFetch<PersonalityResponse>(`/profiles/${id}/personality`).catch(() => null),
-        apiFetch<PartnerPreferences>(`/profiles/${id}/partner-preferences`).catch(() => null),
-        catalogPromise,
-      ]);
+  const promise = apiFetch<FullProfileEnvelope>(`/profiles/${id}/full`)
+    .then(async (envelope) => {
+      const interestCatalog = await catalogPromise;
 
       const resolved: Omit<FullProfileData, 'loading'> = {
-        profile,
-        photos,
-        languages,
+        profile: envelope.profile,
+        photos: envelope.photos,
+        languages: envelope.languages,
         interestCatalog,
-        theirInterests,
-        personality,
-        partnerPrefs,
+        theirInterests: envelope.interests,
+        personality: envelope.personality,
+        partnerPrefs: envelope.partner_preferences,
         notFound: false,
         unauthorized: false,
       };

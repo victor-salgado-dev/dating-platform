@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -173,6 +174,91 @@ func (s *Service) OpenPublicPhoto(ctx context.Context, viewerUserID, profileID, 
 	}
 
 	return rc, ph, nil
+}
+
+// FullProfile agrupa todo lo que useFullProfile.ts (frontend) pedía por
+// separado en 6 peticiones distintas (perfil, fotos, idiomas,
+// intereses, respuestas/puntuaciones de personalidad y preferencias de
+// pareja). No incluye el catálogo de intereses (ver
+// Service.ListInterestCatalog): ese catálogo no depende del perfil
+// visitado y el frontend ya lo cachea por sesión, así que incluirlo
+// aquí solo duplicaría datos en cada respuesta.
+type FullProfile struct {
+	Profile            *Profile
+	Photos             []Photo
+	Languages          []ProfileLanguage
+	Interests          []ProfileInterest
+	PersonalityAnswers []ProfilePersonalityAnswer
+	PersonalityScores  []PersonalityTraitScore
+	PartnerPreferences *PartnerPreferences
+}
+
+// GetFullPublicProfile resuelve en una sola llamada de servicio lo que
+// antes requería 6 peticiones HTTP del cliente. La comprobación de
+// visibilidad (cuenta activa, sin bloqueos en ningún sentido) se hace
+// primero y de forma bloqueante via GetPublicByID, exactamente igual
+// que en GetPublicProfile: si esa falla (perfil inexistente, cuenta
+// inactiva o bloqueo), no se lanza ninguna de las 6 consultas
+// siguientes.
+//
+// Las 6 consultas restantes se lanzan en paralelo con goroutines. Si
+// cualquiera falla, se devuelve el primer error encontrado (el orden
+// entre goroutines no está garantizado, pero con GetPublicByID ya
+// habiendo pasado, un fallo aquí sería un error de infraestructura,
+// no de negocio — cualquiera de los 6 sirve para reportarlo).
+func (s *Service) GetFullPublicProfile(ctx context.Context, viewerUserID, profileID uuid.UUID) (*FullProfile, error) {
+	profile, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		wg                 sync.WaitGroup
+		mu                 sync.Mutex
+		photos             []Photo
+		languages          []ProfileLanguage
+		interests          []ProfileInterest
+		personalityAnswers []ProfilePersonalityAnswer
+		personalityScores  []PersonalityTraitScore
+		partnerPrefs       *PartnerPreferences
+		firstErr           error
+	)
+
+	run := func(fn func() error) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := fn(); err != nil {
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = err
+				}
+				mu.Unlock()
+			}
+		}()
+	}
+
+	run(func() (err error) { photos, err = s.repo.ListPhotos(ctx, profileID); return })
+	run(func() (err error) { languages, err = s.repo.ListProfileLanguages(ctx, profileID); return })
+	run(func() (err error) { interests, err = s.repo.ListProfileInterests(ctx, profileID); return })
+	run(func() (err error) { personalityAnswers, err = s.repo.ListPersonalityAnswers(ctx, profileID); return })
+	run(func() (err error) { personalityScores, err = s.repo.GetPersonalityTraitScores(ctx, profileID); return })
+	run(func() (err error) { partnerPrefs, err = s.repo.GetPartnerPreferences(ctx, profileID); return })
+
+	wg.Wait()
+	if firstErr != nil {
+		return nil, firstErr
+	}
+
+	return &FullProfile{
+		Profile:            profile,
+		Photos:             photos,
+		Languages:          languages,
+		Interests:          interests,
+		PersonalityAnswers: personalityAnswers,
+		PersonalityScores:  personalityScores,
+		PartnerPreferences: partnerPrefs,
+	}, nil
 }
 
 func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, in CreateProfileInput) (*Profile, error) {

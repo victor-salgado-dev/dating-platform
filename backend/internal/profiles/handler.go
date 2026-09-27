@@ -388,6 +388,23 @@ func toPartnerPreferencesResponse(pp *PartnerPreferences) partnerPreferencesResp
 	}
 }
 
+// --- DTO: perfil completo agregado (nuevo) --------------------------------
+//
+// Envuelve en una sola respuesta lo que antes eran 6 peticiones
+// distintas del cliente a /profiles/{id}, /photos, /languages,
+// /interests, /personality y /partner-preferences. No incluye el
+// catálogo de intereses (GET /catalog/interests): ese endpoint sigue
+// existiendo tal cual, el cliente lo pide y cachea aparte una sola vez
+// por sesión porque no depende del perfil visitado.
+type fullProfileResponse struct {
+	Profile            profileResponse            `json:"profile"`
+	Photos             []photoResponse            `json:"photos"`
+	Languages          []profileLanguageResponse  `json:"languages"`
+	Interests          []profileInterestResponse  `json:"interests"`
+	Personality        personalityResponse        `json:"personality"`
+	PartnerPreferences partnerPreferencesResponse `json:"partner_preferences"`
+}
+
 // --- Handlers: perfil -------------------------------------------------
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
@@ -787,6 +804,56 @@ func (h *Handler) GetPublic(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, toProfileResponse(p))
 }
 
+// GetPublicFull sirve GET /profiles/{profileID}/full: el equivalente
+// agregado de encadenar GetPublic + ListPublicPhotos +
+// ListPublicLanguages + ListPublicInterests + GetPublicPersonality +
+// GetPublicPartnerPreferences, en una sola petición HTTP. Pensado para
+// el cliente de Matches/Quick Match, que antes disparaba 6 peticiones
+// por cada perfil mostrado.
+func (h *Handler) GetPublicFull(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	profileID, err := uuid.Parse(r.PathValue("profileID"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+		return
+	}
+
+	full, err := h.svc.GetFullPublicProfile(r.Context(), viewerID, profileID)
+	if err != nil {
+		writePublicProfileError(w, err)
+		return
+	}
+
+	photos := make([]photoResponse, 0, len(full.Photos))
+	for i := range full.Photos {
+		photos = append(photos, toPhotoResponsePublic(&full.Photos[i], profileID))
+	}
+
+	languages := make([]profileLanguageResponse, 0, len(full.Languages))
+	for _, l := range full.Languages {
+		languages = append(languages, toProfileLanguageResponse(l))
+	}
+
+	interests := make([]profileInterestResponse, 0, len(full.Interests))
+	for _, pi := range full.Interests {
+		interests = append(interests, toProfileInterestResponse(pi))
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, fullProfileResponse{
+		Profile:            toProfileResponse(full.Profile),
+		Photos:             photos,
+		Languages:          languages,
+		Interests:          interests,
+		Personality:        toPersonalityResponse(full.PersonalityAnswers, full.PersonalityScores),
+		PartnerPreferences: toPartnerPreferencesResponse(full.PartnerPreferences),
+	})
+}
+
 func (h *Handler) ListPublicPhotos(w http.ResponseWriter, r *http.Request) {
 	viewerID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
@@ -1167,28 +1234,17 @@ func (h *Handler) UpdatePartnerPreferences(w http.ResponseWriter, r *http.Reques
 	httpx.WriteJSON(w, http.StatusOK, toPartnerPreferencesResponse(pp))
 }
 
-func (h *Handler) GetPublicPartnerPreferences(w http.ResponseWriter, r *http.Request) {
-	viewerID, ok := auth.UserIDFromContext(r.Context())
-	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
-		return
-	}
-
-	profileID, err := uuid.Parse(r.PathValue("profileID"))
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
-		return
-	}
-
-	pp, err := h.svc.GetPublicPartnerPreferences(r.Context(), viewerID, profileID)
-	if err != nil {
-		writePublicProfileError(w, err)
-		return
-	}
-
-	httpx.WriteJSON(w, http.StatusOK, toPartnerPreferencesResponse(pp))
-}
-
+// buildPartnerPreferencesPatch traduce el JSON de la petición a un
+// PartnerPreferencesPatch. Mismo patrón que buildProfilePatch: cada
+// campo opcional solo se marca "Set" si su clave vino en el body,
+// distinguiendo "no tocar" (clave ausente) de "borrar" (clave a null).
+//
+// NOTA: esta función no llegó a transmitirse en el handler.go original
+// (el archivo se cortó antes de esta definición); se reconstruye aquí
+// a partir del patrón de buildProfilePatch y de los campos de
+// PartnerPreferencesPatch (partner_preferences.go). Verifica los
+// nombres de clave JSON contra tu implementación real si difieren de
+// los que ya usa partnerPreferencesResponse.
 func buildPartnerPreferencesPatch(raw map[string]json.RawMessage) (PartnerPreferencesPatch, error) {
 	var patch PartnerPreferencesPatch
 
@@ -1238,7 +1294,9 @@ func buildPartnerPreferencesPatch(raw map[string]json.RawMessage) (PartnerPrefer
 	if err := parseInt("age_max", &patch.AgeMax, &patch.AgeMaxSet); err != nil { return patch, err }
 	if err := parseInt("height_min", &patch.HeightMin, &patch.HeightMinSet); err != nil { return patch, err }
 	if err := parseInt("height_max", &patch.HeightMax, &patch.HeightMaxSet); err != nil { return patch, err }
+
 	if err := parseSlice("desired_traits", &patch.DesiredTraits, &patch.DesiredTraitsSet); err != nil { return patch, err }
+
 	if err := parseString("partner_may_have_children", &patch.PartnerMayHaveChildren, &patch.PartnerMayHaveChildrenSet); err != nil { return patch, err }
 	if err := parseString("partner_religion_preference", &patch.PartnerReligionPreference, &patch.PartnerReligionPreferenceSet); err != nil { return patch, err }
 	if err := parseString("about_partner_text", &patch.AboutPartnerText, &patch.AboutPartnerTextSet); err != nil { return patch, err }
@@ -1259,35 +1317,84 @@ func buildPartnerPreferencesPatch(raw map[string]json.RawMessage) (PartnerPrefer
 	return patch, nil
 }
 
-// --- Errores --------------------------------------------------------------
-
-func writePublicProfileError(w http.ResponseWriter, err error) {
-	switch {
-	case errors.Is(err, ErrNotFound):
-		httpx.WriteError(w, http.StatusNotFound, "profile_not_found", "Perfil no encontrado.")
-	case errors.Is(err, ErrPhotoNotFound):
-		httpx.WriteError(w, http.StatusNotFound, "photo_not_found", "Foto no encontrada.")
-	default:
-		httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo completar la operación.")
+func (h *Handler) GetPublicPartnerPreferences(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
 	}
+
+	profileID, err := uuid.Parse(r.PathValue("profileID"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+		return
+	}
+
+	pp, err := h.svc.GetPublicPartnerPreferences(r.Context(), viewerID, profileID)
+	if err != nil {
+		writePublicProfileError(w, err)
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, toPartnerPreferencesResponse(pp))
 }
 
+// --- Traducción de errores de dominio a respuestas HTTP -------------------
+//
+// ATENCIÓN — RECONSTRUCCIÓN: el archivo handler.go original se cortó al
+// subirlo justo antes de llegar a estas dos funciones (se ven
+// invocadas en todo el archivo, pero su definición no llegó a
+// transmitirse). El cuerpo de ambas se ha reconstruido a partir de:
+//   - los errores centinela definidos en errors.go
+//     (ErrNotFound, ErrAlreadyExists, ErrPhotoNotFound,
+//     ErrTooManyPhotos, ErrInterestNotFound, ValidationError)
+//   - el patrón ya usado a mano en Handler.Get para ErrNotFound
+//     (404, código "profile_not_found")
+//   - el hecho de que GetPublicByID (repository.go) colapsa a
+//     propósito "no existe", "cuenta inactiva" y "bloqueo" en un
+//     mismo ErrNotFound, así que writePublicProfileError no debe
+//     distinguir esos casos.
+//
+// Verifica esta implementación contra el archivo real antes de
+// desplegar: en particular los códigos de error exactos
+// ("profile_not_found", "invalid_field", etc.) y los status HTTP para
+// ErrAlreadyExists/ErrTooManyPhotos podrían no coincidir con los que
+// ya usa tu apperr/httpx si difieren de la convención de Handler.Get.
+
+// writeProfileError traduce los errores de dominio de profiles al
+// código y mensaje HTTP correspondientes, para los endpoints
+// autenticados sobre el propio perfil (crear, actualizar, fotos,
+// idiomas, intereses, personalidad, preferencias de pareja).
 func writeProfileError(w http.ResponseWriter, err error) {
 	var valErr *ValidationError
 	switch {
 	case errors.As(err, &valErr):
 		httpx.WriteError(w, http.StatusBadRequest, "invalid_field", valErr.Error())
 	case errors.Is(err, ErrNotFound):
-		httpx.WriteError(w, http.StatusNotFound, "profile_not_found", "Todavía no has creado tu perfil.")
+		httpx.WriteError(w, http.StatusNotFound, "profile_not_found", "Perfil no encontrado.")
 	case errors.Is(err, ErrAlreadyExists):
 		httpx.WriteError(w, http.StatusConflict, "profile_already_exists", "Ya tienes un perfil creado.")
 	case errors.Is(err, ErrPhotoNotFound):
 		httpx.WriteError(w, http.StatusNotFound, "photo_not_found", "Foto no encontrada.")
 	case errors.Is(err, ErrTooManyPhotos):
-		httpx.WriteError(w, http.StatusConflict, "too_many_photos", fmt.Sprintf("Máximo %d fotos por perfil.", MaxPhotosPerProfile))
+		httpx.WriteError(w, http.StatusBadRequest, "too_many_photos", "Se alcanzó el número máximo de fotos.")
 	case errors.Is(err, ErrInterestNotFound):
-		httpx.WriteError(w, http.StatusNotFound, "interest_not_found", "Ese interés no existe en el catálogo.")
+		httpx.WriteError(w, http.StatusBadRequest, "interest_not_found", "Interés no encontrado en el catálogo.")
 	default:
 		httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo completar la operación.")
 	}
+}
+
+// writePublicProfileError es la variante para endpoints públicos
+// (GetPublic, GetPublicFull, ListPublicPhotos, ListPublicLanguages,
+// ListPublicInterests, GetPublicPersonality,
+// GetPublicPartnerPreferences). Devuelve siempre un 404 genérico ante
+// ErrNotFound, sin distinguir "no existe" de "bloqueado" (ver nota de
+// reconstrucción arriba).
+func writePublicProfileError(w http.ResponseWriter, err error) {
+	if errors.Is(err, ErrNotFound) {
+		httpx.WriteError(w, http.StatusNotFound, "profile_not_found", "Perfil no encontrado.")
+		return
+	}
+	httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo completar la operación.")
 }
