@@ -7,7 +7,8 @@
 // memoria (y una sola tanda de peticiones) durante la sesión de navegación.
 
 import { useEffect, useSyncExternalStore } from 'react';
-import { apiFetch, LikesResponse, FavoritesResponse } from '@/lib/api';
+import { apiFetch } from '@/lib/api';
+import type { LikesResponse, FavoritesResponse } from '@/lib/api';
 
 interface InteractionsCache {
   likedIds: Set<string>;
@@ -35,6 +36,10 @@ function emitChange() {
 
 function getSnapshot(): InteractionsCache {
   return cache ?? emptyCache;
+}
+
+function getServerSnapshot(): InteractionsCache {
+  return emptyCache;
 }
 
 function subscribe(listener: () => void): () => void {
@@ -69,7 +74,7 @@ function loadInteractions(): Promise<InteractionsCache> {
 }
 
 export function useProfileInteractions() {
-  const snapshot = useSyncExternalStore(subscribe, getSnapshot);
+  const snapshot = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   useEffect(() => {
     loadInteractions();
