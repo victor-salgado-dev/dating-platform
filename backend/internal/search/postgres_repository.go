@@ -199,11 +199,6 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		add("p.vacation_activities && $%d", f.VacationActivities)
 	}
 
-	// --- NUEVOS FILTROS: Hobbies (Fase 2) -------------------------------
-	for _, hf := range f.Hobbies {
-		where = append(where, hobbyExistsClause(hf, &args))
-	}
-
 	// --- NUEVOS FILTROS: Personalidad (Fase 2) ---------------------------
 	for _, pf := range f.PersonalityTraits {
 		where = append(where, personalityExistsClause(pf, &args))
@@ -286,28 +281,6 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		PageSize:   params.PageSize,
 		TotalPages: totalPages,
 	}, nil
-}
-
-func hobbyExistsClause(hf HobbyFilter, args *[]any) string {
-	*args = append(*args, hf.Key)
-	keyArg := len(*args)
-
-	var b strings.Builder
-	fmt.Fprintf(&b, `EXISTS (
-		SELECT 1 FROM profile_hobbies ph
-		WHERE ph.profile_id = p.id AND ph.hobby_key = $%d AND ph.liked = true`, keyArg)
-
-	if hf.Min != nil {
-		*args = append(*args, *hf.Min)
-		fmt.Fprintf(&b, " AND ph.intensity >= $%d", len(*args))
-	}
-	if hf.Max != nil {
-		*args = append(*args, *hf.Max)
-		fmt.Fprintf(&b, " AND ph.intensity <= $%d", len(*args))
-	}
-	b.WriteString(")")
-
-	return b.String()
 }
 
 func personalityExistsClause(pf PersonalityFilter, args *[]any) string {

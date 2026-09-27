@@ -31,29 +31,15 @@ const (
 	MaxSearchAge    = 120
 )
 
-// HobbyFilter exige que el perfil haya marcado un hobby del catálogo
-// como "me gusta" (liked=true). Si Min y/o Max no son nil, además exige
-// que la intensidad caiga en ese rango (ambos límites inclusive).
-//
-// Un perfil que no contestó ese hobby, o que contestó "no me gusta",
-// nunca cumple este filtro: es la misma REGLA DE LOS DATOS FALTANTES
-// del resto de Filters, aplicada a una tabla aparte (profile_hobbies)
-// en vez de a una columna de profiles.
-type HobbyFilter struct {
-	Key string
-	Min *int
-	Max *int
-}
-
 // PersonalityFilter exige que la media de un rasgo de personalidad
 // (calculada por profiles sobre las afirmaciones contestadas) caiga en
 // el rango [Min, Max] (ambos límites inclusive si no son nil). Un
 // perfil que no ha contestado ninguna afirmación de ese rasgo no tiene
 // media y nunca cumple el filtro — misma regla de datos faltantes.
 //
-// A diferencia de HobbyFilter, aquí no tiene sentido un filtro sin
-// ningún límite (no hay equivalente a "liked" para un rasgo), así que
-// siempre debe traer Min y/o Max.
+// A diferencia de un filtro de pertenencia simple, aquí no tiene
+// sentido un filtro sin ningún límite, así que siempre debe traer
+// Min y/o Max.
 type PersonalityFilter struct {
 	TraitKey string
 	Min      *float64
@@ -61,9 +47,9 @@ type PersonalityFilter struct {
 }
 
 // RawBounds son los límites min/max de un filtro con clave dinámica
-// (un hobby o un rasgo de personalidad concretos), todavía sin
-// parsear ni validar: llegan como texto desde la query string
-// (?hobby_travelling_min=4, ?trait_openness_max=3...).
+// (un rasgo de personalidad concreto), todavía sin parsear ni
+// validar: llegan como texto desde la query string
+// (?trait_openness_max=3...).
 type RawBounds struct {
 	Min string
 	Max string
@@ -125,10 +111,9 @@ type Filters struct {
 	IdealVacationStyle []string
 	VacationActivities []string
 
-	// --- NUEVOS: Hobbies y personalidad (Fase 2) -------------------
+	// --- Personalidad (Fase 2) --------------------------------------
 	// Varios filtros se combinan con AND: el perfil tiene que cumplir
-	// TODOS los que se pidan (ej: jardinería<4 Y viajar>3 a la vez).
-	Hobbies           []HobbyFilter
+	// TODOS los rasgos que se pidan a la vez.
 	PersonalityTraits []PersonalityFilter
 }
 

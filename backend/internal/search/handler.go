@@ -104,9 +104,7 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 		IdealVacationStyle: splitMulti(q["ideal_vacation_style"]),
 		VacationActivities: splitMulti(q["vacation_activities"]),
 
-		// --- Hobbies y personalidad (Fase 2) ---
-		Hobbies:                splitMulti(q["hobby"]),
-		HobbyBounds:            parseKeyedBounds(q, "hobby_"),
+		// --- Personalidad (Fase 2) ---
 		PersonalityTraitBounds: parseKeyedBounds(q, "trait_"),
 	}
 

@@ -63,9 +63,7 @@ type RawQuery struct {
 	IdealVacationStyle []string
 	VacationActivities []string
 
-	// --- NUEVOS: Hobbies y personalidad (Fase 2) -----------------------
-	Hobbies                []string
-	HobbyBounds            map[string]RawBounds
+	// --- NUEVO: Personalidad (Fase 2) -----------------------------------
 	PersonalityTraitBounds map[string]RawBounds
 }
 
@@ -262,40 +260,6 @@ func buildParams(excludeUserID uuid.UUID, raw RawQuery) (Params, error) {
 	f.IdealVacationStyle = cleanSlice(raw.IdealVacationStyle)
 	f.VacationActivities = cleanSlice(raw.VacationActivities)
 
-	// --- NUEVO: Hobbies -----------------------------------------------
-	hobbyFilters := map[string]HobbyFilter{}
-	for _, key := range raw.Hobbies {
-		key = strings.TrimSpace(key)
-		if key == "" {
-			continue
-		}
-		if _, exists := hobbyFilters[key]; !exists {
-			hobbyFilters[key] = HobbyFilter{Key: key}
-		}
-	}
-	for key, bounds := range raw.HobbyBounds {
-		key = strings.TrimSpace(key)
-		if key == "" {
-			continue
-		}
-		hf := hobbyFilters[key]
-		hf.Key = key
-
-		if hf.Min, err = parseInt(fmt.Sprintf("hobby_%s_min", key), bounds.Min, profiles.MinHobbyIntensity, profiles.MaxHobbyIntensity); err != nil {
-			return Params{}, err
-		}
-		if hf.Max, err = parseInt(fmt.Sprintf("hobby_%s_max", key), bounds.Max, profiles.MinHobbyIntensity, profiles.MaxHobbyIntensity); err != nil {
-			return Params{}, err
-		}
-		if hf.Min != nil && hf.Max != nil && *hf.Min > *hf.Max {
-			return Params{}, invalidParam(fmt.Sprintf("hobby_%s_min", key), "no puede ser mayor que el máximo")
-		}
-		hobbyFilters[key] = hf
-	}
-	for _, key := range sortedKeys(hobbyFilters) {
-		f.Hobbies = append(f.Hobbies, hobbyFilters[key])
-	}
-
 	// --- NUEVO: Personalidad -------------------------------------------
 	traitKeys := make([]string, 0, len(raw.PersonalityTraitBounds))
 	for key := range raw.PersonalityTraitBounds {
@@ -368,15 +332,6 @@ func buildParams(excludeUserID uuid.UUID, raw RawQuery) (Params, error) {
 		Page:          page,
 		PageSize:      pageSize,
 	}, nil
-}
-
-func sortedKeys(m map[string]HobbyFilter) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	sort.Strings(keys)
-	return keys
 }
 
 func parseAge(field, raw string) (int, error) {
