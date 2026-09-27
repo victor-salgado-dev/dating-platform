@@ -16,6 +16,20 @@ export class ApiError extends Error {
   }
 }
 
+// Duración de la caché de respuestas GET en milisegundos.
+// Con 60 segundos evitamos la mayoría de duplicados al navegar entre páginas,
+// sin mantener datos obsoletos durante mucho tiempo.
+const GET_CACHE_TTL = 60_000;
+
+// Caché de respuestas GET exitosas. Solo se usa en el navegador.
+// La limpiamos después de cada mutación para que las siguientes GETs
+// reflejen los cambios reales.
+const getCache = new Map<string, { data: unknown; expiresAt: number }>();
+
+function clearGetCache() {
+  getCache.clear();
+}
+
 // Deduplicación de peticiones GET idénticas que están en curso.
 // Si dos componentes intentan hacer la misma llamada al mismo tiempo,
 // solo se enviará una request al backend.
@@ -56,20 +70,45 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
   if (method === 'GET') {
     const key = `GET ${path}`;
+
+    // Solo usamos la caché en el cliente. Así evitamos compartir estado
+    // entre peticiones del servidor durante SSR/SSG.
+    if (typeof window !== 'undefined') {
+      const cached = getCache.get(key);
+      if (cached && cached.expiresAt > Date.now()) {
+        return cached.data as T;
+      }
+      if (cached) {
+        getCache.delete(key);
+      }
+    }
+
     const existing = inFlightRequests.get(key);
     if (existing) return existing as Promise<T>;
 
-    const promise = doApiFetch<T>(path, init);
-    inFlightRequests.set(key, promise);
+    const promise = doApiFetch<T>(path, init)
+      .then((data) => {
+        if (typeof window !== 'undefined') {
+          getCache.set(key, { data, expiresAt: Date.now() + GET_CACHE_TTL });
+        }
+        return data;
+      })
+      .finally(() => {
+        inFlightRequests.delete(key);
+      });
 
-    try {
-      return await promise;
-    } finally {
-      inFlightRequests.delete(key);
-    }
+    inFlightRequests.set(key, promise);
+    return promise;
   }
 
-  return doApiFetch<T>(path, init);
+  // Para mutaciones POST/PUT/PATCH/DELETE no usamos la caché de GET.
+  // Tras una mutación exitosa, limpiamos la caché para que los datos
+  // posteriores estén actualizados.
+  const result = await doApiFetch<T>(path, init);
+  if (typeof window !== 'undefined') {
+    clearGetCache();
+  }
+  return result;
 }
 
 // --- Tipos que reflejan las respuestas del backend (Fases 5 y 6) ---------
