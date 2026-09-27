@@ -1167,6 +1167,28 @@ func (h *Handler) UpdatePartnerPreferences(w http.ResponseWriter, r *http.Reques
 	httpx.WriteJSON(w, http.StatusOK, toPartnerPreferencesResponse(pp))
 }
 
+func (h *Handler) GetPublicPartnerPreferences(w http.ResponseWriter, r *http.Request) {
+	viewerID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	profileID, err := uuid.Parse(r.PathValue("profileID"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+		return
+	}
+
+	pp, err := h.svc.GetPublicPartnerPreferences(r.Context(), viewerID, profileID)
+	if err != nil {
+		writePublicProfileError(w, err)
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, toPartnerPreferencesResponse(pp))
+}
+
 func buildPartnerPreferencesPatch(raw map[string]json.RawMessage) (PartnerPreferencesPatch, error) {
 	var patch PartnerPreferencesPatch
 

@@ -578,6 +578,13 @@ func (s *Service) GetMyPartnerPreferences(ctx context.Context, userID uuid.UUID)
 	return s.repo.GetPartnerPreferences(ctx, profile.ID)
 }
 
+func (s *Service) GetPublicPartnerPreferences(ctx context.Context, viewerUserID, profileID uuid.UUID) (*PartnerPreferences, error) {
+	if _, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID); err != nil {
+		return nil, err
+	}
+	return s.repo.GetPartnerPreferences(ctx, profileID)
+}
+
 func (s *Service) UpdatePartnerPreferences(ctx context.Context, userID uuid.UUID, patch PartnerPreferencesPatch) (*PartnerPreferences, error) {
 	if patch.AgeMinSet && patch.AgeMaxSet && patch.AgeMin != nil && patch.AgeMax != nil && *patch.AgeMin > *patch.AgeMax {
 		return nil, invalidField("age_min", "no puede ser mayor que age_max")

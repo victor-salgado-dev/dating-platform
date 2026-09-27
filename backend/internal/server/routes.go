@@ -127,6 +127,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/profiles/{profileID}/languages", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListPublicLanguages)))
 	mux.Handle("GET /api/v1/profiles/{profileID}/interests", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListPublicInterests)))
 	mux.Handle("GET /api/v1/profiles/{profileID}/personality", requireAuth(http.HandlerFunc(deps.ProfilesHandler.GetPublicPersonality)))
+	mux.Handle("GET /api/v1/profiles/{profileID}/partner-preferences", requireAuth(http.HandlerFunc(deps.ProfilesHandler.GetPublicPartnerPreferences)))
 
 	// --- Search (Fase 5) ------------------------------------------------
 	mux.Handle("GET /api/v1/search/profiles", requireAuth(http.HandlerFunc(deps.SearchHandler.Search)))
