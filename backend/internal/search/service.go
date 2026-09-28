@@ -68,6 +68,10 @@ type RawQuery struct {
 
 	// --- NUEVO: Personalidad (Fase 2) -----------------------------------
 	PersonalityTraitBounds map[string]RawBounds
+
+	// OnlineNow no proviene del query string. Lo asigna directamente el
+	// handler OnlineNow para activar el filtrado por last_active_at.
+	OnlineNow bool
 }
 
 type Service struct {
@@ -332,6 +336,9 @@ func buildParams(excludeUserID uuid.UUID, raw RawQuery) (Params, error) {
 
 		f.PersonalityTraits = append(f.PersonalityTraits, pf)
 	}
+
+	// --- Fin filtros, activar OnlineNow si procede ---
+	f.OnlineNow = raw.OnlineNow
 
 	// Ordenación y Paginación
 	sortValue := Sort(raw.Sort)

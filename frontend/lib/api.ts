@@ -155,6 +155,9 @@ export type NewMembersResponse = {
   total_pages: number;
 };
 
+// OnlineNow usa la misma forma reducida que NewMembers.
+export type OnlineNowResponse = NewMembersResponse;
+
 // PublicProfile refleja profileResponse del handler de profiles.
 //
 // OJO con dos cambios de contrato respecto a versiones anteriores:

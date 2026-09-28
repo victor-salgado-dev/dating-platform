@@ -142,6 +142,12 @@ type Filters struct {
 	// Varios filtros se combinan con AND: el perfil tiene que cumplir
 	// TODOS los rasgos que se pidan a la vez.
 	PersonalityTraits []PersonalityFilter
+
+	// OnlineNow es true cuando la búsqueda procede del endpoint
+	// /search/online-now y debe limitar los resultados a perfiles con
+	// usuarios activos recientemente. No se puede activar desde el
+	// query string: lo fija el handler.
+	OnlineNow bool
 }
 
 // Params agrupa los filtros con la paginación/ordenación y quién busca

@@ -13,7 +13,7 @@ import styles from './page.module.css';
 // popular y online quedan como "próximamente".
 type HomeTab = 'recommended' | 'popular' | 'online' | 'new';
 
-const COMING_SOON_TABS: HomeTab[] = ['popular', 'online'];
+const COMING_SOON_TABS: HomeTab[] = ['popular'];
 
 // -----------------------------------------------------------------------------
 // Página Principal
@@ -35,7 +35,7 @@ export default function HomePage() {
   const lastFetchedPage = useRef<number | null>(null);
 
   // Cargar perfiles recomendados. Solo la pestaña recommended pide datos
-  // reales desde Home; new navega a /new-members.
+  // reales desde Home; new y online navegan a sus propias páginas.
   useEffect(() => {
     if (activeTab !== 'recommended') return;
     if (lastFetchedPage.current === page) return;
@@ -76,6 +76,10 @@ export default function HomePage() {
               onClick={() => {
                 if (tab === 'new') {
                   router.push('/new-members');
+                  return;
+                }
+                if (tab === 'online') {
+                  router.push('/online-now');
                   return;
                 }
                 setActiveTab(tab);

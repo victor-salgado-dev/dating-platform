@@ -11,6 +11,8 @@ import (
 	"dating-platform/backend/internal/profiles"
 )
 
+const onlineNowWindowSeconds = 15 * 60
+
 type PostgresRepository struct {
 	db *pgxpool.Pool
 }
@@ -203,7 +205,16 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		where = append(where, personalityExistsClause(pf, &args))
 	}
 
+	// --- Filtro Online Now -------------------------------------------------
+	if f.OnlineNow {
+		add("u.last_active_at >= now() - ($%d * interval '1 second')", onlineNowWindowSeconds)
+	}
+
 	orderBy := orderByClause(params.Sort)
+	if f.OnlineNow {
+		// En online-now prima la actividad reciente, no la creación reciente.
+		orderBy = "u.last_active_at DESC, p.id ASC"
+	}
 
 	limitArg := len(args) + 1
 	offsetArg := len(args) + 2
