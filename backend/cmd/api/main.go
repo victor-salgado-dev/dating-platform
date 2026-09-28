@@ -147,6 +147,10 @@ func main() {
 	blockingService := blocking.NewService(blockingRepo, profilesRepo)
 	blockingHandler := blocking.NewHandler(blockingService)
 
+	// Inyectar colaboradores para que GetFullPublicProfile pueda
+	// devolver estado de interacción y registrar la visita.
+	profilesService.SetInteractionDeps(favoritesService, likesService, blockingService, visitsService)
+
 	messagingRepo := messaging.NewPostgresRepository(pool)
 	messagingService := messaging.NewService(messagingRepo, profilesRepo, blockingRepo)
 	messagingHandler := messaging.NewHandler(messagingService)

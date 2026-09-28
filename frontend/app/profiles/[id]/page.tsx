@@ -27,8 +27,23 @@ export default function ProfilePage() {
   const router = useRouter();
   const { dictionary } = useI18n();
 
-  const { profile, photos, languages, interestCatalog, theirInterests, personality, partnerPrefs, loading, notFound, unauthorized } =
-    useFullProfile(params?.id);
+  const fullProfileData = useFullProfile(params?.id);
+  const {
+    profile,
+    photos,
+    languages,
+    interestCatalog,
+    theirInterests,
+    personality,
+    partnerPrefs,
+    loading,
+    notFound,
+    unauthorized,
+    favorited: profileFavorited,
+    liked: profileLiked,
+    matched: profileMatched,
+    blocked: profileBlocked,
+  } = fullProfileData;
 
   const [favorited, setFavorited] = useState<boolean | null>(null);
   const [favoriteBusy, setFavoriteBusy] = useState(false);
@@ -48,18 +63,22 @@ export default function ProfilePage() {
   const [reportSent, setReportSent] = useState(false);
   const [reportError, setReportError] = useState<string | null>(null);
 
-  // Registrar visita + estado de like/favorito/bloqueo. Separado de
-  // useFullProfile porque esto es interacción del visitante, no datos del
-  // perfil visitado (Quick Match no necesita nada de esto).
+  // Sincroniza el estado local con los datos consolidados del perfil.
   useEffect(() => {
-    if (!params?.id) return;
-    apiFetch(`/visits/${params.id}`, { method: 'POST' }).catch(() => {});
-    apiFetch<{ favorited: boolean }>(`/favorites/${params.id}`).then((s) => setFavorited(s.favorited)).catch(() => setFavorited(null));
-    apiFetch<{ liked: boolean; matched: boolean }>(`/likes/${params.id}`)
-      .then((s) => { setLiked(s.liked); setMatched(s.matched); })
-      .catch(() => setLiked(null));
-    apiFetch<{ blocked: boolean }>(`/blocks/${params.id}`).then((s) => setBlocked(s.blocked)).catch(() => setBlocked(null));
-  }, [params?.id]);
+    if (!loading && profile) {
+      setFavorited(fullProfileData.favorited);
+      setLiked(fullProfileData.liked);
+      setMatched(fullProfileData.matched);
+      setBlocked(fullProfileData.blocked);
+    }
+  }, [
+    loading,
+    profile,
+    fullProfileData.favorited,
+    fullProfileData.liked,
+    fullProfileData.matched,
+    fullProfileData.blocked,
+  ]);
 
   async function toggleFavorite() {
     if (!params?.id || favorited === null || favoriteBusy) return;

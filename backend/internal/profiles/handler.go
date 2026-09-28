@@ -389,20 +389,19 @@ func toPartnerPreferencesResponse(pp *PartnerPreferences) partnerPreferencesResp
 }
 
 // --- DTO: perfil completo agregado (nuevo) --------------------------------
-//
-// Envuelve en una sola respuesta lo que antes eran 6 peticiones
-// distintas del cliente a /profiles/{id}, /photos, /languages,
-// /interests, /personality y /partner-preferences. No incluye el
-// catálogo de intereses (GET /catalog/interests): ese endpoint sigue
-// existiendo tal cual, el cliente lo pide y cachea aparte una sola vez
-// por sesión porque no depende del perfil visitado.
 type fullProfileResponse struct {
-	Profile            profileResponse            `json:"profile"`
-	Photos             []photoResponse            `json:"photos"`
-	Languages          []profileLanguageResponse  `json:"languages"`
-	Interests          []profileInterestResponse  `json:"interests"`
-	Personality        personalityResponse        `json:"personality"`
-	PartnerPreferences partnerPreferencesResponse `json:"partner_preferences"`
+	Profile            profileResponse              `json:"profile"`
+	Photos             []photoResponse              `json:"photos"`
+	Languages          []profileLanguageResponse    `json:"languages"`
+	Interests          []profileInterestResponse    `json:"interests"`
+	InterestCatalog    []interestDefinitionResponse `json:"interest_catalog"`
+	Personality        personalityResponse          `json:"personality"`
+	PartnerPreferences partnerPreferencesResponse   `json:"partner_preferences"`
+
+	Favorited bool `json:"favorited"`
+	Liked     bool `json:"liked"`
+	Matched   bool `json:"matched"`
+	Blocked   bool `json:"blocked"`
 }
 
 // --- Handlers: perfil -------------------------------------------------
@@ -809,7 +808,8 @@ func (h *Handler) GetPublic(w http.ResponseWriter, r *http.Request) {
 // ListPublicLanguages + ListPublicInterests + GetPublicPersonality +
 // GetPublicPartnerPreferences, en una sola petición HTTP. Pensado para
 // el cliente de Matches/Quick Match, que antes disparaba 6 peticiones
-// por cada perfil mostrado.
+// por cada perfil mostrado. Ahora también devuelve el catálogo de
+// intereses y los flags de interacción del visitante.
 func (h *Handler) GetPublicFull(w http.ResponseWriter, r *http.Request) {
 	viewerID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
@@ -844,13 +844,23 @@ func (h *Handler) GetPublicFull(w http.ResponseWriter, r *http.Request) {
 		interests = append(interests, toProfileInterestResponse(pi))
 	}
 
+	interestCatalog := make([]interestDefinitionResponse, 0, len(full.InterestCatalog))
+	for _, def := range full.InterestCatalog {
+		interestCatalog = append(interestCatalog, toInterestDefinitionResponse(def))
+	}
+
 	httpx.WriteJSON(w, http.StatusOK, fullProfileResponse{
 		Profile:            toProfileResponse(full.Profile),
 		Photos:             photos,
 		Languages:          languages,
 		Interests:          interests,
+		InterestCatalog:    interestCatalog,
 		Personality:        toPersonalityResponse(full.PersonalityAnswers, full.PersonalityScores),
 		PartnerPreferences: toPartnerPreferencesResponse(full.PartnerPreferences),
+		Favorited:          full.Favorited,
+		Liked:              full.Liked,
+		Matched:            full.Matched,
+		Blocked:            full.Blocked,
 	})
 }
 

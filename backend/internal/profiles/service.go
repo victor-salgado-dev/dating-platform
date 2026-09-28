@@ -81,6 +81,30 @@ var allowedPhotoTypes = map[string]string{
 	"image/webp": ".webp",
 }
 
+// FavoriteChecker resume la única operación de favoritos que necesita
+// el servicio de perfiles para calcular el estado del visitante.
+type FavoriteChecker interface {
+	IsFavorited(ctx context.Context, userID, profileID uuid.UUID) (bool, error)
+}
+
+// LikeChecker resume las operaciones de likes/matches necesarias para
+// calcular el estado del visitante.
+type LikeChecker interface {
+	IsLiked(ctx context.Context, fromProfileID, toProfileID uuid.UUID) (bool, error)
+	HasMatch(ctx context.Context, profileA, profileB uuid.UUID) (bool, error)
+}
+
+// BlockChecker resume la operación de bloqueo necesaria para saber si
+// existe bloqueo en cualquier sentido entre dos usuarios.
+type BlockChecker interface {
+	IsBlocked(ctx context.Context, userA, userB uuid.UUID) (bool, error)
+}
+
+// VisitRecorder permite registrar una visita a un perfil.
+type VisitRecorder interface {
+	Record(ctx context.Context, visitorProfileID, visitedProfileID uuid.UUID) error
+}
+
 // CreateProfileInput son los datos necesarios para crear un perfil.
 //
 // Ya no incluye Languages ni Interests: se gestionan aparte, un ítem
@@ -137,10 +161,27 @@ type CreateProfileInput struct {
 type Service struct {
 	repo    Repository
 	storage storage.Storage
+
+	favs   FavoriteChecker
+	likes  LikeChecker
+	blocks BlockChecker
+	visits VisitRecorder
 }
 
 func NewService(repo Repository, store storage.Storage) *Service {
 	return &Service{repo: repo, storage: store}
+}
+
+// SetInteractionDeps inyecta los colaboradores externos que hacen falta
+// para completar el estado de interacción en GetFullPublicProfile.
+// Se hace en un paso separado para no obligar a reordenar el wiring de
+// main.go: los servicios de interacción se crean después que el de
+// perfiles en el bootstrap actual.
+func (s *Service) SetInteractionDeps(favs FavoriteChecker, likes LikeChecker, blocks BlockChecker, visits VisitRecorder) {
+	s.favs = favs
+	s.likes = likes
+	s.blocks = blocks
+	s.visits = visits
 }
 
 func (s *Service) GetMyProfile(ctx context.Context, userID uuid.UUID) (*Profile, error) {
@@ -179,37 +220,40 @@ func (s *Service) OpenPublicPhoto(ctx context.Context, viewerUserID, profileID, 
 // FullProfile agrupa todo lo que useFullProfile.ts (frontend) pedía por
 // separado en 6 peticiones distintas (perfil, fotos, idiomas,
 // intereses, respuestas/puntuaciones de personalidad y preferencias de
-// pareja). No incluye el catálogo de intereses (ver
-// Service.ListInterestCatalog): ese catálogo no depende del perfil
-// visitado y el frontend ya lo cachea por sesión, así que incluirlo
-// aquí solo duplicaría datos en cada respuesta.
+// pareja) más el catálogo de intereses y el estado de interacción del
+// visitante.
 type FullProfile struct {
 	Profile            *Profile
 	Photos             []Photo
 	Languages          []ProfileLanguage
 	Interests          []ProfileInterest
+	InterestCatalog    []InterestDefinition
 	PersonalityAnswers []ProfilePersonalityAnswer
 	PersonalityScores  []PersonalityTraitScore
 	PartnerPreferences *PartnerPreferences
+
+	Favorited bool
+	Liked     bool
+	Matched   bool
+	Blocked   bool
 }
 
 // GetFullPublicProfile resuelve en una sola llamada de servicio lo que
-// antes requería 6 peticiones HTTP del cliente. La comprobación de
-// visibilidad (cuenta activa, sin bloqueos en ningún sentido) se hace
-// primero y de forma bloqueante via GetPublicByID, exactamente igual
-// que en GetPublicProfile: si esa falla (perfil inexistente, cuenta
-// inactiva o bloqueo), no se lanza ninguna de las 6 consultas
-// siguientes.
-//
-// Las 6 consultas restantes se lanzan en paralelo con goroutines. Si
-// cualquiera falla, se devuelve el primer error encontrado (el orden
-// entre goroutines no está garantizado, pero con GetPublicByID ya
-// habiendo pasado, un fallo aquí sería un error de infraestructura,
-// no de negocio — cualquiera de los 6 sirve para reportarlo).
+// antes requería 6 peticiones HTTP del cliente. También carga el
+// catálogo de intereses y el estado de interacción del visitante, y
+// registra la visita si los colaboradores están inyectados.
 func (s *Service) GetFullPublicProfile(ctx context.Context, viewerUserID, profileID uuid.UUID) (*FullProfile, error) {
 	profile, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID)
 	if err != nil {
 		return nil, err
+	}
+
+	var viewerProfile *Profile
+	if s.likes != nil || s.favs != nil || s.visits != nil {
+		viewerProfile, err = s.repo.GetByUserID(ctx, viewerUserID)
+		if err != nil && !errors.Is(err, ErrNotFound) {
+			return nil, err
+		}
 	}
 
 	var (
@@ -218,10 +262,15 @@ func (s *Service) GetFullPublicProfile(ctx context.Context, viewerUserID, profil
 		photos             []Photo
 		languages          []ProfileLanguage
 		interests          []ProfileInterest
+		interestCatalog    []InterestDefinition
 		personalityAnswers []ProfilePersonalityAnswer
 		personalityScores  []PersonalityTraitScore
 		partnerPrefs       *PartnerPreferences
 		firstErr           error
+		favorited          bool
+		liked              bool
+		matched            bool
+		blocked            bool
 	)
 
 	run := func(fn func() error) {
@@ -241,13 +290,49 @@ func (s *Service) GetFullPublicProfile(ctx context.Context, viewerUserID, profil
 	run(func() (err error) { photos, err = s.repo.ListPhotos(ctx, profileID); return })
 	run(func() (err error) { languages, err = s.repo.ListProfileLanguages(ctx, profileID); return })
 	run(func() (err error) { interests, err = s.repo.ListProfileInterests(ctx, profileID); return })
+	run(func() (err error) { interestCatalog, err = s.repo.ListInterestDefinitions(ctx); return })
 	run(func() (err error) { personalityAnswers, err = s.repo.ListPersonalityAnswers(ctx, profileID); return })
 	run(func() (err error) { personalityScores, err = s.repo.GetPersonalityTraitScores(ctx, profileID); return })
 	run(func() (err error) { partnerPrefs, err = s.repo.GetPartnerPreferences(ctx, profileID); return })
 
+	if s.favs != nil {
+		run(func() error {
+			var err error
+			favorited, err = s.favs.IsFavorited(ctx, viewerUserID, profileID)
+			return err
+		})
+	}
+
+	if s.likes != nil && viewerProfile != nil {
+		run(func() error {
+			var err error
+			liked, err = s.likes.IsLiked(ctx, viewerProfile.ID, profileID)
+			return err
+		})
+		run(func() error {
+			var err error
+			matched, err = s.likes.HasMatch(ctx, viewerProfile.ID, profileID)
+			return err
+		})
+	}
+
+	if s.blocks != nil {
+		run(func() error {
+			var err error
+			blocked, err = s.blocks.IsBlocked(ctx, viewerUserID, profile.UserID)
+			return err
+		})
+	}
+
 	wg.Wait()
 	if firstErr != nil {
 		return nil, firstErr
+	}
+
+	if s.visits != nil && viewerProfile != nil && viewerProfile.ID != profileID {
+		if err := s.visits.Record(ctx, viewerProfile.ID, profileID); err != nil {
+			slog.Error("no se pudo registrar la visita", "error", err)
+		}
 	}
 
 	return &FullProfile{
@@ -255,9 +340,14 @@ func (s *Service) GetFullPublicProfile(ctx context.Context, viewerUserID, profil
 		Photos:             photos,
 		Languages:          languages,
 		Interests:          interests,
+		InterestCatalog:    interestCatalog,
 		PersonalityAnswers: personalityAnswers,
 		PersonalityScores:  personalityScores,
 		PartnerPreferences: partnerPrefs,
+		Favorited:          favorited,
+		Liked:              liked,
+		Matched:            matched,
+		Blocked:            blocked,
 	}, nil
 }
 

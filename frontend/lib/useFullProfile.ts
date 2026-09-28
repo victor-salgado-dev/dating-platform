@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from '@/lib/api';
 import type {
+  FullProfileEnvelope,
   PublicProfile,
   ProfilePhoto,
   ProfileLanguage,
@@ -12,36 +13,6 @@ import type {
   PartnerPreferences,
 } from '@/lib/api';
 
-// Envelope devuelto por GET /profiles/{id}/full (backend: Handler.GetPublicFull
-// en internal/profiles/handler.go). Sustituye a las 6 peticiones
-// separadas que hacía este archivo antes (profile, photos, languages,
-// interests, personality, partner-preferences): ahora es una sola
-// llamada HTTP. El catálogo de intereses NO viene en este envelope a
-// propósito — no depende del perfil visitado, así que se sigue
-// pidiendo y cacheando aparte más abajo (interestCatalogCache).
-type FullProfileEnvelope = {
-  profile: PublicProfile;
-  photos: ProfilePhoto[];
-  languages: ProfileLanguage[];
-  interests: ProfileInterest[];
-  personality: PersonalityResponse;
-  partner_preferences: PartnerPreferences;
-};
-
-// Catálogo de intereses: no depende del id visitado, se pide una sola vez
-// y se comparte entre tarjetas (evita re-pedirlo en cada swipe de Quick Match).
-let interestCatalogCache: InterestDefinition[] | null = null;
-
-// Caché en memoria por perfil visitado. Vive durante la sesión de
-// navegación (igual que useProfileInteractions), así que volver a un
-// perfil ya visto -p.ej. "Anterior" en Quick Match- no vuelve a lanzar
-// la petición.
-const profileDataCache = new Map<string, Omit<FullProfileData, 'loading'>>();
-
-// Promesas en vuelo por perfil. Evita que dos componentes pidan el mismo
-// perfil a la vez y lancen una segunda tanda de peticiones.
-const profileDataPromises = new Map<string, Promise<Omit<FullProfileData, 'loading'>>>();
-
 export interface FullProfileData {
   profile: PublicProfile | null;
   photos: ProfilePhoto[];
@@ -50,6 +21,10 @@ export interface FullProfileData {
   theirInterests: ProfileInterest[];
   personality: PersonalityResponse | null;
   partnerPrefs: PartnerPreferences | null;
+  favorited: boolean;
+  liked: boolean;
+  matched: boolean;
+  blocked: boolean;
   loading: boolean;
   notFound: boolean;
   unauthorized: boolean;
@@ -63,39 +38,43 @@ const EMPTY: FullProfileData = {
   theirInterests: [],
   personality: null,
   partnerPrefs: null,
+  favorited: false,
+  liked: false,
+  matched: false,
+  blocked: false,
   loading: true,
   notFound: false,
   unauthorized: false,
 };
 
+// Caché en memoria por perfil visitado. Vive durante la sesión de
+// navegación (igual que useProfileInteractions), así que volver a un
+// perfil ya visto -p.ej. "Anterior" en Quick Match- no vuelve a lanzar
+// la petición.
+const profileDataCache = new Map<string, Omit<FullProfileData, 'loading'>>();
+
+// Promesas en vuelo por perfil. Evita que dos componentes pidan el mismo
+// perfil a la vez y lancen una segunda tanda de peticiones.
+const profileDataPromises = new Map<string, Promise<Omit<FullProfileData, 'loading'>>>();
+
 function fetchFullProfile(id: string): Promise<Omit<FullProfileData, 'loading'>> {
-  // Si ya hay una petición en curso para este id, devolvemos esa misma
-  // promesa. Así, si dos componentes se montan al mismo tiempo, solo se
-  // hará una única carga.
   const existing = profileDataPromises.get(id);
   if (existing) return existing;
 
-  const catalogPromise = interestCatalogCache
-    ? Promise.resolve(interestCatalogCache)
-    : apiFetch<InterestDefinition[]>('/catalog/interests')
-        .then((c) => {
-          interestCatalogCache = c;
-          return c;
-        })
-        .catch(() => [] as InterestDefinition[]);
-
   const promise = apiFetch<FullProfileEnvelope>(`/profiles/${id}/full`)
-    .then(async (envelope) => {
-      const interestCatalog = await catalogPromise;
-
+    .then((envelope) => {
       const resolved: Omit<FullProfileData, 'loading'> = {
         profile: envelope.profile,
         photos: envelope.photos,
         languages: envelope.languages,
-        interestCatalog,
+        interestCatalog: envelope.interest_catalog,
         theirInterests: envelope.interests,
         personality: envelope.personality,
         partnerPrefs: envelope.partner_preferences,
+        favorited: envelope.favorited,
+        liked: envelope.liked,
+        matched: envelope.matched,
+        blocked: envelope.blocked,
         notFound: false,
         unauthorized: false,
       };
