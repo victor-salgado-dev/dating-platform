@@ -83,8 +83,8 @@ export const es = {
       online: 'Conectados ahora',
       new: 'Nuevos miembros',
     },
-    tabComingSoonBadge: 'Próximamente',
-    tabComingSoonHint: 'Disponible cuando el backend permita ordenar por este criterio',
+    empty: 'No hay perfiles en esta sección por ahora.',
+    retry: 'Reintentar',
   },
   profilePublic: {
     notFound: 'Este perfil no existe o ya no está disponible.',

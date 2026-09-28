@@ -71,9 +71,13 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   if (method === 'GET') {
     const key = `GET ${path}`;
 
+    // Con `cache: 'no-store'` se salta la caché de 60 s (útil para datos que
+    // caducan rápido, como "online now"). La deduplicación en vuelo se mantiene.
+    const skipCache = init?.cache === 'no-store';
+
     // Solo usamos la caché en el cliente. Así evitamos compartir estado
     // entre peticiones del servidor durante SSR/SSG.
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && !skipCache) {
       const cached = getCache.get(key);
       if (cached && cached.expiresAt > Date.now()) {
         return cached.data as T;
@@ -88,7 +92,7 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
     const promise = doApiFetch<T>(path, init)
       .then((data) => {
-        if (typeof window !== 'undefined') {
+        if (typeof window !== 'undefined' && !skipCache) {
           getCache.set(key, { data, expiresAt: Date.now() + GET_CACHE_TTL });
         }
         return data;
@@ -160,6 +164,23 @@ export type OnlineNowResponse = NewMembersResponse;
 
 // Popular usa la misma forma reducida que NewMembers.
 export type PopularResponse = NewMembersResponse;
+
+// Convierte la respuesta reducida (new-members / online-now / popular) al
+// shape completo que espera ProfileCard. Único sitio donde se hace este mapeo.
+export function newMemberToSearchItem(item: NewMemberItem): SearchResultItem {
+  return {
+    profile_id: item.profile_id,
+    display_name: item.display_name,
+    age: item.age,
+    gender: item.gender,
+    country_code: item.country_code,
+    region: item.region,
+    relationship_goals: null,
+    has_photo: item.photo_url !== null,
+    photo_url: item.photo_url,
+    created_at: item.created_at,
+  };
+}
 
 // PublicProfile refleja profileResponse del handler de profiles.
 //

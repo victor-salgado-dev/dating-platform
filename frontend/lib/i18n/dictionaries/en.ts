@@ -85,8 +85,8 @@ export const en: Dictionary = {
       online: 'Online now',
       new: 'New members',
     },
-    tabComingSoonBadge: 'Coming soon',
-    tabComingSoonHint: 'Available once the backend supports sorting by this',
+    empty: 'There are no profiles in this section yet.',
+    retry: 'Try again',
   },
   profilePublic: {
     notFound: 'This profile does not exist or is no longer available.',
