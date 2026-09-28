@@ -135,6 +135,26 @@ export type SearchResponse = {
   total_pages: number;
 };
 
+// Respuesta reducida del endpoint /search/new-members.
+export type NewMemberItem = {
+  profile_id: string;
+  display_name: string;
+  age: number;
+  gender: string;
+  country_code: string;
+  region: string | null;
+  photo_url: string | null;
+  created_at: string;
+};
+
+export type NewMembersResponse = {
+  items: NewMemberItem[];
+  page: number;
+  page_size: number;
+  total: number;
+  total_pages: number;
+};
+
 // PublicProfile refleja profileResponse del handler de profiles.
 //
 // OJO con dos cambios de contrato respecto a versiones anteriores:

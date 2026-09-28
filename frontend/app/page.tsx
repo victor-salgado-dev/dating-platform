@@ -1,24 +1,26 @@
 'use client';
 
 import React, { useEffect, useState, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { apiFetch, SearchResponse } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/context';
 import { ProfileCard } from '@/components/ProfileCard';
 import { useProfileInteractions } from '@/lib/useProfileInteractions';
 import styles from './page.module.css';
 
-// Pestañas de Home. Solo "recommended" tiene datos reales hoy: el resto
-// necesita sort_by/order en /search/profiles (backend), que todavía no
-// existe -> se muestran como "próximamente" en vez de fingir que funcionan.
+// Pestañas de Home. Solo "recommended" y "new" tienen datos reales:
+// recommended usa /search/profiles, new usa /search/new-members.
+// popular y online quedan como "próximamente".
 type HomeTab = 'recommended' | 'popular' | 'online' | 'new';
 
-const COMING_SOON_TABS: HomeTab[] = ['popular', 'online', 'new'];
+const COMING_SOON_TABS: HomeTab[] = ['popular', 'online'];
 
 // -----------------------------------------------------------------------------
 // Página Principal
 // -----------------------------------------------------------------------------
 export default function HomePage() {
   const { dictionary } = useI18n();
+  const router = useRouter();
   const [activeTab, setActiveTab] = useState<HomeTab>('recommended');
   const [data, setData] = useState<SearchResponse | null>(null);
   const [page, setPage] = useState(1);
@@ -32,9 +34,8 @@ export default function HomePage() {
   // Guarda para evitar que React StrictMode dispare la búsqueda dos veces al montar
   const lastFetchedPage = useRef<number | null>(null);
 
-  // Cargar perfiles (con guarda anti-duplicado). Solo la pestaña
-  // "recommended" pide datos reales; el resto son placeholders hasta que
-  // el backend soporte ordenar por popularidad / online / fecha.
+  // Cargar perfiles recomendados. Solo la pestaña recommended pide datos
+  // reales desde Home; new navega a /new-members.
   useEffect(() => {
     if (activeTab !== 'recommended') return;
     if (lastFetchedPage.current === page) return;
@@ -72,7 +73,13 @@ export default function HomePage() {
               key={tab}
               type="button"
               disabled={isComingSoon}
-              onClick={() => setActiveTab(tab)}
+              onClick={() => {
+                if (tab === 'new') {
+                  router.push('/new-members');
+                  return;
+                }
+                setActiveTab(tab);
+              }}
               title={isComingSoon ? dictionary.home.tabComingSoonHint : undefined}
               style={{
                 padding: '0.5rem 1rem',
