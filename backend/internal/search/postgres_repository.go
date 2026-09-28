@@ -343,6 +343,18 @@ func orderByClause(sort Sort) string {
 		return "p.birth_date DESC, p.id ASC"
 	case SortAgeDesc:
 		return "p.birth_date ASC, p.id ASC"
+	case SortPopular:
+		return `(
+			(SELECT COUNT(*) FROM likes l WHERE l.to_profile_id = p.id) +
+			(SELECT COUNT(*) FROM favorites f WHERE f.favorite_profile_id = p.id) +
+			(
+				SELECT COUNT(*) FROM messages m
+				JOIN conversations c ON c.id = m.conversation_id
+				WHERE (c.user_one_id = u.id AND m.sender_id <> u.id)
+				   OR (c.user_two_id = u.id AND m.sender_id <> u.id)
+			) +
+			(SELECT COUNT(*) FROM profile_visits v WHERE v.visited_profile_id = p.id)
+		) DESC, p.created_at DESC, p.id ASC`
 	default: // SortRecent
 		return "p.created_at DESC, p.id ASC"
 	}

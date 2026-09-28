@@ -345,10 +345,10 @@ func buildParams(excludeUserID uuid.UUID, raw RawQuery) (Params, error) {
 	switch sortValue {
 	case "":
 		sortValue = SortRecent
-	case SortRecent, SortAgeAsc, SortAgeDesc:
+	case SortRecent, SortAgeAsc, SortAgeDesc, SortPopular:
 		// válido
 	default:
-		return Params{}, invalidParam("sort", "valores permitidos: recent, age_asc, age_desc")
+		return Params{}, invalidParam("sort", "valores permitidos: recent, age_asc, age_desc, popular")
 	}
 
 	page := 1

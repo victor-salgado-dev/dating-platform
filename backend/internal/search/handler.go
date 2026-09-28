@@ -210,6 +210,36 @@ func (h *Handler) OnlineNow(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, toNewMembersResponse(result))
 }
 
+// Popular devuelve los perfiles ordenados por popularidad: suma de
+// likes, favoritos, mensajes y visitas recibidos.
+func (h *Handler) Popular(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	q := r.URL.Query()
+	raw := RawQuery{
+		Page:     q.Get("page"),
+		PageSize: q.Get("page_size"),
+		Sort:     string(SortPopular),
+	}
+
+	result, err := h.svc.Search(r.Context(), userID, raw)
+	if err != nil {
+		var valErr *ValidationError
+		if errors.As(err, &valErr) {
+			httpx.WriteError(w, http.StatusBadRequest, "invalid_param", valErr.Error())
+			return
+		}
+		httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo obtener la lista de perfiles populares.")
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, toNewMembersResponse(result))
+}
+
 func toSearchResponse(res *Result) searchResponse {
 	items := make([]resultItemResponse, 0, len(res.Items))
 	for _, it := range res.Items {

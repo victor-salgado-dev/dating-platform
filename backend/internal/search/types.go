@@ -22,6 +22,7 @@ const (
 	SortRecent  Sort = "recent"   // perfiles creados más recientemente primero (por defecto)
 	SortAgeAsc  Sort = "age_asc"  // más jóvenes primero
 	SortAgeDesc Sort = "age_desc" // más mayores primero
+	SortPopular Sort = "popular"  // mayor actividad social (likes/favoritos/mensajes/visitas)
 )
 
 const (

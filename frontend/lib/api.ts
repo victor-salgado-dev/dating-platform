@@ -158,6 +158,9 @@ export type NewMembersResponse = {
 // OnlineNow usa la misma forma reducida que NewMembers.
 export type OnlineNowResponse = NewMembersResponse;
 
+// Popular usa la misma forma reducida que NewMembers.
+export type PopularResponse = NewMembersResponse;
+
 // PublicProfile refleja profileResponse del handler de profiles.
 //
 // OJO con dos cambios de contrato respecto a versiones anteriores:
