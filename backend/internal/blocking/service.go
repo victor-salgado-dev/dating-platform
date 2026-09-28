@@ -47,6 +47,10 @@ func (s *Service) IsBlockedByMe(ctx context.Context, blockerUserID, targetProfil
 	return s.repo.IsBlocked(ctx, blockerUserID, target.UserID)
 }
 
+func (s *Service) IsBlocked(ctx context.Context, userA, userB uuid.UUID) (bool, error) {
+	return s.repo.IsBlocked(ctx, userA, userB)
+}
+
 func (s *Service) List(ctx context.Context, blockerUserID uuid.UUID, page, pageSize int) (*ListResult, error) {
 	if page < 1 {
 		page = 1

@@ -64,6 +64,14 @@ func (s *Service) Status(ctx context.Context, userID, targetProfileID uuid.UUID)
 	return liked, matched, err
 }
 
+func (s *Service) IsLiked(ctx context.Context, fromProfileID, toProfileID uuid.UUID) (bool, error) {
+	return s.repo.IsLiked(ctx, fromProfileID, toProfileID)
+}
+
+func (s *Service) HasMatch(ctx context.Context, profileA, profileB uuid.UUID) (bool, error) {
+	return s.repo.HasMatch(ctx, profileA, profileB)
+}
+
 func (s *Service) ListSent(ctx context.Context, userID uuid.UUID, page, pageSize int) (*ListResult, error) {
 	own, err := s.profiles.GetByUserID(ctx, userID)
 	if err != nil {
