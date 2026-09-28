@@ -133,6 +133,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	
 	// --- Search (Fase 5) ------------------------------------------------
 	mux.Handle("GET /api/v1/search/profiles", requireAuth(http.HandlerFunc(deps.SearchHandler.Search)))
+	mux.Handle("GET /api/v1/search/new-members", requireAuth(http.HandlerFunc(deps.SearchHandler.NewMembers)))
 
 	// --- Favoritos (Fase 7) ---------------------------------------------
 	mux.Handle("GET /api/v1/favorites", requireAuth(http.HandlerFunc(deps.FavoritesHandler.List)))

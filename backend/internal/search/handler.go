@@ -46,6 +46,27 @@ type searchResponse struct {
 	TotalPages int                  `json:"total_pages"`
 }
 
+// newMemberItemResponse es la versión reducida para el endpoint
+// "new members": solo los datos que necesita una tarjeta simple.
+type newMemberItemResponse struct {
+	ProfileID   string  `json:"profile_id"`
+	DisplayName string  `json:"display_name"`
+	Age         int     `json:"age"`
+	Gender      string  `json:"gender"`
+	CountryCode string  `json:"country_code"`
+	Region      *string `json:"region"`
+	PhotoURL    *string `json:"photo_url"`
+	CreatedAt   string  `json:"created_at"`
+}
+
+type newMembersResponse struct {
+	Items      []newMemberItemResponse `json:"items"`
+	Page       int                     `json:"page"`
+	PageSize   int                     `json:"page_size"`
+	Total      int                     `json:"total"`
+	TotalPages int                     `json:"total_pages"`
+}
+
 func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 	userID, ok := auth.UserIDFromContext(r.Context())
 	if !ok {
@@ -125,6 +146,37 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, toSearchResponse(result))
 }
 
+// NewMembers devuelve los perfiles más recientes, usando la misma capa
+// de búsqueda/configuración de visibilidad que Search, pero con una
+// respuesta más compacta.
+func (h *Handler) NewMembers(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	q := r.URL.Query()
+	raw := RawQuery{
+		Page:     q.Get("page"),
+		PageSize: q.Get("page_size"),
+		Sort:     string(SortRecent),
+	}
+
+	result, err := h.svc.Search(r.Context(), userID, raw)
+	if err != nil {
+		var valErr *ValidationError
+		if errors.As(err, &valErr) {
+			httpx.WriteError(w, http.StatusBadRequest, "invalid_param", valErr.Error())
+			return
+		}
+		httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo obtener la lista de nuevos miembros.")
+		return
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, toNewMembersResponse(result))
+}
+
 func toSearchResponse(res *Result) searchResponse {
 	items := make([]resultItemResponse, 0, len(res.Items))
 	for _, it := range res.Items {
@@ -161,6 +213,37 @@ func toSearchResponse(res *Result) searchResponse {
 	}
 
 	return searchResponse{
+		Items:      items,
+		Page:       res.Page,
+		PageSize:   res.PageSize,
+		Total:      res.Total,
+		TotalPages: res.TotalPages,
+	}
+}
+
+func toNewMembersResponse(res *Result) newMembersResponse {
+	items := make([]newMemberItemResponse, 0, len(res.Items))
+	for _, it := range res.Items {
+		var photoURL *string
+		if it.PhotoID != nil {
+			u := fmt.Sprintf("/api/v1/profiles/%s/photos/%s/file",
+				it.ProfileID.String(), it.PhotoID.String())
+			photoURL = &u
+		}
+
+		items = append(items, newMemberItemResponse{
+			ProfileID:   it.ProfileID.String(),
+			DisplayName: it.DisplayName,
+			Age:         it.Age,
+			Gender:      string(it.Gender),
+			CountryCode: it.CountryCode,
+			Region:      it.Region,
+			PhotoURL:    photoURL,
+			CreatedAt:   it.CreatedAt.Format(time.RFC3339),
+		})
+	}
+
+	return newMembersResponse{
 		Items:      items,
 		Page:       res.Page,
 		PageSize:   res.PageSize,
