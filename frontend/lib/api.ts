@@ -301,4 +301,24 @@ export type FullProfileEnvelope = {
   blocked: boolean;
 };
 
-// ... resto de tipos (FavoriteItem, LikesResponse, etc.) permanece igual ...
+// --- Mensajería ------------------------------------------------------------
+
+export type MessageItem = {
+  id: string;
+  conversation_id: string;
+  sender_id: string;
+  body: string;
+  created_at: string;
+  read_at?: string | null;
+};
+
+// --- Reportes ----------------------------------------------------------------
+
+export const REPORT_REASONS = [
+  { value: 'spam', label: 'Spam' },
+  { value: 'fake_profile', label: 'Perfil falso' },
+  { value: 'harassment', label: 'Acoso' },
+  { value: 'inappropriate_content', label: 'Contenido inapropiado' },
+  { value: 'underage', label: 'Menor de edad' },
+  { value: 'other', label: 'Otro' },
+] as const;

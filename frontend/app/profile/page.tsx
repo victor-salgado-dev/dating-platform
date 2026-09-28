@@ -6,6 +6,7 @@ import Link from 'next/link';
 import {
   apiFetch,
   ApiError,
+  FullProfileEnvelope,
   ProfilePhoto,
   PublicProfile,
   ProfileLanguage,
@@ -108,36 +109,15 @@ export default function MyProfilePage() {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    apiFetch<InterestDefinition[]>('/catalog/interests').then(setInterestCatalog).catch(() => setInterestCatalog([]));
-
-    apiFetch<PublicProfile>('/profiles/me')
-      .then(async (data) => {
-        setProfile(data);
-        try {
-          setPhotos(await apiFetch<ProfilePhoto[]>('/profiles/me/photos'));
-        } catch {
-          setPhotos([]);
-        }
-        try {
-          setLanguages(await apiFetch<ProfileLanguage[]>('/profiles/me/languages'));
-        } catch {
-          setLanguages([]);
-        }
-        try {
-          setMyInterests(await apiFetch<ProfileInterest[]>('/profiles/me/interests'));
-        } catch {
-          setMyInterests([]);
-        }
-        try {
-          setPersonality(await apiFetch<PersonalityResponse>('/profiles/me/personality'));
-        } catch {
-          setPersonality(null);
-        }
-        try {
-          setPartnerPrefs(await apiFetch<PartnerPreferences>('/profiles/me/partner-preferences'));
-        } catch {
-          setPartnerPrefs(null);
-        }
+    apiFetch<FullProfileEnvelope>('/profiles/me/full')
+      .then((data) => {
+        setProfile(data.profile);
+        setPhotos(data.photos);
+        setLanguages(data.languages);
+        setInterestCatalog(data.interest_catalog);
+        setMyInterests(data.interests);
+        setPersonality(data.personality);
+        setPartnerPrefs(data.partner_preferences);
       })
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.status === 404) {
