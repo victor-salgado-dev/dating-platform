@@ -803,6 +803,57 @@ func (h *Handler) GetPublic(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, toProfileResponse(p))
 }
 
+// GetMyFull sirve GET /profiles/me/full: devuelve el perfil completo del
+// usuario autenticado en una sola petición. Es el endpoint que consume
+// la página de "mi perfil".
+func (h *Handler) GetMyFull(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	full, err := h.svc.GetMyFullProfile(r.Context(), userID)
+	if err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	photos := make([]photoResponse, 0, len(full.Photos))
+	for i := range full.Photos {
+		photos = append(photos, toPhotoResponseSelf(&full.Photos[i]))
+	}
+
+	languages := make([]profileLanguageResponse, 0, len(full.Languages))
+	for _, l := range full.Languages {
+		languages = append(languages, toProfileLanguageResponse(l))
+	}
+
+	interests := make([]profileInterestResponse, 0, len(full.Interests))
+	for _, pi := range full.Interests {
+		interests = append(interests, toProfileInterestResponse(pi))
+	}
+
+	interestCatalog := make([]interestDefinitionResponse, 0, len(full.InterestCatalog))
+	for _, def := range full.InterestCatalog {
+		interestCatalog = append(interestCatalog, toInterestDefinitionResponse(def))
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, fullProfileResponse{
+		Profile:            toProfileResponse(full.Profile),
+		Photos:             photos,
+		Languages:          languages,
+		Interests:          interests,
+		InterestCatalog:    interestCatalog,
+		Personality:        toPersonalityResponse(full.PersonalityAnswers, full.PersonalityScores),
+		PartnerPreferences: toPartnerPreferencesResponse(full.PartnerPreferences),
+		Favorited:          false,
+		Liked:              false,
+		Matched:            false,
+		Blocked:            false,
+	})
+}
+
 // GetPublicFull sirve GET /profiles/{profileID}/full: el equivalente
 // agregado de encadenar GetPublic + ListPublicPhotos +
 // ListPublicLanguages + ListPublicInterests + GetPublicPersonality +

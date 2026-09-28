@@ -351,6 +351,72 @@ func (s *Service) GetFullPublicProfile(ctx context.Context, viewerUserID, profil
 	}, nil
 }
 
+// GetMyFullProfile carga el perfil propio del usuario con todos sus
+// datos agregados, pensado para la página "mi perfil". No aplica reglas
+// de visibilidad pública ni registra visitas; los flags de interacción
+// no tienen sentido aquí y se dejan en false.
+func (s *Service) GetMyFullProfile(ctx context.Context, userID uuid.UUID) (*FullProfile, error) {
+	profile, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		wg                 sync.WaitGroup
+		mu                 sync.Mutex
+		photos             []Photo
+		languages          []ProfileLanguage
+		interests          []ProfileInterest
+		interestCatalog    []InterestDefinition
+		personalityAnswers []ProfilePersonalityAnswer
+		personalityScores  []PersonalityTraitScore
+		partnerPrefs       *PartnerPreferences
+		firstErr           error
+	)
+
+	run := func(fn func() error) {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			if err := fn(); err != nil {
+				mu.Lock()
+				if firstErr == nil {
+					firstErr = err
+				}
+				mu.Unlock()
+			}
+		}()
+	}
+
+	run(func() (err error) { photos, err = s.repo.ListPhotos(ctx, profile.ID); return })
+	run(func() (err error) { languages, err = s.repo.ListProfileLanguages(ctx, profile.ID); return })
+	run(func() (err error) { interests, err = s.repo.ListProfileInterests(ctx, profile.ID); return })
+	run(func() (err error) { interestCatalog, err = s.repo.ListInterestDefinitions(ctx); return })
+	run(func() (err error) { personalityAnswers, err = s.repo.ListPersonalityAnswers(ctx, profile.ID); return })
+	run(func() (err error) { personalityScores, err = s.repo.GetPersonalityTraitScores(ctx, profile.ID); return })
+	run(func() (err error) { partnerPrefs, err = s.repo.GetPartnerPreferences(ctx, profile.ID); return })
+
+	wg.Wait()
+	if firstErr != nil {
+		return nil, firstErr
+	}
+
+	return &FullProfile{
+		Profile:            profile,
+		Photos:             photos,
+		Languages:          languages,
+		Interests:          interests,
+		InterestCatalog:    interestCatalog,
+		PersonalityAnswers: personalityAnswers,
+		PersonalityScores:  personalityScores,
+		PartnerPreferences: partnerPrefs,
+		Favorited:          false,
+		Liked:              false,
+		Matched:            false,
+		Blocked:            false,
+	}, nil
+}
+
 func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, in CreateProfileInput) (*Profile, error) {
 	if err := validateDisplayName(in.DisplayName); err != nil {
 		return nil, err

@@ -94,6 +94,7 @@ func NewRouter(deps Dependencies) http.Handler {
 
 	// --- Profiles ----------------------------------------------------
 	mux.Handle("GET /api/v1/profiles/me", requireAuth(http.HandlerFunc(deps.ProfilesHandler.Get)))
+	mux.Handle("GET /api/v1/profiles/me/full", requireAuth(http.HandlerFunc(deps.ProfilesHandler.GetMyFull)))
 	mux.Handle("POST /api/v1/profiles/me", requireAuth(http.HandlerFunc(deps.ProfilesHandler.Create)))
 	mux.Handle("PATCH /api/v1/profiles/me", requireAuth(http.HandlerFunc(deps.ProfilesHandler.Update)))
 
