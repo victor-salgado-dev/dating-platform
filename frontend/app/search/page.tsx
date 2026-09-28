@@ -233,6 +233,16 @@ export default function SearchPage() {
   const router = useRouter();
   const { dictionary, locale } = useI18n();
 
+  // Hydration: locale depende de Intl en el navegador, y sortedCountryOptions
+  // usa Intl.DisplayNames. Para que el SSR y el primer render del cliente
+  // coincidan, no renderizamos los selects de país/nacionalidad en absoluto
+  // hasta que el componente se monta en el cliente.
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
   // --- Rangos numéricos (todo <select>, ver constantes arriba) ---
   const [minAge, setMinAge] = useState('');
   const [maxAge, setMaxAge] = useState('');
@@ -281,8 +291,11 @@ export default function SearchPage() {
   const [vacationActivities, setVacationActivities] = useState<string[]>([]);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
 
-  // --- País / nacionalidad: <select> de códigos ISO, nada de escribirlos ---
-  const countryOptions = useMemo(() => sortedCountryOptions(locale), [locale]);
+  // --- País / nacionalidad: solo se calcula y se renderiza en el cliente. ---
+  const countryOptions = useMemo(
+    () => (isClient ? sortedCountryOptions(locale) : []),
+    [isClient, locale],
+  );
 
   // --- Catálogo de intereses (GET /interests) ---
   const [interests, setInterests] = useState<InterestDefinition[]>([]);
@@ -472,17 +485,19 @@ export default function SearchPage() {
               options={AGE_OPTIONS}
               anyLabel={dictionary.search.any}
             />
-            <div className={styles.field}>
-              <label className={styles.label}>{dictionary.search.labelCountry}</label>
-              <select className={styles.select} value={country} onChange={(e) => setCountry(e.target.value)}>
-                <option value="">{dictionary.search.any}</option>
-                {countryOptions.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {isClient ? (
+              <div className={styles.field}>
+                <label className={styles.label}>{dictionary.search.labelCountry}</label>
+                <select className={styles.select} value={country} onChange={(e) => setCountry(e.target.value)}>
+                  <option value="">{dictionary.search.any}</option>
+                  {countryOptions.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             <ChipGroup label={dictionary.search.labelRelationshipGoal} values={relationshipGoals} onToggle={(v) => toggleValue(relationshipGoals, setRelationshipGoals, v)} options={RELATIONSHIP_GOAL_OPTIONS} labels={dictionary.options.relationshipGoal} />
             <SelectField label={dictionary.search.labelHasChildren} value={hasChildren} onChange={setHasChildren} options={HAS_CHILDREN_OPTIONS} labels={dictionary.options.hasChildren} anyLabel={dictionary.search.any} />
             <SelectField label={dictionary.search.labelWantsChildren} value={wantsChildren} onChange={setWantsChildren} options={WANTS_CHILDREN_OPTIONS} labels={dictionary.options.wantsChildren} anyLabel={dictionary.search.any} />
@@ -545,17 +560,19 @@ export default function SearchPage() {
         <section className={styles.section}>
           <h2 className={styles.sectionTitle}>{dictionary.search.sectionBackground}</h2>
           <div className={styles.fieldGrid}>
-            <div className={styles.field}>
-              <label className={styles.label}>{dictionary.search.labelNationality}</label>
-              <select className={styles.select} value={nationality} onChange={(e) => setNationality(e.target.value)}>
-                <option value="">{dictionary.search.any}</option>
-                {countryOptions.map((c) => (
-                  <option key={c.code} value={c.code}>
-                    {c.label}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {isClient ? (
+              <div className={styles.field}>
+                <label className={styles.label}>{dictionary.search.labelNationality}</label>
+                <select className={styles.select} value={nationality} onChange={(e) => setNationality(e.target.value)}>
+                  <option value="">{dictionary.search.any}</option>
+                  {countryOptions.map((c) => (
+                    <option key={c.code} value={c.code}>
+                      {c.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            ) : null}
             <SelectField label={dictionary.search.labelEducationLevel} value={educationLevel} onChange={setEducationLevel} options={EDUCATION_LEVEL_OPTIONS} labels={dictionary.options.educationLevel} anyLabel={dictionary.search.any} />
             <SelectField label={dictionary.search.labelEnglishAbility} value={englishAbility} onChange={setEnglishAbility} options={ENGLISH_ABILITY_OPTIONS} labels={dictionary.options.englishAbility} anyLabel={dictionary.search.any} />
             <SelectField label={dictionary.search.labelReligion} value={religion} onChange={setReligion} options={RELIGION_OPTIONS} labels={dictionary.options.religion} anyLabel={dictionary.search.any} />
