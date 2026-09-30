@@ -1,9 +1,10 @@
 // Helper mínimo para llamar a la API desde componentes cliente.
 //
-// Usa NEXT_PUBLIC_API_URL (el navegador llega a la API a través de Caddy,
-// en el mismo origen que la propia página), así que la cookie de sesión
-// httpOnly viaja automáticamente sin ninguna gestión manual aquí.
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost/api/v1';
+// Usa NEXT_PUBLIC_API_URL si está definido. Si no, usa una ruta relativa
+// /api/v1 para que el navegador haga la petición al mismo origen desde el
+// que se sirve la aplicación. Así la cookie httpOnly de sesión viaja
+// automáticamente sin gestión manual y no saltan los 401 por CORS.
+const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? '/api/v1';
 
 export class ApiError extends Error {
   status: number;
