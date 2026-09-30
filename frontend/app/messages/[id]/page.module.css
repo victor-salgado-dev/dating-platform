@@ -47,6 +47,31 @@
   background: #f1f1f1;
 }
 
+.body {
+  display: block;
+}
+
+.meta {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.2rem;
+  font-size: 0.7rem;
+  color: #666;
+}
+
+.time {
+  white-space: nowrap;
+}
+
+.checks {
+  letter-spacing: 0.1rem;
+}
+
+.readChecks {
+  color: #2d7ff9;
+}
+
 .composer {
   display: flex;
   gap: 0.5rem;

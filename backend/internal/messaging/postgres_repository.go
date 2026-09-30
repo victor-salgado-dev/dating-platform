@@ -82,14 +82,14 @@ func (r *PostgresRepository) Participants(ctx context.Context, conversationID uu
 
 func (r *PostgresRepository) InsertMessage(ctx context.Context, conversationID, senderID uuid.UUID, body string) (*Message, error) {
 	const query = `
-		INSERT INTO messages (conversation_id, sender_id, body)
-		VALUES ($1, $2, $3)
-		RETURNING id, created_at, read_at
+		INSERT INTO messages (conversation_id, sender_id, body, delivered_at)
+		VALUES ($1, $2, $3, now())
+		RETURNING id, created_at, delivered_at, read_at
 	`
 
 	msg := &Message{ConversationID: conversationID, SenderID: senderID, Body: body}
 	err := r.db.QueryRow(ctx, query, conversationID, senderID, body).
-		Scan(&msg.ID, &msg.CreatedAt, &msg.ReadAt)
+		Scan(&msg.ID, &msg.CreatedAt, &msg.DeliveredAt, &msg.ReadAt)
 	if err != nil {
 		return nil, fmt.Errorf("messaging: enviar mensaje: %w", err)
 	}
@@ -112,7 +112,7 @@ func (r *PostgresRepository) MarkRead(ctx context.Context, conversationID, reade
 
 func (r *PostgresRepository) ListMessages(ctx context.Context, conversationID uuid.UUID, page, pageSize int) (*MessageListResult, error) {
 	const query = `
-		SELECT id, sender_id, body, created_at, read_at, COUNT(*) OVER() AS total_count
+		SELECT id, sender_id, body, created_at, delivered_at, read_at, COUNT(*) OVER() AS total_count
 		FROM messages
 		WHERE conversation_id = $1
 		ORDER BY created_at ASC
@@ -131,7 +131,7 @@ func (r *PostgresRepository) ListMessages(ctx context.Context, conversationID uu
 	for rows.Next() {
 		var m Message
 		var totalCount int
-		if err := rows.Scan(&m.ID, &m.SenderID, &m.Body, &m.CreatedAt, &m.ReadAt, &totalCount); err != nil {
+		if err := rows.Scan(&m.ID, &m.SenderID, &m.Body, &m.CreatedAt, &m.DeliveredAt, &m.ReadAt, &totalCount); err != nil {
 			return nil, fmt.Errorf("messaging: leer mensaje: %w", err)
 		}
 		m.ConversationID = conversationID

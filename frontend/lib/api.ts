@@ -413,8 +413,12 @@ export type MessageItem = {
   sender_id: string;
   body: string;
   created_at: string;
+  delivered_at?: string | null;
   read_at?: string | null;
+  is_mine: boolean;
 };
+
+export type MessagesResponse = Paged<MessageItem>;
 
 // --- Reportes ----------------------------------------------------------------
 

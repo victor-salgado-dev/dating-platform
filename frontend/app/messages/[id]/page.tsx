@@ -8,6 +8,11 @@ import { apiFetch, ApiError, MessagesResponse, MessageItem } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/context';
 import styles from './page.module.css';
 
+function formatMessageTime(iso: string): string {
+  const date = new Date(iso);
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+}
+
 export default function ConversationPage() {
   const params = useParams<{ id: string }>();
   const { dictionary } = useI18n();
@@ -76,7 +81,15 @@ export default function ConversationPage() {
                 key={m.id}
                 className={m.is_mine ? styles.bubbleMine : styles.bubbleTheirs}
               >
-                {m.body}
+                <span className={styles.body}>{m.body}</span>
+                <span className={styles.meta}>
+                  <span className={styles.time}>{formatMessageTime(m.created_at)}</span>
+                  {m.is_mine && (
+                    <span className={`${styles.checks}${m.read_at ? ` ${styles.readChecks}` : ''}`}>
+                      {m.read_at ? '✓✓' : '✓'}
+                    </span>
+                  )}
+                </span>
               </li>
             ))}
           </ul>
