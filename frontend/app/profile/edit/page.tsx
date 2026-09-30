@@ -280,6 +280,7 @@ export default function EditProfilePage() {
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [primaryBusyId, setPrimaryBusyId] = useState<string | null>(null);
 
   const [myLanguages, setMyLanguages] = useState<ProfileLanguage[]>([]);
   const [languageQuery, setLanguageQuery] = useState('');
@@ -479,9 +480,26 @@ export default function EditProfilePage() {
     setError(null);
     try {
       await apiFetch<void>(`/profiles/me/photos/${photoID}`, { method: 'DELETE' });
-      setPhotos((current) => current.filter((photo) => photo.id !== photoID));
+      const refreshed = await apiFetch<ProfilePhoto[]>('/profiles/me/photos');
+      setPhotos(refreshed);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : dictionary.profileEdit.errorDeletePhoto);
+    }
+  }
+
+  async function handleSetPrimary(photoID: string) {
+    setError(null);
+    setPrimaryBusyId(photoID);
+    try {
+      await apiFetch<void>(`/profiles/me/photos/${photoID}/primary`, {
+        method: 'PUT',
+      });
+      const refreshed = await apiFetch<ProfilePhoto[]>('/profiles/me/photos');
+      setPhotos(refreshed);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : dictionary.profileEdit.errorSetPrimary);
+    } finally {
+      setPrimaryBusyId(null);
     }
   }
 
@@ -709,6 +727,11 @@ export default function EditProfilePage() {
   const locationSaved = dictionary.profileEdit.locationSaved
     .replace('{region}', form.region ? `${form.region}, ` : '')
     .replace('{country}', form.country_code);
+
+  const primaryPhotoId = photos.reduce<ProfilePhoto | null>(
+    (min, p) => (min === null || p.position < min.position ? p : min),
+    null
+  )?.id ?? null;
 
   return (
     <main className={styles.main}>
@@ -1103,7 +1126,23 @@ export default function EditProfilePage() {
             {photos.map((photo) => (
               <div key={photo.id} className={styles.photo}>
                 <img src={photo.url} alt="" />
-                <button type="button" onClick={() => handleDeletePhoto(photo.id)}>{dictionary.profileEdit.deletePhoto}</button>
+                <div>
+                  {photo.id === primaryPhotoId && (
+                    <span className={styles.hint}>{dictionary.profileEdit.primaryPhoto}</span>
+                  )}
+                  {photos.length > 1 && photo.id !== primaryPhotoId && (
+                    <button
+                      type="button"
+                      onClick={() => handleSetPrimary(photo.id)}
+                      disabled={primaryBusyId === photo.id}
+                    >
+                      {primaryBusyId === photo.id
+                        ? dictionary.profileEdit.settingPrimary
+                        : dictionary.profileEdit.setPrimary}
+                    </button>
+                  )}
+                  <button type="button" onClick={() => handleDeletePhoto(photo.id)}>{dictionary.profileEdit.deletePhoto}</button>
+                </div>
               </div>
             ))}
           </div>
