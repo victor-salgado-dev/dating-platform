@@ -90,6 +90,7 @@ func NewRouter(deps Dependencies) http.Handler {
 
 	// --- Catálogos ---------------------------------------------------
 	mux.Handle("GET /api/v1/catalog/interests", http.HandlerFunc(deps.ProfilesHandler.ListInterestCatalog))
+	mux.Handle("GET /api/v1/interests", http.HandlerFunc(deps.ProfilesHandler.ListInterestCatalog))
 	mux.Handle("GET /api/v1/catalog/personality-statements", http.HandlerFunc(deps.ProfilesHandler.ListPersonalityCatalog))
 
 	// --- Profiles ----------------------------------------------------
