@@ -1,9 +1,18 @@
 // Helper mínimo para llamar a la API desde componentes cliente.
 //
-// Usa NEXT_PUBLIC_API_URL si está definido. Si no, usa la URL absoluta
-// del backend local. Así la app hace la petición al mismo host que sirve
-// la API y no salta el 401 por no enviar la cookie de sesión.
-const API_BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost/api/v1';
+// Usa NEXT_PUBLIC_API_URL si está definido. Si no, intenta calcular la base
+// correcta según el origen de la página:
+// - En desarrollo con Next en localhost:3000, usamos la URL absoluta del backend.
+// - En el resto de casos (normalmente con Caddy/proxy en localhost), usamos
+//   /api/v1 relativa para que no se rompa la cookie de sesión por CORS.
+const API_BASE =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (typeof window !== 'undefined'
+    ? (window.location.origin === 'http://localhost:3000' ||
+       window.location.origin === 'http://127.0.0.1:3000'
+        ? 'http://localhost/api/v1'
+        : '/api/v1')
+    : 'http://localhost/api/v1');
 
 export class ApiError extends Error {
   status: number;

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, FormEvent } from 'react';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 
 import { apiFetch, ApiError, MessagesResponse, MessageItem } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/context';
@@ -15,6 +15,7 @@ function formatMessageTime(iso: string): string {
 
 export default function ConversationPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const { dictionary } = useI18n();
   const [messages, setMessages] = useState<MessageItem[] | null>(null);
   const [draft, setDraft] = useState('');
@@ -36,7 +37,8 @@ export default function ConversationPage() {
         if (err instanceof ApiError && err.status === 404) {
           setError(dictionary.conversation.notFound);
         } else if (err instanceof ApiError && err.status === 401) {
-          setError(dictionary.conversation.errorUnauthorized);
+          const returnTo = window.location.pathname + window.location.search;
+          router.replace(`/login?next=${encodeURIComponent(returnTo)}`);
         } else {
           setError(dictionary.conversation.loadError);
         }
