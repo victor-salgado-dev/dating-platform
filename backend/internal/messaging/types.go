@@ -29,6 +29,7 @@ type Message struct {
 	SenderID       uuid.UUID
 	Body           string
 	CreatedAt      time.Time
+	DeliveredAt    *time.Time `json:"delivered_at"`
 	ReadAt         *time.Time
 }
 
