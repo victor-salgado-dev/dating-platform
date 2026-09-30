@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { apiFetch } from '@/lib/api';
+import { apiFetch, apiMutateQuiet, peekApiCache } from '@/lib/api';
 import type {
   FullProfileEnvelope,
   PublicProfile,
@@ -47,83 +47,77 @@ const EMPTY: FullProfileData = {
   unauthorized: false,
 };
 
-// Caché en memoria por perfil visitado. Vive durante la sesión de
-// navegación (igual que useProfileInteractions), así que volver a un
-// perfil ya visto -p.ej. "Anterior" en Quick Match- no vuelve a lanzar
-// la petición.
-const profileDataCache = new Map<string, Omit<FullProfileData, 'loading'>>();
-
-// Promesas en vuelo por perfil. Evita que dos componentes pidan el mismo
-// perfil a la vez y lancen una segunda tanda de peticiones.
-const profileDataPromises = new Map<string, Promise<Omit<FullProfileData, 'loading'>>>();
-
-function fetchFullProfile(id: string): Promise<Omit<FullProfileData, 'loading'>> {
-  const existing = profileDataPromises.get(id);
-  if (existing) return existing;
-
-  const promise = apiFetch<FullProfileEnvelope>(`/profiles/${id}/full`)
-    .then((envelope) => {
-      const resolved: Omit<FullProfileData, 'loading'> = {
-        profile: envelope.profile,
-        photos: envelope.photos,
-        languages: envelope.languages,
-        interestCatalog: envelope.interest_catalog,
-        theirInterests: envelope.interests,
-        personality: envelope.personality,
-        partnerPrefs: envelope.partner_preferences,
-        favorited: envelope.favorited,
-        liked: envelope.liked,
-        matched: envelope.matched,
-        blocked: envelope.blocked,
-        notFound: false,
-        unauthorized: false,
-      };
-      profileDataCache.set(id, resolved);
-      return resolved;
-    })
-    .catch((err) => {
-      // Rechazamos la promesa para que el llamador pueda manejar el error.
-      // El `finally` de abajo se encargará de limpiar el mapa de promesas.
-      throw err;
-    })
-    .finally(() => {
-      profileDataPromises.delete(id);
-    });
-
-  profileDataPromises.set(id, promise);
-  return promise;
+// Antes este archivo tenía su propia caché por perfil, que nunca se
+// invalidaba: tras dar like o favorito desde una tarjeta, abrir ese perfil
+// podía enseñar el estado anterior. Ahora se usa la caché de apiFetch (60 s,
+// vaciada en cada mutación), que ya deduplica peticiones en vuelo.
+//
+// recordVisit=false pide /full?visit=0: el backend no registra la visita.
+// Quick Match lo usa para no contar como visita a quien solo se precarga; y
+// registra la visita real con recordProfileVisit cuando muestra la carta.
+function fullPath(id: string, recordVisit: boolean) {
+  return recordVisit ? `/profiles/${id}/full` : `/profiles/${id}/full?visit=0`;
 }
 
-// Lanza la carga de un perfil sin engancharse a ningún componente ni
-// devolver estado. Pensado para precargar "el siguiente" en Quick Match
-// mientras el usuario todavía está mirando el actual. Si ya está en
-// caché o ya se está pidiendo, no hace nada.
+function fromEnvelope(envelope: FullProfileEnvelope): Omit<FullProfileData, 'loading'> {
+  return {
+    profile: envelope.profile,
+    photos: envelope.photos,
+    languages: envelope.languages,
+    interestCatalog: envelope.interest_catalog,
+    theirInterests: envelope.interests,
+    personality: envelope.personality,
+    partnerPrefs: envelope.partner_preferences,
+    favorited: envelope.favorited,
+    liked: envelope.liked,
+    matched: envelope.matched,
+    blocked: envelope.blocked,
+    notFound: false,
+    unauthorized: false,
+  };
+}
+
+// Lanza la carga de un perfil sin engancharse a ningún componente. Pensado
+// para precargar "el siguiente" en Quick Match. Nunca registra visita.
 export function preloadFullProfile(id: string | undefined) {
-  if (!id || profileDataCache.has(id)) return;
-  fetchFullProfile(id).catch(() => {
+  if (!id) return;
+  const path = fullPath(id, false);
+  if (peekApiCache(path)) return;
+  apiFetch<FullProfileEnvelope>(path).catch(() => {
     // Precarga silenciosa: si falla, el hook normal la reintentará
     // cuando el usuario realmente navegue a este perfil.
   });
 }
 
-export function useFullProfile(id: string | undefined): FullProfileData {
+// Registra la visita real a un perfil (Quick Match, que carga con visit=0).
+// No vacía la caché de GET, para no tirar el perfil que se acaba de precargar.
+export function recordProfileVisit(id: string | undefined) {
+  if (!id) return;
+  apiMutateQuiet<void>(`/visits/${id}`, { method: 'POST' }).catch(() => {
+    // Best-effort: una visita no registrada no debe molestar al usuario.
+  });
+}
+
+export function useFullProfile(id: string | undefined, options?: { recordVisit?: boolean }): FullProfileData {
+  const recordVisit = options?.recordVisit ?? true;
   const [data, setData] = useState<FullProfileData>(EMPTY);
 
   useEffect(() => {
     if (!id) return;
+    const path = fullPath(id, recordVisit);
 
-    const cached = profileDataCache.get(id);
+    const cached = peekApiCache<FullProfileEnvelope>(path);
     if (cached) {
-      setData({ ...cached, loading: false });
+      setData({ ...fromEnvelope(cached), loading: false });
       return;
     }
 
     let isMounted = true;
     setData({ ...EMPTY, loading: true });
 
-    fetchFullProfile(id)
-      .then((resolved) => {
-        if (isMounted) setData({ ...resolved, loading: false });
+    apiFetch<FullProfileEnvelope>(path)
+      .then((envelope) => {
+        if (isMounted) setData({ ...fromEnvelope(envelope), loading: false });
       })
       .catch((err: unknown) => {
         if (!isMounted) return;
@@ -134,7 +128,7 @@ export function useFullProfile(id: string | undefined): FullProfileData {
     return () => {
       isMounted = false;
     };
-  }, [id]);
+  }, [id, recordVisit]);
 
   return data;
 }

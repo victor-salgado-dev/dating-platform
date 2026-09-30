@@ -20,6 +20,9 @@ func NewHandler(svc *Service) *Handler {
 	return &Handler{svc: svc}
 }
 
+// resultItemResponse es la ficha de perfil de TODOS los listados de
+// búsqueda (search, new-members, online-now y popular): antes los tres
+// últimos devolvían una versión reducida sin relationship_goals.
 type resultItemResponse struct {
 	ProfileID         string   `json:"profile_id"`
 	DisplayName       string   `json:"display_name"`
@@ -36,6 +39,12 @@ type resultItemResponse struct {
 	// por tarjeta.
 	PhotoURL  *string `json:"photo_url"`
 	CreatedAt string  `json:"created_at"`
+
+	// Relación con quien busca, resuelta en la misma consulta.
+	Liked            bool `json:"liked"`
+	Favorited        bool `json:"favorited"`
+	ReceivedLike     bool `json:"received_like"`
+	ReceivedFavorite bool `json:"received_favorite"`
 }
 
 type searchResponse struct {
@@ -46,34 +55,7 @@ type searchResponse struct {
 	TotalPages int                  `json:"total_pages"`
 }
 
-// newMemberItemResponse es la versión reducida para el endpoint
-// "new members": solo los datos que necesita una tarjeta simple.
-type newMemberItemResponse struct {
-	ProfileID   string  `json:"profile_id"`
-	DisplayName string  `json:"display_name"`
-	Age         int     `json:"age"`
-	Gender      string  `json:"gender"`
-	CountryCode string  `json:"country_code"`
-	Region      *string `json:"region"`
-	PhotoURL    *string `json:"photo_url"`
-	CreatedAt   string  `json:"created_at"`
-}
-
-type newMembersResponse struct {
-	Items      []newMemberItemResponse `json:"items"`
-	Page       int                     `json:"page"`
-	PageSize   int                     `json:"page_size"`
-	Total      int                     `json:"total"`
-	TotalPages int                     `json:"total_pages"`
-}
-
 func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
-	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
-		return
-	}
-
 	q := r.URL.Query()
 	raw := RawQuery{
 		Genders:           splitMulti(q["gender"]),
@@ -132,6 +114,53 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 		PersonalityTraitBounds: parseKeyedBounds(q, "trait_"),
 	}
 
+	h.run(w, r, raw, "No se pudo completar la búsqueda.")
+}
+
+// NewMembers devuelve los perfiles más recientes.
+func (h *Handler) NewMembers(w http.ResponseWriter, r *http.Request) {
+	h.preset(w, r, "No se pudo obtener la lista de nuevos miembros.", func(raw *RawQuery) {
+		raw.Sort = string(SortRecent)
+	})
+}
+
+// OnlineNow devuelve los perfiles cuyo usuario estuvo activo en los
+// últimos minutos, usando users.last_active_at.
+func (h *Handler) OnlineNow(w http.ResponseWriter, r *http.Request) {
+	h.preset(w, r, "No se pudo obtener la lista de usuarios en línea.", func(raw *RawQuery) {
+		raw.Sort = string(SortRecent)
+		raw.OnlineNow = true
+	})
+}
+
+// Popular devuelve los perfiles ordenados por popularidad: actividad de los
+// últimos 30 días (likes, favoritos, mensajes y visitas recibidos), según la
+// vista materializada profile_popularity.
+func (h *Handler) Popular(w http.ResponseWriter, r *http.Request) {
+	h.preset(w, r, "No se pudo obtener la lista de perfiles populares.", func(raw *RawQuery) {
+		raw.Sort = string(SortPopular)
+	})
+}
+
+// preset construye una búsqueda sin filtros de usuario: solo paginación más
+// lo que fije `apply`. Reemplaza a los tres handlers casi idénticos de antes.
+func (h *Handler) preset(w http.ResponseWriter, r *http.Request, failMsg string, apply func(*RawQuery)) {
+	q := r.URL.Query()
+	raw := RawQuery{
+		Page:     q.Get("page"),
+		PageSize: q.Get("page_size"),
+	}
+	apply(&raw)
+	h.run(w, r, raw, failMsg)
+}
+
+func (h *Handler) run(w http.ResponseWriter, r *http.Request, raw RawQuery, failMsg string) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
 	result, err := h.svc.Search(r.Context(), userID, raw)
 	if err != nil {
 		var valErr *ValidationError
@@ -139,105 +168,11 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteError(w, http.StatusBadRequest, "invalid_param", valErr.Error())
 			return
 		}
-		httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo completar la búsqueda.")
+		httpx.WriteError(w, http.StatusInternalServerError, "internal_error", failMsg)
 		return
 	}
 
 	httpx.WriteJSON(w, http.StatusOK, toSearchResponse(result))
-}
-
-// NewMembers devuelve los perfiles más recientes, usando la misma capa
-// de búsqueda/configuración de visibilidad que Search, pero con una
-// respuesta más compacta.
-func (h *Handler) NewMembers(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
-	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
-		return
-	}
-
-	q := r.URL.Query()
-	raw := RawQuery{
-		Page:     q.Get("page"),
-		PageSize: q.Get("page_size"),
-		Sort:     string(SortRecent),
-	}
-
-	result, err := h.svc.Search(r.Context(), userID, raw)
-	if err != nil {
-		var valErr *ValidationError
-		if errors.As(err, &valErr) {
-			httpx.WriteError(w, http.StatusBadRequest, "invalid_param", valErr.Error())
-			return
-		}
-		httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo obtener la lista de nuevos miembros.")
-		return
-	}
-
-	httpx.WriteJSON(w, http.StatusOK, toNewMembersResponse(result))
-}
-
-// OnlineNow devuelve los perfiles cuyo usuario estuvo activo en los
-// últimos minutos, usando last_active_at.
-func (h *Handler) OnlineNow(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
-	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
-		return
-	}
-
-	q := r.URL.Query()
-	raw := RawQuery{
-		Page:      q.Get("page"),
-		PageSize:  q.Get("page_size"),
-		Sort:      string(SortRecent),
-		OnlineNow: true,
-	}
-
-	result, err := h.svc.Search(r.Context(), userID, raw)
-	if err != nil {
-		var valErr *ValidationError
-		if errors.As(err, &valErr) {
-			httpx.WriteError(w, http.StatusBadRequest, "invalid_param", valErr.Error())
-			return
-		}
-		httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo obtener la lista de usuarios en línea.")
-		return
-	}
-
-	// La respuesta reducida de new-members cumple exactamente el contrato
-	// simple que el frontend necesita para la pestaña Online.
-	httpx.WriteJSON(w, http.StatusOK, toNewMembersResponse(result))
-}
-
-// Popular devuelve los perfiles ordenados por popularidad: suma de
-// likes, favoritos, mensajes y visitas recibidos.
-func (h *Handler) Popular(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
-	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
-		return
-	}
-
-	q := r.URL.Query()
-	raw := RawQuery{
-		Page:     q.Get("page"),
-		PageSize: q.Get("page_size"),
-		Sort:     string(SortPopular),
-	}
-
-	result, err := h.svc.Search(r.Context(), userID, raw)
-	if err != nil {
-		var valErr *ValidationError
-		if errors.As(err, &valErr) {
-			httpx.WriteError(w, http.StatusBadRequest, "invalid_param", valErr.Error())
-			return
-		}
-		httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo obtener la lista de perfiles populares.")
-		return
-	}
-
-	httpx.WriteJSON(w, http.StatusOK, toNewMembersResponse(result))
 }
 
 func toSearchResponse(res *Result) searchResponse {
@@ -272,41 +207,14 @@ func toSearchResponse(res *Result) searchResponse {
 			HasPhoto:          it.HasPhoto,
 			PhotoURL:          photoURL,
 			CreatedAt:         it.CreatedAt.Format(time.RFC3339),
+			Liked:             it.Liked,
+			Favorited:         it.Favorited,
+			ReceivedLike:      it.ReceivedLike,
+			ReceivedFavorite:  it.ReceivedFavorite,
 		})
 	}
 
 	return searchResponse{
-		Items:      items,
-		Page:       res.Page,
-		PageSize:   res.PageSize,
-		Total:      res.Total,
-		TotalPages: res.TotalPages,
-	}
-}
-
-func toNewMembersResponse(res *Result) newMembersResponse {
-	items := make([]newMemberItemResponse, 0, len(res.Items))
-	for _, it := range res.Items {
-		var photoURL *string
-		if it.PhotoID != nil {
-			u := fmt.Sprintf("/api/v1/profiles/%s/photos/%s/file",
-				it.ProfileID.String(), it.PhotoID.String())
-			photoURL = &u
-		}
-
-		items = append(items, newMemberItemResponse{
-			ProfileID:   it.ProfileID.String(),
-			DisplayName: it.DisplayName,
-			Age:         it.Age,
-			Gender:      string(it.Gender),
-			CountryCode: it.CountryCode,
-			Region:      it.Region,
-			PhotoURL:    photoURL,
-			CreatedAt:   it.CreatedAt.Format(time.RFC3339),
-		})
-	}
-
-	return newMembersResponse{
 		Items:      items,
 		Page:       res.Page,
 		PageSize:   res.PageSize,

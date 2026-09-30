@@ -65,6 +65,23 @@ async function doApiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
+// Lectura síncrona de la caché de GET: devuelve la respuesta si sigue vigente.
+// Permite pintar al instante lo que ya se pidió (p. ej. un perfil precargado)
+// sin pasar por un estado de "cargando".
+export function peekApiCache<T>(path: string): T | undefined {
+  if (typeof window === 'undefined') return undefined;
+  const cached = getCache.get(`GET ${path}`);
+  if (cached && cached.expiresAt > Date.now()) return cached.data as T;
+  return undefined;
+}
+
+// Mutación que NO vacía la caché de GET. Solo para escrituras que no cambian
+// nada de lo que el usuario está viendo (registrar una visita): con apiFetch
+// vaciaría, por ejemplo, el perfil que Quick Match acaba de precargar.
+export async function apiMutateQuiet<T>(path: string, init: RequestInit): Promise<T> {
+  return doApiFetch<T>(path, init);
+}
+
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {
   const method = (init?.method ?? 'GET').toUpperCase();
 
@@ -117,6 +134,16 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
 
 // --- Tipos que reflejan las respuestas del backend (Fases 5 y 6) ---------
 
+// Relación entre quien mira y el perfil de una ficha. Los calcula el backend
+// en la misma consulta que el listado (ya no hay que descargar las listas de
+// likes y favoritos para pintar los corazones y estrellas).
+export type ProfileFlags = {
+  liked: boolean; // yo le di like
+  favorited: boolean; // lo tengo en favoritos
+  received_like: boolean; // me dio like
+  received_favorite: boolean; // me tiene en favoritos
+};
+
 export type SearchResultItem = {
   profile_id: string;
   display_name: string;
@@ -129,7 +156,7 @@ export type SearchResultItem = {
   has_photo: boolean;
   photo_url: string | null;
   created_at: string;
-};
+} & ProfileFlags;
 
 export type SearchResponse = {
   items: SearchResultItem[];
@@ -139,48 +166,78 @@ export type SearchResponse = {
   total_pages: number;
 };
 
-// Respuesta reducida del endpoint /search/new-members.
-export type NewMemberItem = {
+// /search/new-members, /search/online-now y /search/popular devuelven ahora
+// exactamente lo mismo que /search/profiles. Se conservan los alias para no
+// romper imports antiguos.
+export type NewMemberItem = SearchResultItem;
+export type NewMembersResponse = SearchResponse;
+export type OnlineNowResponse = SearchResponse;
+export type PopularResponse = SearchResponse;
+
+// --- Listados de interacciones (likes, matches, favoritos, visitas, actividad)
+
+type ListedProfile = {
   profile_id: string;
   display_name: string;
   age: number;
   gender: string;
   country_code: string;
   region: string | null;
+  has_photo: boolean;
   photo_url: string | null;
+} & ProfileFlags;
+
+type Paged<T> = { items: T[]; page: number; page_size: number; total: number; total_pages: number };
+
+export type LikeItem = ListedProfile & {
+  relationship_goal: string | null;
+  photo_id: string | null;
+  liked_at: string;
+};
+export type LikesResponse = Paged<LikeItem>;
+
+export type MatchItem = ListedProfile & {
+  photo_id: string | null;
+  matched_at: string;
+  conversation_id?: string | null;
+};
+export type MatchesResponse = Paged<MatchItem>;
+
+export type FavoriteItem = ListedProfile & {
+  relationship_goal: string | null;
+  photo_id: string | null;
+  favorited_at: string;
+};
+export type FavoritesResponse = Paged<FavoriteItem>;
+
+export type VisitItem = ListedProfile & {
+  relationship_goal: string | null;
+  photo_id: string | null;
+  visited_at: string;
+};
+export type VisitsResponse = Paged<VisitItem>;
+
+export type ActivityItem = ListedProfile & {
+  event_type: 'like_received' | 'match_created' | 'favorite_received';
   created_at: string;
 };
+export type ActivityResponse = Paged<ActivityItem>;
 
-export type NewMembersResponse = {
-  items: NewMemberItem[];
-  page: number;
-  page_size: number;
-  total: number;
-  total_pages: number;
+// GET /auth/me: la cuenta más lo que necesita el header (antes eran tres peticiones).
+export type MeResponse = {
+  id: string;
+  email: string;
+  email_verified: boolean;
+  status: string;
+  created_at: string;
+  has_profile: boolean;
+  profile_id: string | null;
+  photo_url: string | null;
+  profile_completion: number; // 0-100
 };
 
-// OnlineNow usa la misma forma reducida que NewMembers.
-export type OnlineNowResponse = NewMembersResponse;
-
-// Popular usa la misma forma reducida que NewMembers.
-export type PopularResponse = NewMembersResponse;
-
-// Convierte la respuesta reducida (new-members / online-now / popular) al
-// shape completo que espera ProfileCard. Único sitio donde se hace este mapeo.
-export function newMemberToSearchItem(item: NewMemberItem): SearchResultItem {
-  return {
-    profile_id: item.profile_id,
-    display_name: item.display_name,
-    age: item.age,
-    gender: item.gender,
-    country_code: item.country_code,
-    region: item.region,
-    relationship_goals: null,
-    has_photo: item.photo_url !== null,
-    photo_url: item.photo_url,
-    created_at: item.created_at,
-  };
-}
+// POST /likes/{id}
+export type LikeResult = { matched: boolean };
 
 // PublicProfile refleja profileResponse del handler de profiles.
 //

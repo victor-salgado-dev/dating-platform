@@ -79,7 +79,7 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		where = append(where, interestExistsClause(itf, &args))
 	}
 
-	// RelationshipGoals: ahora es una columna text[] llamada relationship_goals
+	// RelationshipGoals: columna text[] relationship_goals (índice GIN, migración 000020)
 	if len(f.RelationshipGoals) > 0 {
 		goals := make([]string, len(f.RelationshipGoals))
 		for i, g := range f.RelationshipGoals {
@@ -88,7 +88,6 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		add("p.relationship_goals && $%d", goals)
 	}
 
-	// Cambiado de booleano a string
 	if f.HasChildren != nil {
 		add("p.has_children = $%d", *f.HasChildren)
 	}
@@ -96,7 +95,7 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		add("p.wants_children = $%d", *f.WantsChildren)
 	}
 
-	// --- NUEVOS FILTROS: Físico y Apariencia ---
+	// --- Físico y Apariencia ---
 	if f.MinHeight != nil {
 		add("p.height >= $%d", *f.MinHeight)
 	}
@@ -128,7 +127,7 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		add("p.body_art && $%d", f.BodyArt)
 	}
 
-	// --- NUEVOS FILTROS: Estilo de Vida y Familia ---
+	// --- Estilo de Vida y Familia ---
 	if f.SmokingHabit != nil {
 		add("p.smoking_habit = $%d", *f.SmokingHabit)
 	}
@@ -157,7 +156,7 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		add("p.living_situation = $%d", *f.LivingSituation)
 	}
 
-	// --- NUEVOS FILTROS: Fondo, Cultura y Valores ---
+	// --- Fondo, Cultura y Valores ---
 	if f.Nationality != nil {
 		add("p.nationality = $%d", *f.Nationality)
 	}
@@ -177,7 +176,7 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		add("p.star_sign = $%d", *f.StarSign)
 	}
 
-	// --- NUEVOS FILTROS: Estilo de vida adicional ---
+	// --- Estilo de vida adicional ---
 	if len(f.FutureVision) > 0 {
 		add("p.future_vision && $%d", f.FutureVision)
 	}
@@ -200,20 +199,32 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		add("p.vacation_activities && $%d", f.VacationActivities)
 	}
 
-	// --- NUEVOS FILTROS: Personalidad (Fase 2) ---------------------------
+	// --- Personalidad (Fase 2) ---
 	for _, pf := range f.PersonalityTraits {
 		where = append(where, personalityExistsClause(pf, &args))
 	}
 
-	// --- Filtro Online Now -------------------------------------------------
+	// --- Filtro Online Now ---
 	if f.OnlineNow {
-		add("u.last_active_at >= now() - ($%d * interval '1 second')", onlineNowWindowSeconds)
+		add("u.last_active_at >= now() - make_interval(secs => $%d::double precision)", float64(onlineNowWindowSeconds))
 	}
 
+	// Las condiciones acaban aquí: la consulta de recuento (página fuera de
+	// rango) usa exactamente los mismos argumentos.
+	whereSQL := strings.Join(where, " AND ")
+	filterArgs := len(args)
+
+	// La popularidad viene de la vista materializada profile_popularity
+	// (migración 000020); solo se une cuando el orden la necesita.
+	joins := `JOIN users u ON u.id = p.user_id
+		LEFT JOIN profiles me ON me.user_id = $1`
 	orderBy := orderByClause(params.Sort)
 	if f.OnlineNow {
 		// En online-now prima la actividad reciente, no la creación reciente.
 		orderBy = "u.last_active_at DESC, p.id ASC"
+	} else if params.Sort == SortPopular {
+		joins += `
+		LEFT JOIN profile_popularity pop ON pop.profile_id = p.id`
 	}
 
 	limitArg := len(args) + 1
@@ -224,18 +235,18 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		SELECT
 			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
 			COALESCE(p.relationship_goals, '{}') AS relationship_goals, p.created_at,
-			EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
 			(SELECT ph.id FROM profile_photos ph
 				WHERE ph.profile_id = p.id
 				ORDER BY ph.position ASC, ph.id ASC
 				LIMIT 1) AS photo_id,
+			%s,
 			COUNT(*) OVER() AS total_count
 		FROM profiles p
-		JOIN users u ON u.id = p.user_id
+		%s
 		WHERE %s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d
-	`, strings.Join(where, " AND "), orderBy, limitArg, offsetArg)
+	`, profiles.ViewerFlagsSQL("me", "p"), joins, whereSQL, orderBy, limitArg, offsetArg)
 
 	rows, err := r.db.Query(ctx, query, args...)
 	if err != nil {
@@ -257,12 +268,14 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 
 		if err := rows.Scan(
 			&item.ProfileID, &item.DisplayName, &birthDate, &genderStr, &item.CountryCode,
-			&item.Region, &relGoalsList, &item.CreatedAt, &item.HasPhoto,
-			&item.PhotoID, &totalCount,
+			&item.Region, &relGoalsList, &item.CreatedAt, &item.PhotoID,
+			&item.Liked, &item.Favorited, &item.ReceivedLike, &item.ReceivedFavorite,
+			&totalCount,
 		); err != nil {
 			return nil, fmt.Errorf("search: leer resultado: %w", err)
 		}
 
+		item.HasPhoto = item.PhotoID != nil
 		item.Age = profiles.AgeAt(birthDate, now)
 		item.Gender = profiles.Gender(genderStr)
 		if len(relGoalsList) > 0 {
@@ -277,6 +290,21 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("search: leer resultados: %w", err)
+	}
+
+	// COUNT(*) OVER() vive en las filas devueltas: si la página pedida está
+	// fuera de rango no hay ninguna y total saldría 0, con lo que el cliente
+	// no sabría a qué página volver. En ese caso (y solo ese) se cuenta aparte.
+	if len(items) == 0 && params.Page > 1 {
+		countQuery := fmt.Sprintf(`
+			SELECT COUNT(*)
+			FROM profiles p
+			JOIN users u ON u.id = p.user_id
+			WHERE %s
+		`, whereSQL)
+		if err := r.db.QueryRow(ctx, countQuery, args[:filterArgs]...).Scan(&total); err != nil {
+			return nil, fmt.Errorf("search: contar perfiles: %w", err)
+		}
 	}
 
 	totalPages := 0
@@ -344,17 +372,9 @@ func orderByClause(sort Sort) string {
 	case SortAgeDesc:
 		return "p.birth_date ASC, p.id ASC"
 	case SortPopular:
-		return `(
-			(SELECT COUNT(*) FROM likes l WHERE l.to_profile_id = p.id) +
-			(SELECT COUNT(*) FROM favorites f WHERE f.favorite_profile_id = p.id) +
-			(
-				SELECT COUNT(*) FROM messages m
-				JOIN conversations c ON c.id = m.conversation_id
-				WHERE (c.user_one_id = u.id AND m.sender_id <> u.id)
-				   OR (c.user_two_id = u.id AND m.sender_id <> u.id)
-			) +
-			(SELECT COUNT(*) FROM profile_visits v WHERE v.visited_profile_id = p.id)
-		) DESC, p.created_at DESC, p.id ASC`
+		// pop viene de un LEFT JOIN a profile_popularity: los perfiles sin
+		// actividad reciente no tienen fila y cuentan como 0.
+		return "COALESCE(pop.score, 0) DESC, p.created_at DESC, p.id ASC"
 	default: // SortRecent
 		return "p.created_at DESC, p.id ASC"
 	}

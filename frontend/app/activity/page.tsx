@@ -8,7 +8,6 @@ import { useI18n } from '@/lib/i18n/context';
 import type { Dictionary } from '@/lib/i18n/dictionaries/es';
 import type { Locale } from '@/lib/i18n/config';
 import { PhotoGalleryModal } from '@/components/ProfileCard';
-import { useProfileInteractions } from '@/lib/useProfileInteractions';
 import { EmptyState, ErrorBanner } from '@/components/ListSectionState';
 import LikesSection from '@/components/LikesSection';
 import VisitsSection from '@/components/VisitsSection';
@@ -39,7 +38,8 @@ function relativeDate(value: string, dictionary: Dictionary, locale: Locale): st
 
 // Fila de "Novedades": mismo feed en lista de siempre, pero ahora con las
 // mismas acciones (like / favorito / ver fotos) que las tarjetas de Home,
-// en vez de ser solo un link al perfil.
+// en vez de ser solo un link al perfil. El estado inicial de like/favorito
+// viene en el propio item (el backend lo calcula en la misma consulta).
 function FeedRow({
   item,
   dictionary,
@@ -50,24 +50,21 @@ function FeedRow({
   locale: Locale;
 }) {
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
-  const { likedIds, favoritedIds, toggleLike, toggleFavorite } = useProfileInteractions();
-  const [liked, setLiked] = useState(false);
-  const [favorited, setFavorited] = useState(false);
+  const [liked, setLiked] = useState(item.liked);
+  const [favorited, setFavorited] = useState(item.favorited);
 
-  useEffect(() => setLiked(likedIds.has(item.profile_id)), [likedIds, item.profile_id]);
-  useEffect(() => setFavorited(favoritedIds.has(item.profile_id)), [favoritedIds, item.profile_id]);
+  useEffect(() => setLiked(item.liked), [item.liked]);
+  useEffect(() => setFavorited(item.favorited), [item.favorited]);
 
   async function handleLike(e: MouseEvent) {
     e.preventDefault();
     e.stopPropagation();
     const next = !liked;
     setLiked(next);
-    toggleLike(item.profile_id, next);
     try {
       await apiFetch(`/likes/${item.profile_id}`, { method: next ? 'POST' : 'DELETE' });
     } catch {
       setLiked(!next);
-      toggleLike(item.profile_id, !next);
     }
   }
 
@@ -76,12 +73,10 @@ function FeedRow({
     e.stopPropagation();
     const next = !favorited;
     setFavorited(next);
-    toggleFavorite(item.profile_id, next);
     try {
       await apiFetch(`/favorites/${item.profile_id}`, { method: next ? 'POST' : 'DELETE' });
     } catch {
       setFavorited(!next);
-      toggleFavorite(item.profile_id, !next);
     }
   }
 

@@ -111,6 +111,7 @@ func (s *Service) Register(ctx context.Context, rawEmail, password string, accep
 		return nil, "", err
 	}
 
+	s.touchAsync(u.ID)
 	return u, token, nil
 }
 
@@ -144,6 +145,7 @@ func (s *Service) Login(ctx context.Context, rawEmail, password string) (*users.
 		return nil, "", err
 	}
 
+	s.touchAsync(u.ID)
 	return u, token, nil
 }
 
@@ -153,11 +155,35 @@ func (s *Service) Logout(ctx context.Context, sessionToken string) error {
 	return s.sessions.Delete(ctx, sessionToken)
 }
 
-// CurrentUser resuelve la sesión y devuelve la cuenta asociada.
-// Devuelve ErrTokenInvalid si la sesión no existe o ha caducado, o
-// ErrAccountSuspended si la cuenta fue suspendida después de abrir la
-// sesión (una suspensión debe cortar el acceso de inmediato, no solo
-// impedir logins nuevos).
+// Authenticate es lo que usa RequireAuth en CADA petición: devuelve solo el
+// ID del usuario. Si el SessionStore ofrece el camino rápido
+// (SessionResolver: Redis en un único viaje, sin tocar Postgres) lo usa; si
+// no, cae en CurrentUser. Una suspensión o una eliminación de cuenta cortan
+// el acceso de inmediato porque BlockUser deja una marca que Resolve lee.
+func (s *Service) Authenticate(ctx context.Context, sessionToken string) (uuid.UUID, error) {
+	if resolver, ok := s.sessions.(SessionResolver); ok {
+		userID, touch, err := resolver.Resolve(ctx, sessionToken)
+		if err != nil {
+			return uuid.Nil, err
+		}
+		if touch {
+			s.touchAsync(userID)
+		}
+		return userID, nil
+	}
+
+	u, err := s.CurrentUser(ctx, sessionToken)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return u.ID, nil
+}
+
+// CurrentUser resuelve la sesión y devuelve la cuenta asociada (lectura
+// completa de Postgres). Devuelve ErrTokenInvalid si la sesión no existe o
+// ha caducado, o ErrAccountSuspended si la cuenta fue suspendida después de
+// abrir la sesión. Lo usan los caminos que necesitan el usuario entero, como
+// admin.RequireAdmin (rol); RequireAuth usa Authenticate.
 func (s *Service) CurrentUser(ctx context.Context, sessionToken string) (*users.User, error) {
 	sess, err := s.sessions.Get(ctx, sessionToken)
 	if err != nil {
@@ -177,6 +203,19 @@ func (s *Service) CurrentUser(ctx context.Context, sessionToken string) (*users.
 	}
 
 	return u, nil
+}
+
+// touchAsync refresca users.last_active_at sin retrasar la petición. Se
+// llama como mucho una vez cada pocos minutos por usuario (ver
+// resolveScript), así que es una escritura barata.
+func (s *Service) touchAsync(userID uuid.UUID) {
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if err := s.users.TouchLastActive(ctx, userID); err != nil {
+			slog.Warn("no se pudo actualizar last_active_at", "user_id", userID, "error", err)
+		}
+	}()
 }
 
 // RequestPasswordReset genera un token de reset y envía el email.
@@ -279,8 +318,9 @@ func (s *Service) ResendVerification(ctx context.Context, userID uuid.UUID) erro
 }
 
 // DeleteAccount confirma la contraseña y elimina (soft delete) la cuenta.
-// No cierra la sesión: eso lo hace el handler HTTP, que es quien conoce
-// la cookie concreta a invalidar.
+// No cierra la sesión de la cookie actual: eso lo hace el handler HTTP, que
+// es quien conoce esa cookie. Las sesiones en otros dispositivos se cortan
+// con la marca de bloqueo (ver Authenticate).
 func (s *Service) DeleteAccount(ctx context.Context, userID uuid.UUID, password string) error {
 	u, err := s.users.GetByID(ctx, userID)
 	if err != nil {
@@ -291,7 +331,16 @@ func (s *Service) DeleteAccount(ctx context.Context, userID uuid.UUID, password 
 		return ErrInvalidCredentials
 	}
 
-	return s.users.SoftDelete(ctx, userID)
+	if err := s.users.SoftDelete(ctx, userID); err != nil {
+		return err
+	}
+
+	if blocker, ok := s.sessions.(AccountBlocker); ok {
+		if err := blocker.BlockUser(ctx, userID, BlockDeleted); err != nil {
+			slog.Error("no se pudo marcar la cuenta eliminada como bloqueada", "user_id", userID, "error", err)
+		}
+	}
+	return nil
 }
 
 func (s *Service) sendVerificationEmailBestEffort(ctx context.Context, u *users.User) {

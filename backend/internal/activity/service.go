@@ -2,7 +2,6 @@ package activity
 
 import (
 	"context"
-	"sort"
 
 	"github.com/google/uuid"
 
@@ -10,16 +9,19 @@ import (
 )
 
 type Service struct {
-	repo     Repository
-	profiles profiles.Repository
+	repo Repository
+	ids  *profiles.IDResolver
 }
 
-func NewService(repo Repository, profilesRepo profiles.Repository) *Service {
-	return &Service{repo: repo, profiles: profilesRepo}
+func NewService(repo Repository, ids *profiles.IDResolver) *Service {
+	return &Service{repo: repo, ids: ids}
 }
 
+// List devuelve el feed de actividad. El repositorio ya lo entrega ordenado
+// (created_at DESC, event_type, profile id); antes se reordenaba aquí en Go
+// con exactamente el mismo criterio.
 func (s *Service) List(ctx context.Context, userID uuid.UUID, page, pageSize int) (*Result, error) {
-	profile, err := s.profiles.GetByUserID(ctx, userID)
+	profileID, err := s.ids.ProfileID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
@@ -32,22 +34,5 @@ func (s *Service) List(ctx context.Context, userID uuid.UUID, page, pageSize int
 	if pageSize > MaxPageSize {
 		pageSize = MaxPageSize
 	}
-	result, err := s.repo.List(ctx, profile.ID, page, pageSize)
-	if err != nil {
-		return nil, err
-	}
-	sortItems(result.Items)
-	return result, nil
-}
-
-func sortItems(items []Item) {
-	sort.SliceStable(items, func(i, j int) bool {
-		if items[i].CreatedAt.Equal(items[j].CreatedAt) {
-			if items[i].EventType == items[j].EventType {
-				return items[i].ProfileID.String() < items[j].ProfileID.String()
-			}
-			return items[i].EventType < items[j].EventType
-		}
-		return items[i].CreatedAt.After(items[j].CreatedAt)
-	})
+	return s.repo.List(ctx, profileID, page, pageSize)
 }

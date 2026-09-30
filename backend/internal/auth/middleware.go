@@ -17,6 +17,10 @@ const userIDContextKey contextKey = "auth_user_id"
 // RequireAuth exige una cookie de sesión válida. Si es válida, añade el
 // ID del usuario al contexto de la petición (ver UserIDFromContext) y
 // continúa; si no, responde 401 sin llegar al handler protegido.
+//
+// Usa Service.Authenticate: con RedisSessionStore es UN viaje a Redis por
+// petición y ninguna consulta a Postgres (antes eran GET + TTL en Redis y
+// la fila completa del usuario, con su hash de contraseña).
 func RequireAuth(svc *Service, cookieName string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -26,7 +30,7 @@ func RequireAuth(svc *Service, cookieName string) func(http.Handler) http.Handle
 				return
 			}
 
-			u, err := svc.CurrentUser(r.Context(), cookie.Value)
+			userID, err := svc.Authenticate(r.Context(), cookie.Value)
 			if err != nil {
 				switch {
 				case errors.Is(err, ErrTokenInvalid):
@@ -39,7 +43,7 @@ func RequireAuth(svc *Service, cookieName string) func(http.Handler) http.Handle
 				return
 			}
 
-			ctx := ContextWithUserID(r.Context(), u.ID)
+			ctx := ContextWithUserID(r.Context(), userID)
 			next.ServeHTTP(w, r.WithContext(ctx))
 		})
 	}

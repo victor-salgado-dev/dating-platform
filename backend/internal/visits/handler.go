@@ -36,6 +36,11 @@ type profileResponse struct {
 	// que discover/search, likes y activity:
 	// /api/v1/profiles/{profileID}/photos/{photoID}/file
 	PhotoURL *string `json:"photo_url"`
+
+	Liked            bool `json:"liked"`
+	Favorited        bool `json:"favorited"`
+	ReceivedLike     bool `json:"received_like"`
+	ReceivedFavorite bool `json:"received_favorite"`
 }
 
 type listResponse struct {
@@ -159,6 +164,10 @@ func toListResponse(result *ListResult) listResponse {
 			VisitedAt:        it.VisitedAt.Format(time.RFC3339),
 			PhotoID:          photoIDString(it.PhotoID),
 			PhotoURL:         photoURL(it.ProfileID, it.PhotoID),
+			Liked:            it.Liked,
+			Favorited:        it.Favorited,
+			ReceivedLike:     it.ReceivedLike,
+			ReceivedFavorite: it.ReceivedFavorite,
 		})
 	}
 	return listResponse{

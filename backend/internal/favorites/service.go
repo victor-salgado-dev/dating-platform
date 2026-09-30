@@ -9,24 +9,24 @@ import (
 )
 
 type Service struct {
-	repo     Repository
-	profiles profiles.Repository
+	repo Repository
+	ids  *profiles.IDResolver
 }
 
-func NewService(repo Repository, profilesRepo profiles.Repository) *Service {
-	return &Service{repo: repo, profiles: profilesRepo}
+func NewService(repo Repository, ids *profiles.IDResolver) *Service {
+	return &Service{repo: repo, ids: ids}
 }
 
 // Add marca profileID como favorito de userID. Valida que el perfil
-// exista y sea de una cuenta activa (misma regla de privacidad básica
-// que la Fase 6: profiles.ErrNotFound cubre ambos casos sin distinguir)
-// y que no sea el propio perfil del usuario.
+// exista y sea de una cuenta activa sin bloqueos (profiles.ErrNotFound
+// cubre todos esos casos sin distinguir) y que no sea el propio perfil
+// del usuario. Todo en una sola consulta ligera (IDResolver.ResolveTarget).
 func (s *Service) Add(ctx context.Context, userID, profileID uuid.UUID) error {
-	target, err := s.profiles.GetPublicByID(ctx, profileID, userID)
+	target, err := s.ids.ResolveTarget(ctx, userID, profileID)
 	if err != nil {
 		return err
 	}
-	if target.UserID == userID {
+	if target.TargetUserID == userID {
 		return ErrCannotFavoriteSelf
 	}
 	return s.repo.Add(ctx, userID, profileID)
@@ -43,40 +43,28 @@ func (s *Service) IsFavorited(ctx context.Context, userID, profileID uuid.UUID) 
 }
 
 func (s *Service) List(ctx context.Context, userID uuid.UUID, page, pageSize int) (*ListResult, error) {
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 {
-		pageSize = DefaultPageSize
-	}
-	if pageSize > MaxPageSize {
-		pageSize = MaxPageSize
-	}
+	page, pageSize = clampPaging(page, pageSize)
 	return s.repo.List(ctx, userID, page, pageSize)
 }
 
 func (s *Service) ListReceived(ctx context.Context, userID uuid.UUID, page, pageSize int) (*ListResult, error) {
-	profile, err := s.profiles.GetByUserID(ctx, userID)
+	profileID, err := s.ids.ProfileID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	if page < 1 {
-		page = 1
-	}
-	if pageSize < 1 {
-		pageSize = DefaultPageSize
-	}
-	if pageSize > MaxPageSize {
-		pageSize = MaxPageSize
-	}
-	return s.repo.ListReceived(ctx, profile.ID, page, pageSize)
+	page, pageSize = clampPaging(page, pageSize)
+	return s.repo.ListReceived(ctx, profileID, page, pageSize)
 }
 
-// ListMutual lista los favoritos mutuos del usuario. A diferencia de
-// ListReceived, no necesita resolver el perfil: el repositorio recibe el
-// user_id directamente (la condición "yo marqué" se resuelve por user_id,
+// ListMutual lista los favoritos mutuos del usuario. El repositorio recibe
+// el user_id directamente (la condición "yo marqué" se resuelve por user_id,
 // y "me marcaron" se contrasta internamente contra mi profile_id).
 func (s *Service) ListMutual(ctx context.Context, userID uuid.UUID, page, pageSize int) (*ListResult, error) {
+	page, pageSize = clampPaging(page, pageSize)
+	return s.repo.ListMutual(ctx, userID, page, pageSize)
+}
+
+func clampPaging(page, pageSize int) (int, int) {
 	if page < 1 {
 		page = 1
 	}
@@ -86,5 +74,5 @@ func (s *Service) ListMutual(ctx context.Context, userID uuid.UUID, page, pageSi
 	if pageSize > MaxPageSize {
 		pageSize = MaxPageSize
 	}
-	return s.repo.ListMutual(ctx, userID, page, pageSize)
+	return page, pageSize
 }

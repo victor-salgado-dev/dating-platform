@@ -2,6 +2,7 @@ package auth
 
 import (
 	"errors"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -12,13 +13,19 @@ import (
 
 // Handler expone el módulo auth como endpoints HTTP bajo /api/v1/auth.
 type Handler struct {
-	svc *Service
-	cfg config.AuthConfig
+	svc     *Service
+	cfg     config.AuthConfig
+	summary SummaryProvider // opcional; ver SetSummaryProvider
 }
 
 func NewHandler(svc *Service, cfg config.AuthConfig) *Handler {
 	return &Handler{svc: svc, cfg: cfg}
 }
+
+// SetSummaryProvider inyecta quien calcula avatar y % de perfil completado
+// para GET /auth/me (profiles.SummaryStore). Es opcional: sin él, /auth/me
+// devuelve solo los datos de la cuenta, como antes.
+func (h *Handler) SetSummaryProvider(p SummaryProvider) { h.summary = p }
 
 // --- DTOs de petición/respuesta -------------------------------------------
 
@@ -56,6 +63,16 @@ type userResponse struct {
 	EmailVerified bool   `json:"email_verified"`
 	Status        string `json:"status"`
 	CreatedAt     string `json:"created_at"`
+}
+
+// meResponse amplía userResponse con lo que necesita el header, para que el
+// cliente no tenga que pedir además /profiles/me y /profiles/me/photos.
+type meResponse struct {
+	userResponse
+	HasProfile        bool    `json:"has_profile"`
+	ProfileID         *string `json:"profile_id"`
+	PhotoURL          *string `json:"photo_url"`
+	ProfileCompletion int     `json:"profile_completion"`
 }
 
 func toUserResponse(u *users.User) userResponse {
@@ -145,7 +162,23 @@ func (h *Handler) Me(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	httpx.WriteJSON(w, http.StatusOK, toUserResponse(u))
+	resp := meResponse{userResponse: toUserResponse(u)}
+	if h.summary != nil {
+		if sum, err := h.summary.AccountSummary(r.Context(), userID); err != nil {
+			// El resumen es accesorio: si falla, /auth/me sigue respondiendo.
+			slog.Warn("no se pudo calcular el resumen de cuenta", "user_id", userID, "error", err)
+		} else {
+			resp.HasProfile = sum.HasProfile
+			resp.PhotoURL = sum.PhotoURL
+			resp.ProfileCompletion = sum.Completion
+			if sum.ProfileID != nil {
+				id := sum.ProfileID.String()
+				resp.ProfileID = &id
+			}
+		}
+	}
+
+	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) ForgotPassword(w http.ResponseWriter, r *http.Request) {
@@ -273,3 +306,4 @@ func (h *Handler) clearSessionCookie(w http.ResponseWriter) {
 		MaxAge:   -1,
 	})
 }
+

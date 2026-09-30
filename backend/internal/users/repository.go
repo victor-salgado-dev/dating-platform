@@ -44,6 +44,11 @@ type Repository interface {
 	// SoftDelete. Devuelve ErrNotFound si la cuenta no existe.
 	SetStatus(ctx context.Context, id uuid.UUID, status Status) error
 
+	// TouchLastActive fija last_active_at a la hora actual. Lo llama auth
+	// como mucho una vez cada pocos minutos por usuario (alimenta
+	// /search/online-now). No modifica updated_at (ver migración 000020).
+	TouchLastActive(ctx context.Context, id uuid.UUID) error
+
 	// List pagina cuentas para el panel de administración (Fase 10).
 	// A diferencia de GetByID/GetByEmail, SÍ incluye cuentas eliminadas
 	// (el admin necesita verlas para auditoría); statusFilter es

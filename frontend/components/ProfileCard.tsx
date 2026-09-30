@@ -1,9 +1,15 @@
 'use client';
 
 // Tarjeta de perfil + modal de fotos, compartidos entre Home, Discover,
-// Likes, Visits, Favorites y Activity. Antes vivían solo dentro de
-// app/home/page.tsx; se extraen aquí para no duplicar la lógica de
-// like/favorito/galería en cada pantalla que lista perfiles.
+// Likes, Visits, Favorites y Activity.
+//
+// El estado inicial de like / favorito y las insignias de "te dio like" /
+// "te tiene en favoritos" vienen en la propia ficha (profile.liked,
+// profile.favorited, profile.received_like, profile.received_favorite): el
+// backend los calcula en la misma consulta que el listado. Las props
+// initialLiked / initialFavorited / receivedLike / receivedFavorite siguen
+// aceptándose (y, si se pasan, mandan) para no romper pantallas antiguas que
+// todavía usan useProfileInteractions.
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -26,6 +32,12 @@ export interface ProfileItem {
   relationship_goals?: string[] | null;
   has_photo: boolean;
   photo_url?: string | null;
+
+  // Relación con quien mira, calculada por el backend.
+  liked?: boolean;
+  favorited?: boolean;
+  received_like?: boolean;
+  received_favorite?: boolean;
 }
 
 interface PhotoItem {
@@ -127,42 +139,45 @@ export function ProfileCard({
 }: {
   profile: ProfileItem;
   isPremium: boolean;
-  initialLiked: boolean;
-  initialFavorited: boolean;
-  receivedLike: boolean;
-  receivedFavorite: boolean;
-  onToggleLike: (id: string, liked: boolean) => void;
-  onToggleFavorite: (id: string, favorited: boolean) => void;
+  // Opcionales: si no se pasan, se usan los flags de `profile`.
+  initialLiked?: boolean;
+  initialFavorited?: boolean;
+  receivedLike?: boolean;
+  receivedFavorite?: boolean;
+  onToggleLike?: (id: string, liked: boolean) => void;
+  onToggleFavorite?: (id: string, favorited: boolean) => void;
 }) {
   const { dictionary } = useI18n();
   const [isGalleryOpen, setIsGalleryOpen] = useState(false);
-  const [liked, setLiked] = useState(initialLiked);
-  const [favorited, setFavorited] = useState(initialFavorited);
+
+  const likedFromServer = initialLiked ?? profile.liked ?? false;
+  const favoritedFromServer = initialFavorited ?? profile.favorited ?? false;
+  const [liked, setLiked] = useState(likedFromServer);
+  const [favorited, setFavorited] = useState(favoritedFromServer);
 
   useEffect(() => {
-    setLiked(initialLiked);
-  }, [initialLiked]);
+    setLiked(likedFromServer);
+  }, [likedFromServer]);
 
   useEffect(() => {
-    setFavorited(initialFavorited);
-  }, [initialFavorited]);
+    setFavorited(favoritedFromServer);
+  }, [favoritedFromServer]);
+
+  const gotLike = receivedLike ?? profile.received_like ?? false;
+  const gotFavorite = receivedFavorite ?? profile.received_favorite ?? false;
 
   const handleLike = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
     const nextState = !liked;
     setLiked(nextState);
-    onToggleLike(profile.profile_id, nextState);
+    onToggleLike?.(profile.profile_id, nextState);
 
     try {
-      if (!nextState) {
-        await apiFetch(`/likes/${profile.profile_id}`, { method: 'DELETE' });
-      } else {
-        await apiFetch(`/likes/${profile.profile_id}`, { method: 'POST' });
-      }
+      await apiFetch(`/likes/${profile.profile_id}`, { method: nextState ? 'POST' : 'DELETE' });
     } catch (err) {
       setLiked(!nextState);
-      onToggleLike(profile.profile_id, !nextState);
+      onToggleLike?.(profile.profile_id, !nextState);
       console.error('Error al procesar like', err);
     }
   };
@@ -172,26 +187,22 @@ export function ProfileCard({
     e.stopPropagation();
     const nextState = !favorited;
     setFavorited(nextState);
-    onToggleFavorite(profile.profile_id, nextState);
+    onToggleFavorite?.(profile.profile_id, nextState);
 
     try {
-      if (!nextState) {
-        await apiFetch(`/favorites/${profile.profile_id}`, { method: 'DELETE' });
-      } else {
-        await apiFetch(`/favorites/${profile.profile_id}`, { method: 'POST' });
-      }
+      await apiFetch(`/favorites/${profile.profile_id}`, { method: nextState ? 'POST' : 'DELETE' });
     } catch (err) {
       setFavorited(!nextState);
-      onToggleFavorite(profile.profile_id, !nextState);
+      onToggleFavorite?.(profile.profile_id, !nextState);
       console.error('Error al procesar favorito', err);
     }
   };
 
-  const receivedClass = receivedLike && receivedFavorite
+  const receivedClass = gotLike && gotFavorite
     ? styles.receivedBoth
-    : receivedLike
+    : gotLike
     ? styles.receivedLike
-    : receivedFavorite
+    : gotFavorite
     ? styles.receivedFav
     : '';
 
@@ -215,15 +226,15 @@ export function ProfileCard({
               src={profile.photo_url}
               alt={profile.display_name}
               className={styles.photoImg}
-              loading="lazy" // <--- Descarga escalonada: solo descarga la imagen si entra en la vista
+              loading="lazy" // Descarga escalonada: solo descarga la imagen si entra en la vista
             />
           ) : (
             <div className={styles.photoPlaceholder}>{dictionary.common.noPhoto}</div>
           )}
-          {(receivedLike || receivedFavorite) && (
+          {(gotLike || gotFavorite) && (
             <div className={styles.receivedBadges}>
-              {receivedLike && <span className={styles.badgeLike}>♥</span>}
-              {receivedFavorite && <span className={styles.badgeFav}>★</span>}
+              {gotLike && <span className={styles.badgeLike}>♥</span>}
+              {gotFavorite && <span className={styles.badgeFav}>★</span>}
             </div>
           )}
         </div>

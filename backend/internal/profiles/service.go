@@ -329,7 +329,7 @@ func (s *Service) GetFullPublicProfile(ctx context.Context, viewerUserID, profil
 		return nil, firstErr
 	}
 
-	if s.visits != nil && viewerProfile != nil && viewerProfile.ID != profileID {
+	if s.visits != nil && viewerProfile != nil && viewerProfile.ID != profileID && !visitSkipped(ctx) {
 		if err := s.visits.Record(ctx, viewerProfile.ID, profileID); err != nil {
 			slog.Error("no se pudo registrar la visita", "error", err)
 		}

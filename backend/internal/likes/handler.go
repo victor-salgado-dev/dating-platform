@@ -34,6 +34,11 @@ type profileResponse struct {
 	// foto de cada tarjeta por separado (evita el N+1 en el cliente).
 	PhotoURL *string `json:"photo_url"`
 	LikedAt  string  `json:"liked_at"`
+
+	Liked            bool `json:"liked"`
+	Favorited        bool `json:"favorited"`
+	ReceivedLike     bool `json:"received_like"`
+	ReceivedFavorite bool `json:"received_favorite"`
 }
 type listResponse struct {
 	Items      []profileResponse `json:"items"`
@@ -56,6 +61,11 @@ type matchResponse struct {
 	PhotoURL       *string `json:"photo_url"`
 	MatchedAt      string  `json:"matched_at"`
 	ConversationID *string `json:"conversation_id,omitempty"`
+
+	Liked            bool `json:"liked"`
+	Favorited        bool `json:"favorited"`
+	ReceivedLike     bool `json:"received_like"`
+	ReceivedFavorite bool `json:"received_favorite"`
 }
 type matchesResponse struct {
 	Items      []matchResponse `json:"items"`
@@ -70,6 +80,12 @@ type statusResponse struct {
 	Matched bool `json:"matched"`
 }
 
+// addResponse: POST /likes/{id} devuelve si el like ha formado un match, para
+// que el cliente pueda avisar al momento sin una segunda petición.
+type addResponse struct {
+	Matched bool `json:"matched"`
+}
+
 func (h *Handler) Add(w http.ResponseWriter, r *http.Request) {
 	userID, profileID, ok := h.authAndProfileID(w, r)
 	if !ok {
@@ -80,8 +96,7 @@ func (h *Handler) Add(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	_ = matched
-	w.WriteHeader(http.StatusNoContent)
+	httpx.WriteJSON(w, http.StatusOK, addResponse{Matched: matched})
 }
 func (h *Handler) Remove(w http.ResponseWriter, r *http.Request) {
 	userID, profileID, ok := h.authAndProfileID(w, r)
@@ -153,7 +168,23 @@ func (h *Handler) ListMatches(w http.ResponseWriter, r *http.Request) {
 			v := it.ConversationID.String()
 			conversationID = &v
 		}
-		items = append(items, matchResponse{ProfileID: it.ProfileID.String(), DisplayName: it.DisplayName, Age: it.Age, Gender: string(it.Gender), CountryCode: it.CountryCode, Region: it.Region, HasPhoto: it.HasPhoto, PhotoID: photoIDString(it.PhotoID), PhotoURL: photoURL(it.ProfileID, it.PhotoID), MatchedAt: it.MatchedAt.Format(time.RFC3339), ConversationID: conversationID})
+		items = append(items, matchResponse{
+			ProfileID:        it.ProfileID.String(),
+			DisplayName:      it.DisplayName,
+			Age:              it.Age,
+			Gender:           string(it.Gender),
+			CountryCode:      it.CountryCode,
+			Region:           it.Region,
+			HasPhoto:         it.HasPhoto,
+			PhotoID:          photoIDString(it.PhotoID),
+			PhotoURL:         photoURL(it.ProfileID, it.PhotoID),
+			MatchedAt:        it.MatchedAt.Format(time.RFC3339),
+			ConversationID:   conversationID,
+			Liked:            it.Liked,
+			Favorited:        it.Favorited,
+			ReceivedLike:     it.ReceivedLike,
+			ReceivedFavorite: it.ReceivedFavorite,
+		})
 	}
 	httpx.WriteJSON(w, http.StatusOK, matchesResponse{Items: items, Page: result.Page, PageSize: result.PageSize, Total: result.Total, TotalPages: result.TotalPages})
 }
@@ -225,7 +256,23 @@ func toListResponse(result *ListResult) listResponse {
 			v := string(*it.RelationshipGoal)
 			goal = &v
 		}
-		items = append(items, profileResponse{ProfileID: it.ProfileID.String(), DisplayName: it.DisplayName, Age: it.Age, Gender: string(it.Gender), CountryCode: it.CountryCode, Region: it.Region, RelationshipGoal: goal, HasPhoto: it.HasPhoto, PhotoID: photoIDString(it.PhotoID), PhotoURL: photoURL(it.ProfileID, it.PhotoID), LikedAt: it.LikedAt.Format(time.RFC3339)})
+		items = append(items, profileResponse{
+			ProfileID:        it.ProfileID.String(),
+			DisplayName:      it.DisplayName,
+			Age:              it.Age,
+			Gender:           string(it.Gender),
+			CountryCode:      it.CountryCode,
+			Region:           it.Region,
+			RelationshipGoal: goal,
+			HasPhoto:         it.HasPhoto,
+			PhotoID:          photoIDString(it.PhotoID),
+			PhotoURL:         photoURL(it.ProfileID, it.PhotoID),
+			LikedAt:          it.LikedAt.Format(time.RFC3339),
+			Liked:            it.Liked,
+			Favorited:        it.Favorited,
+			ReceivedLike:     it.ReceivedLike,
+			ReceivedFavorite: it.ReceivedFavorite,
+		})
 	}
 	return listResponse{Items: items, Page: result.Page, PageSize: result.PageSize, Total: result.Total, TotalPages: result.TotalPages}
 }

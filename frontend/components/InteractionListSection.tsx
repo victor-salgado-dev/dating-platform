@@ -6,11 +6,15 @@
 // datos de cada pestaña y los textos a mostrar. Así, añadir una cuarta
 // lista de interacciones en el futuro es escribir un fetchPage, no
 // duplicar otras 150 líneas.
+//
+// Ya no hay caché propia de páginas ni useProfileInteractions: cada ficha
+// trae sus flags (liked, favorited, received_*) desde el backend, y la caché
+// de apiFetch (60 s, vaciada en cada like/favorito) evita repetir peticiones
+// sin servir marcas de corazón caducadas.
 
 import React, { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ProfileCard, ProfileItem } from './ProfileCard';
-import { useProfileInteractions } from '@/lib/useProfileInteractions';
 import { EmptyState, ErrorBanner } from './ListSectionState';
 import styles from './ListSection.module.css';
 
@@ -49,22 +53,6 @@ export interface InteractionListSectionProps<T extends string> {
   openConversationLabel?: string;
 }
 
-type PageFetchResult = {
-  items: InteractionCardItem[];
-  page: number;
-  total_pages: number;
-  total: number;
-};
-
-// Caché en memoria de páginas ya pedidas. Vive durante la sesión de
-// navegación y se limpia con cada like/favorito para volver a pedir datos
-// actualizados la próxima vez que se entre a la pestaña/página.
-const interactionListCache = new Map<string, Map<number, PageFetchResult>>();
-
-function clearInteractionListCache() {
-  interactionListCache.clear();
-}
-
 export function InteractionListSection<T extends string>({
   tabs,
   defaultTab,
@@ -88,45 +76,10 @@ export function InteractionListSection<T extends string>({
   const [error, setError] = useState<string | null>(null);
   const [sortDesc, setSortDesc] = useState(true);
 
-  const {
-    likedIds,
-    favoritedIds,
-    receivedLikeIds,
-    receivedFavIds,
-    toggleLike: baseToggleLike,
-    toggleFavorite: baseToggleFavorite,
-  } = useProfileInteractions();
-
   const activeConfig = tabs.find((t) => t.key === tab) ?? tabs[0];
-
-  function handleToggleLike(id: string, isLiked: boolean) {
-    clearInteractionListCache();
-    baseToggleLike(id, isLiked);
-  }
-
-  function handleToggleFavorite(id: string, isFav: boolean) {
-    clearInteractionListCache();
-    baseToggleFavorite(id, isFav);
-  }
 
   useEffect(() => {
     let active = true;
-    const cacheKey = activeConfig.key;
-    const pageCache = interactionListCache.get(cacheKey) ?? new Map<number, PageFetchResult>();
-    const cachedPage = pageCache.get(page);
-
-    if (cachedPage) {
-      setItems(cachedPage.items);
-      setMeta({
-        page: cachedPage.page,
-        total_pages: cachedPage.total_pages,
-        total: cachedPage.total,
-      });
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
     setLoading(true);
     setError(null);
 
@@ -134,24 +87,8 @@ export function InteractionListSection<T extends string>({
       .fetchPage(page)
       .then((data) => {
         if (!active) return;
-
-        const result: PageFetchResult = {
-          items: data.items,
-          page: data.page,
-          total_pages: data.total_pages,
-          total: data.total,
-        };
-
-        const currentPageCache = interactionListCache.get(cacheKey) ?? new Map<number, PageFetchResult>();
-        currentPageCache.set(page, result);
-        interactionListCache.set(cacheKey, currentPageCache);
-
-        setItems(result.items);
-        setMeta({
-          page: result.page,
-          total_pages: result.total_pages,
-          total: result.total,
-        });
+        setItems(data.items);
+        setMeta({ page: data.page, total_pages: data.total_pages, total: data.total });
       })
       .catch((err: unknown) => {
         if (!active) return;
@@ -223,18 +160,7 @@ export function InteractionListSection<T extends string>({
           ) : (
             <div className={styles.grid}>
               {sortedItems.map((item) => {
-                const card = (
-                  <ProfileCard
-                    profile={item}
-                    isPremium={false}
-                    initialLiked={likedIds.has(item.profile_id)}
-                    initialFavorited={favoritedIds.has(item.profile_id)}
-                    receivedLike={receivedLikeIds.has(item.profile_id)}
-                    receivedFavorite={receivedFavIds.has(item.profile_id)}
-                    onToggleLike={handleToggleLike}
-                    onToggleFavorite={handleToggleFavorite}
-                  />
-                );
+                const card = <ProfileCard profile={item} isPremium={false} />;
 
                 // Solo Likes muestra el link de conversación bajo la
                 // tarjeta; el resto renderiza la tarjeta suelta, igual

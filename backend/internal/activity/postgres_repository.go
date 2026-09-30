@@ -18,7 +18,7 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository { return &Postg
 var _ Repository = (*PostgresRepository)(nil)
 
 func (r *PostgresRepository) List(ctx context.Context, profileID uuid.UUID, page, pageSize int) (*Result, error) {
-	const query = `
+	query := fmt.Sprintf(`
         WITH events AS (
             SELECT 'like_received'::text AS event_type, l.from_profile_id AS profile_id, l.created_at
             FROM likes l
@@ -43,10 +43,11 @@ func (r *PostgresRepository) List(ctx context.Context, profileID uuid.UUID, page
                    SELECT '/api/v1/profiles/' || p.id::text || '/photos/' || ph.id::text || '/file'
                    FROM profile_photos ph
                    WHERE ph.profile_id = p.id
-                   ORDER BY ph.position ASC, ph.created_at ASC
+                   ORDER BY ph.position ASC, ph.id ASC
                    LIMIT 1
                ) AS photo_url,
-               e.created_at, COUNT(*) OVER()
+               e.created_at, COUNT(*) OVER(),
+               %s
         FROM events e
         JOIN profiles viewer ON viewer.id = $1::uuid
         JOIN profiles p ON p.id = e.profile_id
@@ -59,7 +60,8 @@ func (r *PostgresRepository) List(ctx context.Context, profileID uuid.UUID, page
           )
         ORDER BY e.created_at DESC, e.event_type ASC, p.id ASC
         LIMIT $2 OFFSET $3
-    `
+    `, profiles.ViewerFlagsSQL("viewer", "p"))
+
 	rows, err := r.db.Query(ctx, query, profileID, pageSize, (page-1)*pageSize)
 	if err != nil {
 		return nil, fmt.Errorf("activity: listar actividad: %w", err)
@@ -83,9 +85,13 @@ func (r *PostgresRepository) List(ctx context.Context, profileID uuid.UUID, page
 			&item.CountryCode,
 			&item.Region,
 			&item.HasPhoto,
-			&item.PhotoURL, // <--- Escaneamos la URL directa
+			&item.PhotoURL,
 			&item.CreatedAt,
 			&totalCount,
+			&item.Liked,
+			&item.Favorited,
+			&item.ReceivedLike,
+			&item.ReceivedFavorite,
 		); err != nil {
 			return nil, fmt.Errorf("activity: leer actividad: %w", err)
 		}

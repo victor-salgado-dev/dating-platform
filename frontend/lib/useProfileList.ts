@@ -1,8 +1,8 @@
 'use client';
 
-// Carga una página de perfiles para cualquiera de las pestañas de Home y
-// devuelve SIEMPRE el mismo shape (SearchResultItem[]), de modo que la
-// pantalla no necesite saber qué endpoint hay detrás.
+// Carga una página de perfiles para cualquiera de las pestañas de Home. Los
+// cuatro endpoints devuelven ya el mismo shape (SearchResponse, con los flags
+// de like/favorito incluidos), así que aquí no hay ningún mapeo.
 //
 // - Sin AbortController a propósito: apiFetch deduplica peticiones GET
 //   idénticas compartiendo la misma promesa, y abortarla dejaría colgado a
@@ -15,13 +15,7 @@
 //   caduca rápido.
 
 import { useEffect, useState } from 'react';
-import {
-  apiFetch,
-  newMemberToSearchItem,
-  type NewMembersResponse,
-  type SearchResponse,
-  type SearchResultItem,
-} from '@/lib/api';
+import { apiFetch, type SearchResponse, type SearchResultItem } from '@/lib/api';
 
 export type HomeTab = 'recommended' | 'popular' | 'online' | 'new';
 
@@ -55,14 +49,10 @@ export function useProfileList(tab: HomeTab, page: number) {
     const path = `${ENDPOINTS[tab]}?page=${page}&page_size=${PAGE_SIZE}`;
     const init: RequestInit | undefined = tab === 'online' ? { cache: 'no-store' } : undefined;
 
-    apiFetch<SearchResponse | NewMembersResponse>(path, init)
+    apiFetch<SearchResponse>(path, init)
       .then((res) => {
         if (cancelled) return;
-        const items: SearchResultItem[] =
-          tab === 'recommended'
-            ? ((res as SearchResponse).items ?? [])
-            : ((res as NewMembersResponse).items ?? []).map(newMemberToSearchItem);
-        setLoaded({ tab, items, totalPages: res.total_pages ?? 1 });
+        setLoaded({ tab, items: res.items ?? [], totalPages: res.total_pages ?? 1 });
       })
       .catch(() => {
         if (!cancelled) setError(true);

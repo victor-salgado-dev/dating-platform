@@ -22,7 +22,7 @@ const (
 	SortRecent  Sort = "recent"   // perfiles creados más recientemente primero (por defecto)
 	SortAgeAsc  Sort = "age_asc"  // más jóvenes primero
 	SortAgeDesc Sort = "age_desc" // más mayores primero
-	SortPopular Sort = "popular"  // mayor actividad social (likes/favoritos/mensajes/visitas)
+	SortPopular Sort = "popular"  // mayor actividad social de los últimos 30 días (vista profile_popularity)
 )
 
 const (
@@ -179,6 +179,14 @@ type ResultItem struct {
 	// photo_url sin una petición adicional por resultado.
 	PhotoID   *uuid.UUID
 	CreatedAt time.Time
+
+	// Relación entre quien busca y este perfil, calculada en la misma
+	// consulta (ver profiles.ViewerFlagsSQL). Evita que el cliente tenga
+	// que descargar sus listas de likes y favoritos para pintar las tarjetas.
+	Liked            bool
+	Favorited        bool
+	ReceivedLike     bool
+	ReceivedFavorite bool
 }
 
 // Result es una página de resultados de búsqueda.

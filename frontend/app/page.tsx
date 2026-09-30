@@ -5,7 +5,6 @@ import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useI18n } from '@/lib/i18n/context';
 import { ProfileCard } from '@/components/ProfileCard';
-import { useProfileInteractions } from '@/lib/useProfileInteractions';
 import { HOME_TABS, useProfileList, type HomeTab } from '@/lib/useProfileList';
 import styles from './page.module.css';
 
@@ -39,8 +38,6 @@ function HomeContent() {
   const page = parsePage(searchParams?.get('page'));
 
   const { items: profiles, totalPages, loading, error, reload } = useProfileList(tab, page);
-  const { likedIds, favoritedIds, receivedLikeIds, receivedFavIds, toggleLike, toggleFavorite } =
-    useProfileInteractions();
 
   // Posición del anuncio cuadrado: se sortea al cambiar de pestaña/página,
   // NO en cada fetch, para que no salte mientras cargan los datos.
@@ -101,16 +98,7 @@ function HomeContent() {
                 {index === adIndex && <div className={styles.adSquare}>{dictionary.discover.sponsoredRandom}</div>}
                 {index === 14 && <div className={styles.adBanner}>{dictionary.discover.bannerMid}</div>}
 
-                <ProfileCard
-                  profile={profile}
-                  isPremium={index === 0}
-                  initialLiked={likedIds.has(profile.profile_id)}
-                  initialFavorited={favoritedIds.has(profile.profile_id)}
-                  receivedLike={receivedLikeIds.has(profile.profile_id)}
-                  receivedFavorite={receivedFavIds.has(profile.profile_id)}
-                  onToggleLike={toggleLike}
-                  onToggleFavorite={toggleFavorite}
-                />
+                <ProfileCard profile={profile} isPremium={index === 0} />
               </React.Fragment>
             ))}
           </div>

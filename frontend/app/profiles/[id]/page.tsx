@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 
-import { apiFetch, ApiError, MessageItem, REPORT_REASONS } from '@/lib/api';
+import { apiFetch, ApiError, LikeResult, MessageItem, REPORT_REASONS } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/context';
 import { useFullProfile } from '@/lib/useFullProfile';
 import { FullProfileSections } from '@/components/FullProfileSections';
@@ -27,6 +27,7 @@ export default function ProfilePage() {
   const router = useRouter();
   const { dictionary } = useI18n();
 
+  // Esta pantalla SÍ cuenta como visita: /full la registra en el servidor.
   const fullProfileData = useFullProfile(params?.id);
   const {
     profile,
@@ -39,10 +40,6 @@ export default function ProfilePage() {
     loading,
     notFound,
     unauthorized,
-    favorited: profileFavorited,
-    liked: profileLiked,
-    matched: profileMatched,
-    blocked: profileBlocked,
   } = fullProfileData;
 
   const [favorited, setFavorited] = useState<boolean | null>(null);
@@ -99,12 +96,13 @@ export default function ProfilePage() {
     setLikeBusy(true);
     const next = !liked;
     try {
-      await apiFetch<void>(`/likes/${params.id}`, { method: next ? 'POST' : 'DELETE' });
+      // POST /likes/{id} devuelve { matched }: ya no hace falta pedir /matches/{id} aparte.
+      const res = await apiFetch<LikeResult | undefined>(`/likes/${params.id}`, { method: next ? 'POST' : 'DELETE' });
       setLiked(next);
       if (next) {
-        const status = await apiFetch<{ matched: boolean }>(`/matches/${params.id}`);
-        setMatched(status.matched);
-        if (status.matched && !matched) setShowMatchNotice(true);
+        const nowMatched = res?.matched ?? false;
+        setMatched(nowMatched);
+        if (nowMatched && !matched) setShowMatchNotice(true);
       } else {
         setMatched(false);
       }

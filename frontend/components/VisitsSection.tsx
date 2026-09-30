@@ -20,6 +20,10 @@ export default function VisitsSection() {
       region: item.region,
       has_photo: item.has_photo,
       photo_url: item.photo_url,
+      liked: item.liked,
+      favorited: item.favorited,
+      received_like: item.received_like,
+      received_favorite: item.received_favorite,
       interaction_at: item.visited_at,
     }));
     return { items, page: data.page, total_pages: data.total_pages, total: data.total };

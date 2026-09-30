@@ -21,6 +21,9 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 
 var _ Repository = (*PostgresRepository)(nil)
 
+// Record registra (o refresca) la visita. Recibe IDs de PERFIL. Como
+// satisface profiles.VisitRecorder, se inyecta directamente en
+// profiles.Service.SetInteractionDeps.
 func (r *PostgresRepository) Record(ctx context.Context, visitorProfileID, visitedProfileID uuid.UUID) error {
 	const query = `
 INSERT INTO profile_visits (visitor_profile_id, visited_profile_id, visited_at)
@@ -51,7 +54,7 @@ func (r *PostgresRepository) ListReceived(ctx context.Context, profileID uuid.UU
 }
 
 func (r *PostgresRepository) ListMutual(ctx context.Context, profileID uuid.UUID, page, pageSize int) (*ListResult, error) {
-	const query = `
+	query := fmt.Sprintf(`
 SELECT p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
        EXISTS (SELECT 1 FROM profile_photos ph WHERE ph.profile_id = p.id) AS has_photo,
        (SELECT ph.id FROM profile_photos ph
@@ -59,7 +62,8 @@ SELECT p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
             ORDER BY ph.position ASC, ph.id ASC
             LIMIT 1) AS photo_id,
        GREATEST(v.visited_at, r.visited_at) AS visited_at,
-       COUNT(*) OVER()
+       COUNT(*) OVER(),
+       %s
 FROM profile_visits v
 JOIN profile_visits r
   ON r.visitor_profile_id = v.visited_profile_id
@@ -76,47 +80,9 @@ WHERE v.visitor_profile_id = $1
   )
 ORDER BY GREATEST(v.visited_at, r.visited_at) DESC
 LIMIT $2 OFFSET $3
-`
+`, profiles.ViewerFlagsSQL("viewer", "p"))
 
-	rows, err := r.db.Query(ctx, query, profileID, pageSize, (page-1)*pageSize)
-	if err != nil {
-		return nil, fmt.Errorf("visits: listar visitas mutuas: %w", err)
-	}
-	defer rows.Close()
-
-	var items []ListItem
-	total := 0
-
-	for rows.Next() {
-		var (
-			photoID    *uuid.UUID
-			visitedAt  time.Time
-			totalCount int
-		)
-
-		base, scanErr := profiles.ScanBaseListItem(rows, &photoID, &visitedAt, &totalCount)
-		if scanErr != nil {
-			return nil, fmt.Errorf("visits: leer visita mutua: %w", scanErr)
-		}
-
-		items = append(items, ListItem{
-			BaseListItem: base,
-			VisitedAt:    visitedAt,
-			PhotoID:      photoID,
-		})
-		total = totalCount
-	}
-	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("visits: listar visitas mutuas: %w", err)
-	}
-
-	return &ListResult{
-		Items:      items,
-		Total:      total,
-		Page:       page,
-		PageSize:   pageSize,
-		TotalPages: pagination.TotalPages(total, pageSize),
-	}, nil
+	return r.scanList(ctx, query, profileID, page, pageSize, "listar visitas mutuas")
 }
 
 func (r *PostgresRepository) listVisits(ctx context.Context, profileID uuid.UUID, sent bool, page, pageSize int) (*ListResult, error) {
@@ -134,7 +100,8 @@ SELECT p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
             ORDER BY ph.position ASC, ph.id ASC
             LIMIT 1) AS photo_id,
        v.visited_at,
-       COUNT(*) OVER()
+       COUNT(*) OVER(),
+       %s
 FROM profile_visits v
 JOIN profiles viewer ON viewer.id = $1
 JOIN profiles p ON p.id = %s
@@ -147,11 +114,15 @@ WHERE %s AND u.status = 'active' AND u.deleted_at IS NULL
   )
 ORDER BY v.visited_at DESC
 LIMIT $2 OFFSET $3
-`, profileColumn, direction)
+`, profiles.ViewerFlagsSQL("viewer", "p"), profileColumn, direction)
 
+	return r.scanList(ctx, query, profileID, page, pageSize, "listar visitas")
+}
+
+func (r *PostgresRepository) scanList(ctx context.Context, query string, profileID uuid.UUID, page, pageSize int, action string) (*ListResult, error) {
 	rows, err := r.db.Query(ctx, query, profileID, pageSize, (page-1)*pageSize)
 	if err != nil {
-		return nil, fmt.Errorf("visits: listar visitas: %w", err)
+		return nil, fmt.Errorf("visits: %s: %w", action, err)
 	}
 	defer rows.Close()
 
@@ -165,7 +136,7 @@ LIMIT $2 OFFSET $3
 			totalCount int
 		)
 
-		base, scanErr := profiles.ScanBaseListItem(rows, &photoID, &visitedAt, &totalCount)
+		base, scanErr := profiles.ScanListItem(rows, &photoID, &visitedAt, &totalCount)
 		if scanErr != nil {
 			return nil, fmt.Errorf("visits: leer visita: %w", scanErr)
 		}
@@ -178,7 +149,7 @@ LIMIT $2 OFFSET $3
 		total = totalCount
 	}
 	if err := rows.Err(); err != nil {
-		return nil, fmt.Errorf("visits: listar visitas: %w", err)
+		return nil, fmt.Errorf("visits: %s: %w", action, err)
 	}
 
 	return &ListResult{

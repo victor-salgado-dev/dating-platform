@@ -16,6 +16,10 @@ function mapItem(item: LikeItem | MatchItem): InteractionCardItem {
     region: item.region,
     has_photo: item.has_photo,
     photo_url: item.photo_url,
+    liked: item.liked,
+    favorited: item.favorited,
+    received_like: item.received_like,
+    received_favorite: item.received_favorite,
     // liked_at para received/sent, matched_at para mutual (reusa /matches,
     // no existe /likes/mutual). Normalizado a un solo campo para ordenar.
     interaction_at: 'liked_at' in item ? item.liked_at : item.matched_at,

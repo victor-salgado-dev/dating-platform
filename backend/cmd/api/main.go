@@ -16,6 +16,9 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgxpool"
+
 	"dating-platform/backend/internal/activity"
 	"dating-platform/backend/internal/admin"
 	"dating-platform/backend/internal/auth"
@@ -120,6 +123,9 @@ func main() {
 	}
 
 	profilesRepo := profiles.NewPostgresRepository(pool)
+	// Resuelve profile_id y visibilidad con consultas ligeras (y caché en
+	// memoria del profile_id) para likes, favoritos, visitas y actividad.
+	idResolver := profiles.NewIDResolver(pool)
 	profilesService := profiles.NewService(profilesRepo, fileStorage)
 	profilesHandler := profiles.NewHandler(profilesService)
 
@@ -128,19 +134,19 @@ func main() {
 	searchHandler := search.NewHandler(searchService)
 
 	favoritesRepo := favorites.NewPostgresRepository(pool)
-	favoritesService := favorites.NewService(favoritesRepo, profilesRepo)
+	favoritesService := favorites.NewService(favoritesRepo, idResolver)
 	favoritesHandler := favorites.NewHandler(favoritesService)
 
 	activityRepo := activity.NewPostgresRepository(pool)
-	activityService := activity.NewService(activityRepo, profilesRepo)
+	activityService := activity.NewService(activityRepo, idResolver)
 	activityHandler := activity.NewHandler(activityService)
 
 	likesRepo := likes.NewPostgresRepository(pool)
-	likesService := likes.NewService(likesRepo, profilesRepo)
+	likesService := likes.NewService(likesRepo, idResolver)
 	likesHandler := likes.NewHandler(likesService)
 
 	visitsRepo := visits.NewPostgresRepository(pool)
-	visitsService := visits.NewService(visitsRepo, profilesRepo)
+	visitsService := visits.NewService(visitsRepo, idResolver)
 	visitsHandler := visits.NewHandler(visitsService)
 
 	blockingRepo := blocking.NewPostgresRepository(pool)
@@ -149,7 +155,12 @@ func main() {
 
 	// Inyectar colaboradores para que GetFullPublicProfile pueda
 	// devolver estado de interacción y registrar la visita.
-	profilesService.SetInteractionDeps(favoritesService, likesService, blockingService, visitsService)
+	//
+	// OJO: profiles.VisitRecorder recibe IDs de PERFIL (visitante y visitado),
+	// así que se le pasa el repositorio de visitas, no visits.Service (cuyo
+	// Record espera el user_id de quien visita: con el servicio, la visita
+	// desde /full fallaba siempre con "perfil no encontrado").
+	profilesService.SetInteractionDeps(favoritesService, likesService, blockingService, visitsRepo)
 
 	messagingRepo := messaging.NewPostgresRepository(pool)
 	messagingService := messaging.NewService(messagingRepo, profilesRepo, blockingRepo)
@@ -159,8 +170,20 @@ func main() {
 	reportsService := reports.NewService(reportsRepo, profilesRepo)
 	reportsHandler := reports.NewHandler(reportsService)
 
-	adminService := admin.NewService(usersRepo, reportsRepo)
+	adminService := admin.NewService(usersRepo, reportsRepo, sessionStore)
 	adminHandler := admin.NewHandler(adminService)
+
+	// Avatar y % de perfil completado en GET /auth/me (una petición en vez de tres).
+	authHandler.SetSummaryProvider(profiles.NewSummaryStore(pool))
+
+	// Antes de este cambio RequireAuth consultaba Postgres en cada petición y
+	// una cuenta suspendida o eliminada dejaba de valer al instante. Ahora se
+	// apoya en una marca en Redis; se rellena al arrancar con las cuentas que
+	// ya estaban bloqueadas para no reabrir sesiones antiguas.
+	backfillBlockedAccounts(ctx, pool, sessionStore, cfg.Auth.SessionTTL)
+
+	// Popularidad de "Popular": vista materializada refrescada en segundo plano.
+	go search.StartPopularityRefresher(ctx, pool, search.DefaultPopularityRefreshInterval)
 
 	rateLimiter := ratelimit.New(rdb)
 
@@ -212,6 +235,45 @@ func main() {
 	}
 
 	slog.Info("servidor detenido correctamente")
+}
+
+// backfillBlockedAccounts marca en Redis las cuentas suspendidas (todas) y las
+// eliminadas dentro de la vida de una sesión, que son las únicas que pueden
+// conservar una sesión abierta.
+func backfillBlockedAccounts(ctx context.Context, pool *pgxpool.Pool, store *auth.RedisSessionStore, sessionTTL time.Duration) {
+	rows, err := pool.Query(ctx, `
+		SELECT id, deleted_at IS NOT NULL
+		FROM users
+		WHERE (status = 'suspended' AND deleted_at IS NULL)
+		   OR (deleted_at IS NOT NULL AND deleted_at > now() - make_interval(secs => $1::double precision))
+	`, sessionTTL.Seconds())
+	if err != nil {
+		slog.Error("no se pudieron leer las cuentas bloqueadas", "error", err)
+		return
+	}
+	defer rows.Close()
+
+	n := 0
+	for rows.Next() {
+		var (
+			id      uuid.UUID
+			deleted bool
+		)
+		if err := rows.Scan(&id, &deleted); err != nil {
+			slog.Error("no se pudo leer una cuenta bloqueada", "error", err)
+			return
+		}
+		reason := auth.BlockSuspended
+		if deleted {
+			reason = auth.BlockDeleted
+		}
+		if err := store.BlockUser(ctx, id, reason); err != nil {
+			slog.Error("no se pudo marcar una cuenta como bloqueada", "user_id", id, "error", err)
+			return
+		}
+		n++
+	}
+	slog.Info("cuentas bloqueadas cargadas en Redis", "count", n)
 }
 
 // parseLogLevel traduce LOG_LEVEL a slog.Level. Un valor desconocido o

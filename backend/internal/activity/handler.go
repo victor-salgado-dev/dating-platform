@@ -24,8 +24,13 @@ type itemResponse struct {
 	CountryCode string  `json:"country_code"`
 	Region      *string `json:"region"`
 	HasPhoto    bool    `json:"has_photo"`
-	PhotoURL    *string `json:"photo_url"` // <--- 1. AÑADIDO AL JSON DE RESPUESTA
+	PhotoURL    *string `json:"photo_url"`
 	CreatedAt   string  `json:"created_at"`
+
+	Liked            bool `json:"liked"`
+	Favorited        bool `json:"favorited"`
+	ReceivedLike     bool `json:"received_like"`
+	ReceivedFavorite bool `json:"received_favorite"`
 }
 
 type listResponse struct {
@@ -54,16 +59,20 @@ func (h *Handler) List(w http.ResponseWriter, r *http.Request) {
 	items := make([]itemResponse, 0, len(result.Items))
 	for _, item := range result.Items {
 		items = append(items, itemResponse{
-			EventType:   item.EventType,
-			ProfileID:   item.ProfileID.String(),
-			DisplayName: item.DisplayName,
-			Age:         item.Age,
-			Gender:      string(item.Gender),
-			CountryCode: item.CountryCode,
-			Region:      item.Region,
-			HasPhoto:    item.HasPhoto,
-			PhotoURL:    item.PhotoURL, // <--- 2. MAPEADO AQUÍ
-			CreatedAt:   item.CreatedAt.Format(time.RFC3339),
+			EventType:        item.EventType,
+			ProfileID:        item.ProfileID.String(),
+			DisplayName:      item.DisplayName,
+			Age:              item.Age,
+			Gender:           string(item.Gender),
+			CountryCode:      item.CountryCode,
+			Region:           item.Region,
+			HasPhoto:         item.HasPhoto,
+			PhotoURL:         item.PhotoURL,
+			CreatedAt:        item.CreatedAt.Format(time.RFC3339),
+			Liked:            item.Liked,
+			Favorited:        item.Favorited,
+			ReceivedLike:     item.ReceivedLike,
+			ReceivedFavorite: item.ReceivedFavorite,
 		})
 	}
 	httpx.WriteJSON(w, http.StatusOK, listResponse{

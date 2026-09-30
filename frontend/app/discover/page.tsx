@@ -7,7 +7,6 @@ import { useSearchParams } from 'next/navigation';
 import { apiFetch, ApiError, SearchResponse } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/context';
 import { ProfileCard } from '@/components/ProfileCard';
-import { useProfileInteractions } from '@/lib/useProfileInteractions';
 import styles from './page.module.css';
 
 // -----------------------------------------------------------------------------
@@ -24,9 +23,6 @@ function DiscoverContent() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [randomAdIndex, setRandomAdIndex] = useState(-1);
-
-  const { likedIds, favoritedIds, receivedLikeIds, receivedFavIds, toggleLike, toggleFavorite } =
-    useProfileInteractions();
 
   // Guarda contra React Strict Mode / peticiones duplicadas
   const lastSearchKey = useRef<string | null>(null);
@@ -129,16 +125,7 @@ function DiscoverContent() {
                     {showAdSquare && <div className={styles.adSquare}>{dictionary.discover.sponsoredRandom}</div>}
                     {showBannerHorizontal && <div className={styles.adBanner}>{dictionary.discover.bannerMid}</div>}
 
-                    <ProfileCard
-                      profile={profile}
-                      isPremium={isPremium}
-                      initialLiked={likedIds.has(profile.profile_id)}
-                      initialFavorited={favoritedIds.has(profile.profile_id)}
-                      receivedLike={receivedLikeIds.has(profile.profile_id)}
-                      receivedFavorite={receivedFavIds.has(profile.profile_id)}
-                      onToggleLike={toggleLike}
-                      onToggleFavorite={toggleFavorite}
-                    />
+                    <ProfileCard profile={profile} isPremium={isPremium} />
                   </React.Fragment>
                 );
               })}
