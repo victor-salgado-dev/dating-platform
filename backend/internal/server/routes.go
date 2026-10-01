@@ -103,6 +103,7 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/profiles/me/photos", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListPhotos)))
 	mux.Handle("GET /api/v1/profiles/me/photos/{id}/file", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ServePhoto)))
 	mux.Handle("DELETE /api/v1/profiles/me/photos/{id}", requireAuth(http.HandlerFunc(deps.ProfilesHandler.DeletePhoto)))
+	mux.Handle("PUT /api/v1/profiles/me/photos/{id}/primary", requireAuth(http.HandlerFunc(deps.ProfilesHandler.SetPrimaryPhoto)))
 
 	// --- Idiomas del usuario ------------------------------------------
 	mux.Handle("GET /api/v1/profiles/me/languages", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListMyLanguages)))

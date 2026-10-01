@@ -199,7 +199,7 @@ func (s *Service) ListPublicPhotos(ctx context.Context, viewerUserID, profileID 
 	return s.repo.ListPhotos(ctx, profileID)
 }
 
-func (s *Service) OpenPublicPhoto(ctx context.Context, viewerUserID, profileID, photoID uuid.UUID) (io.ReadCloser, *Photo, error) {
+func (s *Service) OpenPublicPhoto(ctx context.Context, viewerUserID, profileID, photoID uuid.UUID, thumb bool) (io.ReadCloser, *Photo, error) {
 	if _, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID); err != nil {
 		return nil, nil, err
 	}
@@ -209,12 +209,7 @@ func (s *Service) OpenPublicPhoto(ctx context.Context, viewerUserID, profileID, 
 		return nil, nil, err
 	}
 
-	rc, err := s.storage.Open(ctx, ph.StorageKey)
-	if err != nil {
-		return nil, nil, fmt.Errorf("profiles: abrir fichero de foto: %w", err)
-	}
-
-	return rc, ph, nil
+	return s.openPhotoFile(ctx, ph, thumb)
 }
 
 // FullProfile agrupa todo lo que useFullProfile.ts (frontend) pedía por
@@ -572,8 +567,7 @@ func (s *Service) UploadPhoto(ctx context.Context, userID uuid.UUID, declaredCon
 	peek = peek[:n]
 
 	detectedType := http.DetectContentType(peek)
-	ext, ok := allowedPhotoTypes[detectedType]
-	if !ok {
+	if _, ok := allowedPhotoTypes[detectedType]; !ok {
 		return nil, invalidField("photo", "el contenido del fichero no es una imagen JPEG, PNG o WebP válida")
 	}
 	if declaredContentType != "" && declaredContentType != detectedType {
@@ -596,16 +590,27 @@ func (s *Service) UploadPhoto(ctx context.Context, userID uuid.UUID, declaredCon
 		return nil, ErrTooManyPhotos
 	}
 
-	key := fmt.Sprintf("profiles/%s/%s%s", profile.ID, uuid.NewString(), ext)
-	if err := s.storage.Save(ctx, key, fullReader); err != nil {
-		return nil, fmt.Errorf("profiles: guardar fichero de foto: %w", err)
+	// Lo caro (decodificar y reducir) va después de las comprobaciones baratas.
+	processed, err := processPhoto(ctx, fullReader)
+	if err != nil {
+		return nil, err
 	}
 
-	photo := &Photo{StorageKey: key, ContentType: detectedType}
+	base := fmt.Sprintf("profiles/%s/%s", profile.ID, uuid.NewString())
+	key := base + processedExt
+	thumbKey := base + thumbKeySuffix + processedExt
+
+	if err := s.storage.Save(ctx, key, bytes.NewReader(processed.Full)); err != nil {
+		return nil, fmt.Errorf("profiles: guardar fichero de foto: %w", err)
+	}
+	if err := s.storage.Save(ctx, thumbKey, bytes.NewReader(processed.Thumb)); err != nil {
+		s.deleteKeys(ctx, key)
+		return nil, fmt.Errorf("profiles: guardar miniatura: %w", err)
+	}
+
+	photo := &Photo{StorageKey: key, ThumbStorageKey: thumbKey, ContentType: processedContentType}
 	if err := s.repo.AddPhoto(ctx, profile.ID, photo); err != nil {
-		if delErr := s.storage.Delete(ctx, key); delErr != nil {
-			slog.Error("no se pudo limpiar el fichero huérfano tras un fallo", "key", key, "error", delErr)
-		}
+		s.deleteKeys(ctx, key, thumbKey)
 		return nil, err
 	}
 
@@ -620,7 +625,7 @@ func (s *Service) ListPhotos(ctx context.Context, userID uuid.UUID) ([]Photo, er
 	return s.repo.ListPhotos(ctx, profile.ID)
 }
 
-func (s *Service) OpenPhoto(ctx context.Context, userID, photoID uuid.UUID) (io.ReadCloser, *Photo, error) {
+func (s *Service) OpenPhoto(ctx context.Context, userID, photoID uuid.UUID, thumb bool) (io.ReadCloser, *Photo, error) {
 	profile, err := s.repo.GetByUserID(ctx, userID)
 	if err != nil {
 		return nil, nil, err
@@ -631,12 +636,45 @@ func (s *Service) OpenPhoto(ctx context.Context, userID, photoID uuid.UUID) (io.
 		return nil, nil, err
 	}
 
+	return s.openPhotoFile(ctx, ph, thumb)
+}
+
+// openPhotoFile abre la miniatura si se pide y existe; si no, la original.
+// Devuelve una copia de Photo con el ContentType del fichero realmente servido.
+func (s *Service) openPhotoFile(ctx context.Context, ph *Photo, thumb bool) (io.ReadCloser, *Photo, error) {
+	if thumb && ph.ThumbStorageKey != "" {
+		rc, err := s.storage.Open(ctx, ph.ThumbStorageKey)
+		if err == nil {
+			served := *ph
+			served.ContentType = processedContentType
+			return rc, &served, nil
+		}
+		if !errors.Is(err, storage.ErrNotFound) {
+			return nil, nil, fmt.Errorf("profiles: abrir miniatura: %w", err)
+		}
+		slog.Warn("miniatura ausente en storage, se sirve la original", "key", ph.ThumbStorageKey)
+	}
+
 	rc, err := s.storage.Open(ctx, ph.StorageKey)
 	if err != nil {
 		return nil, nil, fmt.Errorf("profiles: abrir fichero de foto: %w", err)
 	}
-
 	return rc, ph, nil
+}
+
+// SetPrimaryPhoto marca una foto del usuario como principal (position 0).
+func (s *Service) SetPrimaryPhoto(ctx context.Context, userID, photoID uuid.UUID) error {
+	profile, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return err
+	}
+
+	// Comprueba que la foto es de este perfil (ErrPhotoNotFound si no).
+	if _, err := s.repo.GetPhoto(ctx, profile.ID, photoID); err != nil {
+		return err
+	}
+
+	return s.repo.SetPrimaryPhoto(ctx, profile.ID, photoID)
 }
 
 func (s *Service) DeletePhoto(ctx context.Context, userID, photoID uuid.UUID) error {
@@ -654,11 +692,21 @@ func (s *Service) DeletePhoto(ctx context.Context, userID, photoID uuid.UUID) er
 		return err
 	}
 
-	if err := s.storage.Delete(ctx, ph.StorageKey); err != nil {
-		slog.Error("no se pudo borrar el fichero de la foto", "key", ph.StorageKey, "error", err)
-	}
-
+	s.deleteKeys(ctx, ph.StorageKey, ph.ThumbStorageKey)
 	return nil
+}
+
+// deleteKeys borra ficheros de storage ignorando claves vacías. Un fallo se
+// registra pero no se propaga: el dato ya no está en la base de datos.
+func (s *Service) deleteKeys(ctx context.Context, keys ...string) {
+	for _, k := range keys {
+		if k == "" {
+			continue
+		}
+		if err := s.storage.Delete(ctx, k); err != nil {
+			slog.Error("no se pudo borrar un fichero de foto", "key", k, "error", err)
+		}
+	}
 }
 
 // --- Idiomas del usuario -------------------------------------------------

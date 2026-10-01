@@ -1125,7 +1125,7 @@ export default function EditProfilePage() {
           <div className={styles.photoGrid}>
             {photos.map((photo) => (
               <div key={photo.id} className={styles.photo}>
-                <img src={photo.url} alt="" />
+                <img src={photo.thumb_url ?? photo.url} alt="" loading="lazy" />
                 <div>
                   {photo.id === primaryPhotoId && (
                     <span className={styles.hint}>{dictionary.profileEdit.primaryPhoto}</span>

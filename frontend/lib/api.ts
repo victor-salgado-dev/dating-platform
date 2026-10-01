@@ -308,6 +308,8 @@ export type PublicProfile = {
 export type ProfilePhoto = {
   id: string;
   url: string;
+  // Miniatura (480 px como máximo) para rejillas y listados.
+  thumb_url: string;
   position: number;
   created_at: string;
 };

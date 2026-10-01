@@ -268,15 +268,15 @@ func relationshipGoalsToDB(goals []RelationshipGoal) []string {
 
 func (r *PostgresRepository) AddPhoto(ctx context.Context, profileID uuid.UUID, photo *Photo) error {
 	const query = `
-		INSERT INTO profile_photos (profile_id, storage_key, content_type, position)
+		INSERT INTO profile_photos (profile_id, storage_key, thumb_storage_key, content_type, position)
 		VALUES (
-			$1, $2, $3,
+			$1, $2, NULLIF($3, ''), $4,
 			COALESCE((SELECT MAX(position) + 1 FROM profile_photos WHERE profile_id = $1), 0)
 		)
 		RETURNING id, position, created_at
 	`
 
-	err := r.db.QueryRow(ctx, query, profileID, photo.StorageKey, photo.ContentType).
+	err := r.db.QueryRow(ctx, query, profileID, photo.StorageKey, photo.ThumbStorageKey, photo.ContentType).
 		Scan(&photo.ID, &photo.Position, &photo.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("profiles: guardar foto: %w", err)
@@ -288,7 +288,7 @@ func (r *PostgresRepository) AddPhoto(ctx context.Context, profileID uuid.UUID, 
 
 func (r *PostgresRepository) ListPhotos(ctx context.Context, profileID uuid.UUID) ([]Photo, error) {
 	const query = `
-		SELECT id, profile_id, storage_key, content_type, position, created_at
+		SELECT id, profile_id, storage_key, COALESCE(thumb_storage_key, ''), content_type, position, created_at
 		FROM profile_photos
 		WHERE profile_id = $1
 		ORDER BY position ASC
@@ -303,7 +303,7 @@ func (r *PostgresRepository) ListPhotos(ctx context.Context, profileID uuid.UUID
 	var photos []Photo
 	for rows.Next() {
 		var ph Photo
-		if err := rows.Scan(&ph.ID, &ph.ProfileID, &ph.StorageKey, &ph.ContentType, &ph.Position, &ph.CreatedAt); err != nil {
+		if err := rows.Scan(&ph.ID, &ph.ProfileID, &ph.StorageKey, &ph.ThumbStorageKey, &ph.ContentType, &ph.Position, &ph.CreatedAt); err != nil {
 			return nil, fmt.Errorf("profiles: leer foto: %w", err)
 		}
 		photos = append(photos, ph)
@@ -327,14 +327,14 @@ func (r *PostgresRepository) CountPhotos(ctx context.Context, profileID uuid.UUI
 
 func (r *PostgresRepository) GetPhoto(ctx context.Context, profileID, photoID uuid.UUID) (*Photo, error) {
 	const query = `
-		SELECT id, profile_id, storage_key, content_type, position, created_at
+		SELECT id, profile_id, storage_key, COALESCE(thumb_storage_key, ''), content_type, position, created_at
 		FROM profile_photos
 		WHERE id = $1 AND profile_id = $2
 	`
 
 	var ph Photo
 	err := r.db.QueryRow(ctx, query, photoID, profileID).
-		Scan(&ph.ID, &ph.ProfileID, &ph.StorageKey, &ph.ContentType, &ph.Position, &ph.CreatedAt)
+		Scan(&ph.ID, &ph.ProfileID, &ph.StorageKey, &ph.ThumbStorageKey, &ph.ContentType, &ph.Position, &ph.CreatedAt)
 	if err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, ErrPhotoNotFound
@@ -356,6 +356,30 @@ func (r *PostgresRepository) DeletePhoto(ctx context.Context, profileID, photoID
 		return ErrPhotoNotFound
 	}
 
+	return nil
+}
+
+// SetPrimaryPhoto deja photoID en position 0 y renumera el resto (0..n-1)
+// conservando su orden. Una sola sentencia: es atómica y no deja estados
+// intermedios con posiciones repetidas. Marcar como principal la que ya lo es
+// no cambia nada (idempotente).
+func (r *PostgresRepository) SetPrimaryPhoto(ctx context.Context, profileID, photoID uuid.UUID) error {
+	const query = `
+		WITH ordered AS (
+			SELECT id,
+			       (ROW_NUMBER() OVER (ORDER BY (id = $2) DESC, position ASC, created_at ASC, id ASC) - 1)::int AS new_pos
+			FROM profile_photos
+			WHERE profile_id = $1
+		)
+		UPDATE profile_photos p
+		SET position = o.new_pos
+		FROM ordered o
+		WHERE p.id = o.id
+	`
+
+	if _, err := r.db.Exec(ctx, query, profileID, photoID); err != nil {
+		return fmt.Errorf("profiles: marcar foto principal: %w", err)
+	}
 	return nil
 }
 

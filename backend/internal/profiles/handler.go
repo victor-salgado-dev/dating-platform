@@ -138,25 +138,33 @@ func toProfileResponse(p *Profile) profileResponse {
 }
 
 type photoResponse struct {
-	ID        string `json:"id"`
+	ID string `json:"id"`
+	// URL es la foto (reducida a 1600 px como máximo); ThumbURL la miniatura
+	// para rejillas y listados. Si la foto es anterior a las miniaturas, el
+	// servidor sirve la original también en ThumbURL.
 	URL       string `json:"url"`
+	ThumbURL  string `json:"thumb_url"`
 	Position  int    `json:"position"`
 	CreatedAt string `json:"created_at"`
 }
 
 func toPhotoResponseSelf(ph *Photo) photoResponse {
+	url := fmt.Sprintf("/api/v1/profiles/me/photos/%s/file", ph.ID.String())
 	return photoResponse{
 		ID:        ph.ID.String(),
-		URL:       fmt.Sprintf("/api/v1/profiles/me/photos/%s/file", ph.ID.String()),
+		URL:       url,
+		ThumbURL:  url + "?size=thumb",
 		Position:  ph.Position,
 		CreatedAt: ph.CreatedAt.Format(time.RFC3339),
 	}
 }
 
 func toPhotoResponsePublic(ph *Photo, profileID uuid.UUID) photoResponse {
+	url := fmt.Sprintf("/api/v1/profiles/%s/photos/%s/file", profileID.String(), ph.ID.String())
 	return photoResponse{
 		ID:        ph.ID.String(),
-		URL:       fmt.Sprintf("/api/v1/profiles/%s/photos/%s/file", profileID.String(), ph.ID.String()),
+		URL:       url,
+		ThumbURL:  url + "?size=thumb",
 		Position:  ph.Position,
 		CreatedAt: ph.CreatedAt.Format(time.RFC3339),
 	}
@@ -748,7 +756,7 @@ func (h *Handler) ServePhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rc, ph, err := h.svc.OpenPhoto(r.Context(), userID, photoID)
+	rc, ph, err := h.svc.OpenPhoto(r.Context(), userID, photoID, wantsThumb(r))
 	if err != nil {
 		writeProfileError(w, err)
 		return
@@ -779,6 +787,33 @@ func (h *Handler) DeletePhoto(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// SetPrimaryPhoto marca una foto del usuario como principal.
+func (h *Handler) SetPrimaryPhoto(w http.ResponseWriter, r *http.Request) {
+	userID, ok := auth.UserIDFromContext(r.Context())
+	if !ok {
+		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
+		return
+	}
+
+	photoID, err := uuid.Parse(r.PathValue("id"))
+	if err != nil {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de foto inválido.")
+		return
+	}
+
+	if err := h.svc.SetPrimaryPhoto(r.Context(), userID, photoID); err != nil {
+		writeProfileError(w, err)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// wantsThumb indica si la petición pide la miniatura (?size=thumb).
+func wantsThumb(r *http.Request) bool {
+	return r.URL.Query().Get("size") == "thumb"
 }
 
 func (h *Handler) GetPublic(w http.ResponseWriter, r *http.Request) {
@@ -960,7 +995,7 @@ func (h *Handler) ServePublicPhoto(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rc, ph, err := h.svc.OpenPublicPhoto(r.Context(), viewerID, profileID, photoID)
+	rc, ph, err := h.svc.OpenPublicPhoto(r.Context(), viewerID, profileID, photoID, wantsThumb(r))
 	if err != nil {
 		writePublicProfileError(w, err)
 		return

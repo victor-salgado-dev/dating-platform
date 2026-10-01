@@ -48,6 +48,12 @@ type Repository interface {
 	GetPhoto(ctx context.Context, profileID, photoID uuid.UUID) (*Photo, error)
 	DeletePhoto(ctx context.Context, profileID, photoID uuid.UUID) error
 
+	// SetPrimaryPhoto deja photoID en position 0 y renumera el resto sin
+	// huecos conservando su orden relativo. La foto principal es siempre la
+	// de menor position. El llamador debe haber comprobado antes que la foto
+	// pertenece al perfil (GetPhoto).
+	SetPrimaryPhoto(ctx context.Context, profileID, photoID uuid.UUID) error
+
 	// --- Idiomas del perfil ---------------------------------------------
 	//
 	// Sin catálogo propio (a diferencia de intereses/hobbies): la lista
