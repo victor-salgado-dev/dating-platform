@@ -1,6 +1,6 @@
-﻿# seed_profiles.ps1 - Versión con Bypass de Rate Limit + Auto-Wait + Campos Completos
-$baseUrl    = "http://localhost"
-$totalUsers = 500
+﻿# seed_profiles.ps1 - Versión para 5.000 usuarios
+$baseUrl    = "http://localhost:8080" # Asegúrate de que el puerto sea el correcto (8080 o el de Caddy)
+$totalUsers = 5000
 $delayMs    = 0
 $cookieName = "session_id"
 $fotosDir   = "C:\Users\Victor\Downloads\fotos\Nueva carpeta (4)"
@@ -41,7 +41,7 @@ if (-not $backendReady) {
     exit
 }
 Reset-RedisBucket
-Write-Host "¡Backend Listo! Comenzando generación de 500 usuarios..." -ForegroundColor Green
+Write-Host "¡Backend Listo! Comenzando generación de $totalUsers usuarios..." -ForegroundColor Green
 
 # --- Fotos disponibles ------------------------------------------------------
 $fotos = @()
@@ -192,7 +192,7 @@ for ($i = 0; $i -lt $totalUsers; $i++) {
         continue
     }
 
-    # 2) Completar Perfil Extendido (Migración 12, 13, 15)
+    # 2) Completar Perfil Extendido
     $hasChildren = $hasChildrenOptions | Get-Random
     
     $profileBody = [ordered]@{
@@ -258,20 +258,20 @@ for ($i = 0; $i -lt $totalUsers; $i++) {
     $currentProfileId = if ($createdProfile.data.id) { $createdProfile.data.id } else { $createdProfile.id }
     if ($currentProfileId) { $profileIdMap[$num] = $currentProfileId }
 
-    # 3) Idiomas (Migración 14)
+    # 3) Idiomas
     $langsToSet = @($languageCodes | Get-Random -Count (Get-Random -Minimum 1 -Maximum 4))
     foreach ($code in $langsToSet) {
         $langJson = @{ level = Get-Random -Minimum 1 -Maximum 6 } | ConvertTo-Json
         try { $null = Invoke-RestMethod -Uri "$baseUrl/api/v1/profiles/me/languages/$code" -Method Put -Body $langJson -ContentType "application/json" -WebSession $sess } catch {}
     }
 
-    # 4) Personalidad (Migración 13)
+    # 4) Personalidad
     foreach ($pk in $personalityKeys) {
         $persJson = @{ score = Get-Random -Minimum 1 -Maximum 6 } | ConvertTo-Json
         try { $null = Invoke-RestMethod -Uri "$baseUrl/api/v1/profiles/me/personality/$pk" -Method Put -Body $persJson -ContentType "application/json" -WebSession $sess } catch {}
     }
 
-    # 5) Preferencias de Pareja (Migración 13)
+    # 5) Preferencias de Pareja
     $aMin = Get-Random -Minimum 18 -Maximum 35
     $hMin = Get-Random -Minimum 150 -Maximum 170
     $partnerBody = [ordered]@{
@@ -300,7 +300,7 @@ for ($i = 0; $i -lt $totalUsers; $i++) {
 
     try { $null = Invoke-RestMethod -Uri "$baseUrl/api/v1/profiles/me/partner-preferences" -Method Patch -Body $partnerBody -ContentType "application/json" -WebSession $sess } catch {}
 
-    # 6) Intereses / Hobbies (Migración 16)
+    # 6) Intereses / Hobbies
     $selIntW = @($interestsWithLevel | Get-Random -Count (Get-Random -Minimum 2 -Maximum 5))
     foreach ($intW in $selIntW) {
         $intJson = @{ level = (Get-Random -Minimum 1 -Maximum 6) } | ConvertTo-Json
@@ -313,7 +313,7 @@ for ($i = 0; $i -lt $totalUsers; $i++) {
         try { $null = Invoke-RestMethod -Uri "$baseUrl/api/v1/profiles/me/interests/$intN" -Method Put -Body $intJson2 -ContentType "application/json" -WebSession $sess } catch {}
     }
 
-    # 7) FOTOS: 1 a 4 fotos para cada perfil de forma consecutiva
+    # 7) FOTOS
     if ($fotos.Count -gt 0) {
         $cookieVal = $sess.Cookies.GetCookies($baseUrl)[$cookieName].Value
         if ($cookieVal) {
@@ -333,6 +333,7 @@ for ($i = 0; $i -lt $totalUsers; $i++) {
 
 # ============================================================================
 # FASE 2: Generar Interacciones MASIVAS (Likes, Matches, Favoritos y Visitas)
+# Adaptado para que User 1 sea extremadamente popular (usando 5000 perfiles)
 # ============================================================================
 Write-Host "`n=== 2/2 Generando Interacciones de red para user1 ===" -ForegroundColor Green
 
@@ -360,8 +361,9 @@ $user1Session = Login-Demo 1
 $user1ProfileId = $profileIdMap[1]
 
 if ($user1ProfileId) {
-    # 1. Matches (User 2 a 15 hacen like mutuo con user1)
-    for ($u = 2; $u -le 15; $u++) {
+    # 1. Matches (User 2 a 50 hacen like mutuo con user1)
+    for ($u = 2; $u -le 50; $u++) {
+        if ($u % 10 -eq 0) { Clear-RateLimits }
         $uSess = Login-Demo $u
         $uProfileId = $profileIdMap[$u]
         if ($uProfileId) {
@@ -369,26 +371,28 @@ if ($user1ProfileId) {
             try { $null = Invoke-RestMethod -Uri "$baseUrl/api/v1/likes/$uProfileId" -Method Post -WebSession $user1Session } catch {}
         }
     }
-    Write-Host " -> 14 Matches creados para user1" -ForegroundColor Cyan
+    Write-Host " -> 49 Matches creados para user1" -ForegroundColor Cyan
 
-    # 2. Likes Recibidos pendientes (User 16 a 40 le dan like a user1)
-    for ($u = 16; $u -le 40; $u++) {
+    # 2. Likes Recibidos pendientes (User 51 a 150 le dan like a user1)
+    for ($u = 51; $u -le 150; $u++) {
+        if ($u % 10 -eq 0) { Clear-RateLimits }
         $uSess = Login-Demo $u
         try { $null = Invoke-RestMethod -Uri "$baseUrl/api/v1/likes/$user1ProfileId" -Method Post -WebSession $uSess } catch {}
     }
-    Write-Host " -> 25 Likes recibidos creados para user1" -ForegroundColor Cyan
+    Write-Host " -> 100 Likes recibidos creados para user1" -ForegroundColor Cyan
 
-    # 3. Likes Enviados (user1 le da like a User 41 a 55)
-    for ($u = 41; $u -le 55; $u++) {
+    # 3. Likes Enviados (user1 le da like a User 151 a 200)
+    for ($u = 151; $u -le 200; $u++) {
         $uProfileId = $profileIdMap[$u]
         if ($uProfileId) {
             try { $null = Invoke-RestMethod -Uri "$baseUrl/api/v1/likes/$uProfileId" -Method Post -WebSession $user1Session } catch {}
         }
     }
-    Write-Host " -> 15 Likes enviados creados por user1" -ForegroundColor Cyan
+    Write-Host " -> 50 Likes enviados creados por user1" -ForegroundColor Cyan
 
-    # 4. Favoritos MUTUOS (User 56 a 65 y user1 se marcan mutuamente como favorito)
-    for ($u = 56; $u -le 65; $u++) {
+    # 4. Favoritos MUTUOS (User 201 a 250 y user1 se marcan mutuamente)
+    for ($u = 201; $u -le 250; $u++) {
+        if ($u % 10 -eq 0) { Clear-RateLimits }
         $uSess = Login-Demo $u
         $uProfileId = $profileIdMap[$u]
         if ($uProfileId) {
@@ -396,35 +400,36 @@ if ($user1ProfileId) {
             try { $null = Invoke-RestMethod -Uri "$baseUrl/api/v1/favorites/$uProfileId" -Method Post -WebSession $user1Session } catch {}
         }
     }
-    Write-Host " -> 10 Favoritos MUTUOS creados" -ForegroundColor Cyan
+    Write-Host " -> 50 Favoritos MUTUOS creados" -ForegroundColor Cyan
 
     # 5. Favoritos Recibidos y Enviados cruzados
-    for ($u = 66; $u -le 85; $u++) {
+    for ($u = 251; $u -le 350; $u++) {
+        if ($u % 10 -eq 0) { Clear-RateLimits }
         $uSess = Login-Demo $u
         try { $null = Invoke-RestMethod -Uri "$baseUrl/api/v1/favorites/$user1ProfileId" -Method Post -WebSession $uSess } catch {}
     }
-    for ($u = 86; $u -le 100; $u++) {
+    for ($u = 351; $u -le 400; $u++) {
         $uProfileId = $profileIdMap[$u]
         if ($uProfileId) {
             try { $null = Invoke-RestMethod -Uri "$baseUrl/api/v1/favorites/$uProfileId" -Method Post -WebSession $user1Session } catch {}
         }
     }
-    Write-Host " -> 20 Favoritos recibidos / 15 Favoritos enviados" -ForegroundColor Cyan
+    Write-Host " -> 100 Favoritos recibidos / 50 Favoritos enviados" -ForegroundColor Cyan
 
-    # 6. Visitas (Usuarios 101 al 200 visitan a user1)
-    for ($u = 101; $u -le 200; $u++) {
+    # 6. Visitas (Usuarios 401 al 1000 visitan a user1)
+    for ($u = 401; $u -le 1000; $u++) {
         if ($u % 25 -eq 0) { Clear-RateLimits }
         $uSess = Login-Demo $u
         try { $null = Invoke-RestMethod -Uri "$baseUrl/api/v1/visits/$user1ProfileId" -Method Post -WebSession $uSess } catch {}
     }
-    for ($u = 201; $u -le 230; $u++) {
+    for ($u = 1001; $u -le 1100; $u++) {
         $uProfileId = $profileIdMap[$u]
         if ($uProfileId) {
             try { $null = Invoke-RestMethod -Uri "$baseUrl/api/v1/visits/$uProfileId" -Method Post -WebSession $user1Session } catch {}
         }
     }
-    Write-Host " -> 100 Visitas recibidas / 30 Visitas enviadas" -ForegroundColor Cyan
+    Write-Host " -> 600 Visitas recibidas / 100 Visitas enviadas" -ForegroundColor Cyan
 }
 
-Write-Host "`n=== TODO LISTO: 500 usuarios generados con datos reales, fotos e interacciones masivas ===" -ForegroundColor Green
+Write-Host "`n=== TODO LISTO: 5000 usuarios generados con datos reales, fotos e interacciones masivas ===" -ForegroundColor Green
 Write-Host "Inicia sesión en la aplicación con: user1@datingdemo.com / DemoPass123!" -ForegroundColor Yellow
