@@ -11,8 +11,9 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
-// idResolverMaxEntries acota el mapa en memoria. Cuando se llena se vacía
-// entero: es una caché de conveniencia, no una fuente de verdad.
+// idResolverMaxEntries acota el mapa en memoria. Cuando se llena se expulsa
+// UNA entrada al azar: es una caché de conveniencia, no una fuente de verdad, y
+// vaciarla entera provocaría una avalancha de consultas a la vez.
 const idResolverMaxEntries = 50_000
 
 // IDResolver resuelve identificadores sin cargar la fila completa del perfil
@@ -22,12 +23,13 @@ const idResolverMaxEntries = 50_000
 type IDResolver struct {
 	db *pgxpool.Pool
 
-	mu    sync.RWMutex
-	cache map[uuid.UUID]uuid.UUID // user_id -> profile_id
+	mu         sync.RWMutex
+	cache      map[uuid.UUID]uuid.UUID // user_id -> profile_id
+	maxEntries int
 }
 
 func NewIDResolver(db *pgxpool.Pool) *IDResolver {
-	return &IDResolver{db: db, cache: make(map[uuid.UUID]uuid.UUID)}
+	return &IDResolver{db: db, cache: make(map[uuid.UUID]uuid.UUID), maxEntries: idResolverMaxEntries}
 }
 
 // ProfileID devuelve el id del perfil de un usuario. La relación
@@ -87,8 +89,12 @@ func (r *IDResolver) ResolveTarget(ctx context.Context, viewerUserID, targetProf
 
 func (r *IDResolver) remember(userID, profileID uuid.UUID) {
 	r.mu.Lock()
-	if len(r.cache) >= idResolverMaxEntries {
-		r.cache = make(map[uuid.UUID]uuid.UUID)
+	if _, exists := r.cache[userID]; !exists && len(r.cache) >= r.maxEntries {
+		// El orden de iteración de un map es aleatorio: expulsa una al azar.
+		for k := range r.cache {
+			delete(r.cache, k)
+			break
+		}
 	}
 	r.cache[userID] = profileID
 	r.mu.Unlock()

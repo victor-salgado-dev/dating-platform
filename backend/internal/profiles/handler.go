@@ -1022,26 +1022,6 @@ func (h *Handler) GetPublicPartnerPreferences(w http.ResponseWriter, r *http.Req
 }
 
 // --- Traducción de errores de dominio a respuestas HTTP -------------------
-//
-// ATENCIÓN — RECONSTRUCCIÓN: el archivo handler.go original se cortó al
-// subirlo justo antes de llegar a estas dos funciones (se ven
-// invocadas en todo el archivo, pero su definición no llegó a
-// transmitirse). El cuerpo de ambas se ha reconstruido a partir de:
-//   - los errores centinela definidos en errors.go
-//     (ErrNotFound, ErrAlreadyExists, ErrPhotoNotFound,
-//     ErrTooManyPhotos, ErrInterestNotFound, ValidationError)
-//   - el patrón ya usado a mano en Handler.Get para ErrNotFound
-//     (404, código "profile_not_found")
-//   - el hecho de que GetPublicByID (repository.go) colapsa a
-//     propósito "no existe", "cuenta inactiva" y "bloqueo" en un
-//     mismo ErrNotFound, así que writePublicProfileError no debe
-//     distinguir esos casos.
-//
-// Verifica esta implementación contra el archivo real antes de
-// desplegar: en particular los códigos de error exactos
-// ("profile_not_found", "invalid_field", etc.) y los status HTTP para
-// ErrAlreadyExists/ErrTooManyPhotos podrían no coincidir con los que
-// ya usa tu apperr/httpx si difieren de la convención de Handler.Get.
 
 // writeProfileError traduce los errores de dominio de profiles al
 // código y mensaje HTTP correspondientes, para los endpoints

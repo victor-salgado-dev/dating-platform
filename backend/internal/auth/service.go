@@ -20,6 +20,13 @@ import (
 // entradas obviamente inválidas antes de tocar la base de datos.
 var emailPattern = regexp.MustCompile(`^[^\s@]+@[^\s@]+\.[^\s@]+$`)
 
+// dummyPasswordHash es un hash bcrypt válido, con el coste por defecto (el mismo
+// que usa HashPassword), de una contraseña aleatoria que se descartó. Login lo
+// compara cuando el email no existe, para que ese camino cueste lo mismo que una
+// contraseña incorrecta: sin esto, la respuesta tarda microsegundos en vez de
+// decenas de milisegundos y el tiempo delata qué emails están registrados.
+const dummyPasswordHash = "$2a$10$i2nfzpT3SmFFSxWYxwHGzO4SwtWAFjY0y7dD/0IvEFKLS5d1uL4P2"
+
 // ConsentRecorder es la interfaz mínima que auth necesita del módulo
 // consent: persistir que se aceptaron los documentos legales al
 // registrarse. auth valida el booleano accepted por su cuenta (ver
@@ -127,6 +134,7 @@ func (s *Service) Login(ctx context.Context, rawEmail, password string) (*users.
 	u, err := s.users.GetByEmail(ctx, normEmail)
 	if err != nil {
 		if errors.Is(err, users.ErrNotFound) {
+			_ = VerifyPassword(dummyPasswordHash, password) // mismo coste que una contraseña incorrecta
 			return nil, "", ErrInvalidCredentials
 		}
 		return nil, "", err
@@ -219,9 +227,13 @@ func (s *Service) touchAsync(userID uuid.UUID) {
 }
 
 // RequestPasswordReset genera un token de reset y envía el email.
-// Deliberadamente no revela si el email existe o no: siempre devuelve
-// nil salvo un error real de infraestructura, para no facilitar
-// enumeración de cuentas registradas.
+//
+// Deliberadamente no revela si el email existe o no: ni en el resultado (siempre
+// devuelve nil salvo un error real de infraestructura al buscar la cuenta) ni en
+// el tiempo de respuesta. Por eso, una vez localizada la cuenta, crear el token y
+// enviar el correo (SMTP, lento) se hace en segundo plano: ambos caminos cuestan
+// una sola consulta. Un fallo posterior solo se registra; si el proceso se apaga
+// justo en ese momento el correo puede perderse y el usuario lo pide de nuevo.
 func (s *Service) RequestPasswordReset(ctx context.Context, rawEmail string) error {
 	normEmail, err := normalizeEmail(rawEmail)
 	if err != nil {
@@ -236,9 +248,19 @@ func (s *Service) RequestPasswordReset(ctx context.Context, rawEmail string) err
 		return err
 	}
 
+	// El contexto de la petición se cancela al responder: el envío necesita el suyo.
+	go s.sendPasswordResetEmail(context.WithoutCancel(ctx), u)
+	return nil
+}
+
+func (s *Service) sendPasswordResetEmail(ctx context.Context, u *users.User) {
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
+	defer cancel()
+
 	token, err := s.tokens.Create(ctx, PurposePasswordReset, u.ID, s.resetTTL)
 	if err != nil {
-		return err
+		slog.Error("no se pudo crear el token de reset de contraseña", "user_id", u.ID, "error", err)
+		return
 	}
 
 	err = s.sender.Send(ctx, email.Message{
@@ -250,10 +272,8 @@ func (s *Service) RequestPasswordReset(ctx context.Context, rawEmail string) err
 		),
 	})
 	if err != nil {
-		slog.Error("no se pudo enviar el email de reset de contraseña", "error", err)
+		slog.Error("no se pudo enviar el email de reset de contraseña", "user_id", u.ID, "error", err)
 	}
-
-	return nil
 }
 
 // ResetPassword consume un token de reset y fija una contraseña nueva.

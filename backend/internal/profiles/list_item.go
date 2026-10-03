@@ -2,6 +2,7 @@ package profiles
 
 import (
 	"fmt"
+	"regexp"
 	"time"
 
 	"github.com/google/uuid"
@@ -43,29 +44,7 @@ type BaseListItem struct {
 // COUNT(*) OVER(), etc.) se pasan como punteros adicionales y se escanean
 // a continuación, en el mismo orden en que aparezcan en el SELECT.
 func ScanBaseListItem(row pgx.Row, extras ...any) (BaseListItem, error) {
-	var (
-		base   BaseListItem
-		birth  time.Time
-		gender string
-	)
-
-	dest := append([]any{
-		&base.ProfileID,
-		&base.DisplayName,
-		&birth,
-		&gender,
-		&base.CountryCode,
-		&base.Region,
-		&base.HasPhoto,
-	}, extras...)
-
-	if err := row.Scan(dest...); err != nil {
-		return BaseListItem{}, err
-	}
-
-	base.Age = AgeAt(birth, time.Now())
-	base.Gender = Gender(gender)
-	return base, nil
+	return scanListItem(row, false, extras)
 }
 
 // ScanListItem es ScanBaseListItem más los cuatro flags de interacción, que
@@ -74,13 +53,18 @@ func ScanBaseListItem(row pgx.Row, extras ...any) (BaseListItem, error) {
 //
 //	<7 columnas base>, <extras...>, liked, favorited, received_like, received_favorite
 func ScanListItem(row pgx.Row, extras ...any) (BaseListItem, error) {
+	return scanListItem(row, true, extras)
+}
+
+func scanListItem(row pgx.Row, withFlags bool, extras []any) (BaseListItem, error) {
 	var (
 		base   BaseListItem
 		birth  time.Time
 		gender string
 	)
 
-	dest := []any{
+	dest := make([]any, 0, 7+len(extras)+4)
+	dest = append(dest,
 		&base.ProfileID,
 		&base.DisplayName,
 		&birth,
@@ -88,9 +72,11 @@ func ScanListItem(row pgx.Row, extras ...any) (BaseListItem, error) {
 		&base.CountryCode,
 		&base.Region,
 		&base.HasPhoto,
-	}
+	)
 	dest = append(dest, extras...)
-	dest = append(dest, &base.Liked, &base.Favorited, &base.ReceivedLike, &base.ReceivedFavorite)
+	if withFlags {
+		dest = append(dest, &base.Liked, &base.Favorited, &base.ReceivedLike, &base.ReceivedFavorite)
+	}
 
 	if err := row.Scan(dest...); err != nil {
 		return BaseListItem{}, err
@@ -101,6 +87,11 @@ func ScanListItem(row pgx.Row, extras ...any) (BaseListItem, error) {
 	return base, nil
 }
 
+var (
+	sqlAliasPattern     = regexp.MustCompile(`^[A-Za-z_][A-Za-z0-9_]*$`)
+	reservedFlagAliases = map[string]bool{"fl": true, "ff": true, "rl": true, "rf": true}
+)
+
 // ViewerFlagsSQL devuelve las cuatro columnas de interacción entre quien
 // mira (alias de una fila de profiles, con .id y .user_id) y el perfil de la
 // ficha (alias `profile`). Cada columna es un EXISTS por índice único
@@ -108,7 +99,17 @@ func ScanListItem(row pgx.Row, extras ...any) (BaseListItem, error) {
 // así que el coste depende del tamaño de la página, no de cuántos likes o
 // favoritos acumule el usuario. Si el alias del visitante viene de un
 // LEFT JOIN y no tiene fila, los cuatro flags salen false.
+//
+// viewer y profile se interpolan en el SQL: deben ser alias literales del
+// código (nunca entrada de usuario). Se valida que sean identificadores simples
+// y que no choquen con los alias internos (fl, ff, rl, rf); si no, entra en
+// pánico, porque es un error de programación y no de datos.
 func ViewerFlagsSQL(viewer, profile string) string {
+	for _, alias := range []string{viewer, profile} {
+		if !sqlAliasPattern.MatchString(alias) || reservedFlagAliases[alias] {
+			panic(fmt.Sprintf("profiles: alias SQL no válido en ViewerFlagsSQL: %q", alias))
+		}
+	}
 	return fmt.Sprintf(`EXISTS (SELECT 1 FROM likes fl WHERE fl.from_profile_id = %[1]s.id AND fl.to_profile_id = %[2]s.id) AS liked,
 			EXISTS (SELECT 1 FROM favorites ff WHERE ff.user_id = %[1]s.user_id AND ff.favorite_profile_id = %[2]s.id) AS favorited,
 			EXISTS (SELECT 1 FROM likes rl WHERE rl.from_profile_id = %[2]s.id AND rl.to_profile_id = %[1]s.id) AS received_like,
