@@ -27,8 +27,8 @@ var _ auth.SummaryProvider = (*SummaryStore)(nil)
 
 // Criterios (los mismos que calculaba account-nav.tsx en el cliente): 4
 // puntos base por tener perfil, 1 por cada uno de region, objetivos,
-// has_children, bio, wants_children y nationality, y 2 por tener al menos
-// una foto. Máximo 12.
+// has_children, bio, wants_children y nationality (un texto vacío no cuenta
+// como contestado), y 2 por tener al menos una foto. Máximo 12.
 const (
 	completionBase     = 4
 	completionPhotoPts = 2
@@ -47,7 +47,7 @@ func (s *SummaryStore) AccountSummary(ctx context.Context, userID uuid.UUID) (au
 		     + (p.has_children IS NOT NULL)::int
 		     + (COALESCE(btrim(p.bio), '') <> '')::int
 		     + (p.wants_children IS NOT NULL)::int
-		     + (p.nationality IS NOT NULL)::int AS optional_points
+		     + (COALESCE(btrim(p.nationality), '') <> '')::int AS optional_points
 		FROM profiles p
 		WHERE p.user_id = $1
 	`
@@ -64,13 +64,22 @@ func (s *SummaryStore) AccountSummary(ctx context.Context, userID uuid.UUID) (au
 		return auth.AccountSummary{}, fmt.Errorf("profiles: resumen de cuenta: %w", err)
 	}
 
-	score := completionBase + optional
 	sum := auth.AccountSummary{ProfileID: &profileID, HasProfile: true}
 	if photoID != nil {
-		score += completionPhotoPts
-		url := fmt.Sprintf("/api/v1/profiles/%s/photos/%s/file", profileID, *photoID)
+		// Es un avatar del header: basta la miniatura, no la foto de 1600 px.
+		url := publicPhotoURL(profileID, *photoID, true)
 		sum.PhotoURL = &url
 	}
-	sum.Completion = int(math.Round(float64(score) / completionMax * 100))
+	sum.Completion = completionPercent(optional, photoID != nil)
 	return sum, nil
+}
+
+// completionPercent convierte los puntos obtenidos en el porcentaje 0-100 que
+// ve el usuario.
+func completionPercent(optionalPoints int, hasPhoto bool) int {
+	score := completionBase + optionalPoints
+	if hasPhoto {
+		score += completionPhotoPts
+	}
+	return int(math.Round(float64(score) / completionMax * 100))
 }

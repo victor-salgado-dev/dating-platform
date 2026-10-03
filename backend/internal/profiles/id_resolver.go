@@ -70,12 +70,7 @@ func (r *IDResolver) ResolveTarget(ctx context.Context, viewerUserID, targetProf
 		JOIN users u ON u.id = p.user_id
 		JOIN profiles me ON me.user_id = $2
 		WHERE p.id = $1
-		  AND u.status = 'active' AND u.deleted_at IS NULL
-		  AND NOT EXISTS (
-		      SELECT 1 FROM blocks b
-		      WHERE (b.blocker_id = $2 AND b.blocked_id = p.user_id)
-		         OR (b.blocker_id = p.user_id AND b.blocked_id = $2)
-		  )
+		  AND ` + visiblePredicate + `
 	`
 
 	var t Target

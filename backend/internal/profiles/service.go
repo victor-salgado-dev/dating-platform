@@ -94,10 +94,10 @@ type LikeChecker interface {
 	HasMatch(ctx context.Context, profileA, profileB uuid.UUID) (bool, error)
 }
 
-// BlockChecker resume la operación de bloqueo necesaria para saber si
-// existe bloqueo en cualquier sentido entre dos usuarios.
-type BlockChecker interface {
-	IsBlocked(ctx context.Context, userA, userB uuid.UUID) (bool, error)
+// ProfileIDResolver resuelve user_id -> profile_id sin cargar el perfil
+// completo (44 columnas). Lo implementa *IDResolver, que además cachea.
+type ProfileIDResolver interface {
+	ProfileID(ctx context.Context, userID uuid.UUID) (uuid.UUID, error)
 }
 
 // VisitRecorder permite registrar una visita a un perfil.
@@ -105,66 +105,17 @@ type VisitRecorder interface {
 	Record(ctx context.Context, visitorProfileID, visitedProfileID uuid.UUID) error
 }
 
-// CreateProfileInput son los datos necesarios para crear un perfil.
-//
-// Ya no incluye Languages ni Interests: se gestionan aparte, un ítem
-// cada vez, con Service.SetLanguage / Service.SetInterest — igual que
-// las fotos no se suben como parte de este struct.
-type CreateProfileInput struct {
-	DisplayName       string
-	BirthDate         time.Time
-	Gender            Gender
-	CountryCode       string
-	Region            *string
-	RelationshipGoals []RelationshipGoal
-	HasChildren       *string
-	WantsChildren     *string
-	Bio               *string
-
-	Height                *int
-	Weight                *int
-	BodyType              *string
-	Ethnicity             *string
-	AppearanceRating      *string
-	HairColor             *string
-	EyeColor              *string
-	BodyArt               []string
-	SmokingHabit          *string
-	DrinkingHabit         *string
-	RelocationWillingness []string
-	MaritalStatus         *string
-	ChildrenCount         *int
-	YoungestChildAge      *int
-	OldestChildAge        *int
-	Occupation            *string
-	EmploymentStatus      *string
-	IncomeLevel           *string
-	LivingSituation       *string
-	Nationality           *string
-	EducationLevel        *string
-	EnglishAbility        *string
-	Religion              *string
-	ReligiousValues       *string
-	StarSign              *string
-
-	FutureVision       []string
-	Sports             []string
-	LikesPets          *string
-	PetsOwned          []string
-	FavoriteSeason     *string
-	IdealVacationStyle []string
-	VacationActivities []string
-	ProfileQuote       *string
-	DreamWish          *string
-}
-
 type Service struct {
 	repo    Repository
 	storage storage.Storage
 
+	// ids es opcional; sin él, profileID cae a repo.GetByUserID.
+	ids ProfileIDResolver
+
+	interests interestCatalogCache
+
 	favs   FavoriteChecker
 	likes  LikeChecker
-	blocks BlockChecker
 	visits VisitRecorder
 }
 
@@ -177,11 +128,51 @@ func NewService(repo Repository, store storage.Storage) *Service {
 // Se hace en un paso separado para no obligar a reordenar el wiring de
 // main.go: los servicios de interacción se crean después que el de
 // perfiles en el bootstrap actual.
-func (s *Service) SetInteractionDeps(favs FavoriteChecker, likes LikeChecker, blocks BlockChecker, visits VisitRecorder) {
+func (s *Service) SetInteractionDeps(favs FavoriteChecker, likes LikeChecker, visits VisitRecorder) {
 	s.favs = favs
 	s.likes = likes
-	s.blocks = blocks
 	s.visits = visits
+}
+
+// SetIDResolver inyecta el resolvedor de IDs con caché. Opcional, pero sin él
+// cada operación sobre el propio perfil carga la fila entera solo para leer su ID.
+func (s *Service) SetIDResolver(r ProfileIDResolver) {
+	s.ids = r
+}
+
+// profileID devuelve el id del perfil de un usuario (ErrNotFound si no tiene).
+// Siempre devuelve uuid.Nil junto con un error.
+func (s *Service) profileID(ctx context.Context, userID uuid.UUID) (uuid.UUID, error) {
+	if s.ids != nil {
+		return s.ids.ProfileID(ctx, userID)
+	}
+	p, err := s.repo.GetByUserID(ctx, userID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return p.ID, nil
+}
+
+// cachedInterestCatalog devuelve el catálogo de intereses desde memoria
+// (recargado cada interestCatalogTTL). SOLO LECTURA: no modificar el resultado.
+func (s *Service) cachedInterestCatalog(ctx context.Context) ([]InterestDefinition, error) {
+	snap, err := s.interests.get(ctx, s.repo.ListInterestDefinitions)
+	if err != nil {
+		return nil, err
+	}
+	return snap.list, nil
+}
+
+// cachedInterestDefinition busca un interés en el catálogo en memoria. Si no
+// está, consulta la BD (puede ser un interés añadido tras la última carga), así
+// que una clave inexistente cuesta un SELECT por PK, igual que antes.
+func (s *Service) cachedInterestDefinition(ctx context.Context, key string) (*InterestDefinition, error) {
+	if snap, err := s.interests.get(ctx, s.repo.ListInterestDefinitions); err == nil {
+		if d, ok := snap.byKey[key]; ok {
+			return &d, nil
+		}
+	}
+	return s.repo.GetInterestDefinition(ctx, key)
 }
 
 func (s *Service) GetMyProfile(ctx context.Context, userID uuid.UUID) (*Profile, error) {
@@ -193,18 +184,15 @@ func (s *Service) GetPublicProfile(ctx context.Context, viewerUserID, profileID 
 }
 
 func (s *Service) ListPublicPhotos(ctx context.Context, viewerUserID, profileID uuid.UUID) ([]Photo, error) {
-	if _, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID); err != nil {
+	if err := s.repo.IsVisible(ctx, profileID, viewerUserID); err != nil {
 		return nil, err
 	}
 	return s.repo.ListPhotos(ctx, profileID)
 }
 
 func (s *Service) OpenPublicPhoto(ctx context.Context, viewerUserID, profileID, photoID uuid.UUID, thumb bool) (io.ReadCloser, *Photo, error) {
-	if _, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID); err != nil {
-		return nil, nil, err
-	}
-
-	ph, err := s.repo.GetPhoto(ctx, profileID, photoID)
+	// Visibilidad y foto en UNA consulta: esto se pide una vez por miniatura.
+	ph, err := s.repo.GetPublicPhoto(ctx, profileID, viewerUserID, photoID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -230,22 +218,30 @@ type FullProfile struct {
 	Favorited bool
 	Liked     bool
 	Matched   bool
-	Blocked   bool
+}
+
+// FullPublicOptions ajusta GetFullPublicProfile. El valor cero es el
+// comportamiento normal.
+type FullPublicOptions struct {
+	// SkipVisit evita registrar la visita. El cliente lo pide al PRECARGAR el
+	// siguiente perfil de Quick Match (?visit=0): precargar no es ver, y sin
+	// esto contaría como visita a alguien que el usuario aún no ha visto.
+	SkipVisit bool
 }
 
 // GetFullPublicProfile resuelve en una sola llamada de servicio lo que
 // antes requería 6 peticiones HTTP del cliente. También carga el
 // catálogo de intereses y el estado de interacción del visitante, y
 // registra la visita si los colaboradores están inyectados.
-func (s *Service) GetFullPublicProfile(ctx context.Context, viewerUserID, profileID uuid.UUID) (*FullProfile, error) {
+func (s *Service) GetFullPublicProfile(ctx context.Context, viewerUserID, profileID uuid.UUID, opts FullPublicOptions) (*FullProfile, error) {
 	profile, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID)
 	if err != nil {
 		return nil, err
 	}
 
-	var viewerProfile *Profile
+	var viewerProfileID uuid.UUID // uuid.Nil = el visitante aún no tiene perfil
 	if s.likes != nil || s.favs != nil || s.visits != nil {
-		viewerProfile, err = s.repo.GetByUserID(ctx, viewerUserID)
+		viewerProfileID, err = s.profileID(ctx, viewerUserID)
 		if err != nil && !errors.Is(err, ErrNotFound) {
 			return nil, err
 		}
@@ -265,7 +261,6 @@ func (s *Service) GetFullPublicProfile(ctx context.Context, viewerUserID, profil
 		favorited          bool
 		liked              bool
 		matched            bool
-		blocked            bool
 	)
 
 	run := func(fn func() error) {
@@ -285,7 +280,7 @@ func (s *Service) GetFullPublicProfile(ctx context.Context, viewerUserID, profil
 	run(func() (err error) { photos, err = s.repo.ListPhotos(ctx, profileID); return })
 	run(func() (err error) { languages, err = s.repo.ListProfileLanguages(ctx, profileID); return })
 	run(func() (err error) { interests, err = s.repo.ListProfileInterests(ctx, profileID); return })
-	run(func() (err error) { interestCatalog, err = s.repo.ListInterestDefinitions(ctx); return })
+	run(func() (err error) { interestCatalog, err = s.cachedInterestCatalog(ctx); return })
 	run(func() (err error) { personalityAnswers, err = s.repo.ListPersonalityAnswers(ctx, profileID); return })
 	run(func() (err error) { personalityScores, err = s.repo.GetPersonalityTraitScores(ctx, profileID); return })
 	run(func() (err error) { partnerPrefs, err = s.repo.GetPartnerPreferences(ctx, profileID); return })
@@ -298,23 +293,15 @@ func (s *Service) GetFullPublicProfile(ctx context.Context, viewerUserID, profil
 		})
 	}
 
-	if s.likes != nil && viewerProfile != nil {
+	if s.likes != nil && viewerProfileID != uuid.Nil {
 		run(func() error {
 			var err error
-			liked, err = s.likes.IsLiked(ctx, viewerProfile.ID, profileID)
+			liked, err = s.likes.IsLiked(ctx, viewerProfileID, profileID)
 			return err
 		})
 		run(func() error {
 			var err error
-			matched, err = s.likes.HasMatch(ctx, viewerProfile.ID, profileID)
-			return err
-		})
-	}
-
-	if s.blocks != nil {
-		run(func() error {
-			var err error
-			blocked, err = s.blocks.IsBlocked(ctx, viewerUserID, profile.UserID)
+			matched, err = s.likes.HasMatch(ctx, viewerProfileID, profileID)
 			return err
 		})
 	}
@@ -324,8 +311,8 @@ func (s *Service) GetFullPublicProfile(ctx context.Context, viewerUserID, profil
 		return nil, firstErr
 	}
 
-	if s.visits != nil && viewerProfile != nil && viewerProfile.ID != profileID && !visitSkipped(ctx) {
-		if err := s.visits.Record(ctx, viewerProfile.ID, profileID); err != nil {
+	if s.visits != nil && viewerProfileID != uuid.Nil && viewerProfileID != profileID && !opts.SkipVisit {
+		if err := s.visits.Record(ctx, viewerProfileID, profileID); err != nil {
 			slog.Error("no se pudo registrar la visita", "error", err)
 		}
 	}
@@ -342,7 +329,6 @@ func (s *Service) GetFullPublicProfile(ctx context.Context, viewerUserID, profil
 		Favorited:          favorited,
 		Liked:              liked,
 		Matched:            matched,
-		Blocked:            blocked,
 	}, nil
 }
 
@@ -386,7 +372,7 @@ func (s *Service) GetMyFullProfile(ctx context.Context, userID uuid.UUID) (*Full
 	run(func() (err error) { photos, err = s.repo.ListPhotos(ctx, profile.ID); return })
 	run(func() (err error) { languages, err = s.repo.ListProfileLanguages(ctx, profile.ID); return })
 	run(func() (err error) { interests, err = s.repo.ListProfileInterests(ctx, profile.ID); return })
-	run(func() (err error) { interestCatalog, err = s.repo.ListInterestDefinitions(ctx); return })
+	run(func() (err error) { interestCatalog, err = s.cachedInterestCatalog(ctx); return })
 	run(func() (err error) { personalityAnswers, err = s.repo.ListPersonalityAnswers(ctx, profile.ID); return })
 	run(func() (err error) { personalityScores, err = s.repo.GetPersonalityTraitScores(ctx, profile.ID); return })
 	run(func() (err error) { partnerPrefs, err = s.repo.GetPartnerPreferences(ctx, profile.ID); return })
@@ -408,145 +394,99 @@ func (s *Service) GetMyFullProfile(ctx context.Context, userID uuid.UUID) (*Full
 		Favorited:          false,
 		Liked:              false,
 		Matched:            false,
-		Blocked:            false,
 	}, nil
 }
 
-func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, in CreateProfileInput) (*Profile, error) {
-	if err := validateDisplayName(in.DisplayName); err != nil {
+// CreateProfile valida y normaliza los datos de p, lo asocia a userID y lo
+// guarda. No modifica p: devuelve el perfil creado (con ID y fechas).
+func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, p *Profile) (*Profile, error) {
+	if err := validateDisplayName(p.DisplayName); err != nil {
 		return nil, err
 	}
-	if err := validateBirthDate(in.BirthDate); err != nil {
+	if err := validateBirthDate(p.BirthDate); err != nil {
 		return nil, err
 	}
-	if err := validateGender(in.Gender); err != nil {
+	if err := validateGender(p.Gender); err != nil {
 		return nil, err
 	}
-	countryCode := strings.ToUpper(strings.TrimSpace(in.CountryCode))
+	countryCode := strings.ToUpper(strings.TrimSpace(p.CountryCode))
 	if err := validateCountryCode(countryCode); err != nil {
 		return nil, err
 	}
-	if err := validateRelationshipGoals(in.RelationshipGoals); err != nil {
+	if err := validateRelationshipGoals(p.RelationshipGoals); err != nil {
 		return nil, err
 	}
-	if err := validateBio(in.Bio); err != nil {
+	if err := validateBio(p.Bio); err != nil {
 		return nil, err
 	}
-	if err := validateProfileQuote(in.ProfileQuote); err != nil {
+	if err := validateProfileQuote(p.ProfileQuote); err != nil {
 		return nil, err
 	}
-	if err := validateDreamWish(in.DreamWish); err != nil {
-		return nil, err
-	}
-
-	var nationality *string
-	if in.Nationality != nil {
-		n := strings.ToUpper(strings.TrimSpace(*in.Nationality))
-		nationality = &n
-	}
-
-	p := &Profile{
-		UserID:            userID,
-		DisplayName:       strings.TrimSpace(in.DisplayName),
-		BirthDate:         in.BirthDate,
-		Gender:            in.Gender,
-		CountryCode:       countryCode,
-		Region:            in.Region,
-		RelationshipGoals: in.RelationshipGoals,
-		HasChildren:       in.HasChildren,
-		WantsChildren:     in.WantsChildren,
-		Bio:               in.Bio,
-
-		Height:                in.Height,
-		Weight:                in.Weight,
-		BodyType:              in.BodyType,
-		Ethnicity:             in.Ethnicity,
-		AppearanceRating:      in.AppearanceRating,
-		HairColor:             in.HairColor,
-		EyeColor:              in.EyeColor,
-		BodyArt:               in.BodyArt,
-		SmokingHabit:          in.SmokingHabit,
-		DrinkingHabit:         in.DrinkingHabit,
-		RelocationWillingness: in.RelocationWillingness,
-		MaritalStatus:         in.MaritalStatus,
-		ChildrenCount:         in.ChildrenCount,
-		YoungestChildAge:      in.YoungestChildAge,
-		OldestChildAge:        in.OldestChildAge,
-		Occupation:            in.Occupation,
-		EmploymentStatus:      in.EmploymentStatus,
-		IncomeLevel:           in.IncomeLevel,
-		LivingSituation:       in.LivingSituation,
-		Nationality:           nationality,
-		EducationLevel:        in.EducationLevel,
-		EnglishAbility:        in.EnglishAbility,
-		Religion:              in.Religion,
-		ReligiousValues:       in.ReligiousValues,
-		StarSign:              in.StarSign,
-
-		FutureVision:       in.FutureVision,
-		Sports:             in.Sports,
-		LikesPets:          in.LikesPets,
-		PetsOwned:          in.PetsOwned,
-		FavoriteSeason:     in.FavoriteSeason,
-		IdealVacationStyle: in.IdealVacationStyle,
-		VacationActivities: in.VacationActivities,
-		ProfileQuote:       in.ProfileQuote,
-		DreamWish:          in.DreamWish,
-	}
-
-	if err := s.repo.Create(ctx, p); err != nil {
+	if err := validateDreamWish(p.DreamWish); err != nil {
 		return nil, err
 	}
 
-	return p, nil
+	profile := *p // copia superficial: la normalización no toca al llamador
+	profile.UserID = userID
+	profile.DisplayName = strings.TrimSpace(p.DisplayName)
+	profile.CountryCode = countryCode
+	if p.Nationality != nil {
+		n := strings.ToUpper(strings.TrimSpace(*p.Nationality))
+		profile.Nationality = &n
+	}
+
+	if err := s.repo.Create(ctx, &profile); err != nil {
+		return nil, err
+	}
+
+	return &profile, nil
 }
 
 func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, patch ProfilePatch) (*Profile, error) {
-	if patch.DisplayName != nil {
-		if err := validateDisplayName(*patch.DisplayName); err != nil {
+	if patch.DisplayName.Set {
+		if err := validateDisplayName(patch.DisplayName.Value); err != nil {
 			return nil, err
 		}
-		trimmed := strings.TrimSpace(*patch.DisplayName)
-		patch.DisplayName = &trimmed
+		patch.DisplayName.Value = strings.TrimSpace(patch.DisplayName.Value)
 	}
-	if patch.BirthDate != nil {
-		if err := validateBirthDate(*patch.BirthDate); err != nil {
-			return nil, err
-		}
-	}
-	if patch.Gender != nil {
-		if err := validateGender(*patch.Gender); err != nil {
+	if patch.BirthDate.Set {
+		if err := validateBirthDate(patch.BirthDate.Value.Time()); err != nil {
 			return nil, err
 		}
 	}
-	if patch.CountryCode != nil {
-		cc := strings.ToUpper(strings.TrimSpace(*patch.CountryCode))
+	if patch.Gender.Set {
+		if err := validateGender(patch.Gender.Value); err != nil {
+			return nil, err
+		}
+	}
+	if patch.CountryCode.Set {
+		cc := strings.ToUpper(strings.TrimSpace(patch.CountryCode.Value))
 		if err := validateCountryCode(cc); err != nil {
 			return nil, err
 		}
-		patch.CountryCode = &cc
+		patch.CountryCode.Value = cc
 	}
-	if patch.Nationality != nil {
-		nat := strings.ToUpper(strings.TrimSpace(*patch.Nationality))
-		patch.Nationality = &nat
+	if patch.Nationality.Value != nil {
+		nat := strings.ToUpper(strings.TrimSpace(*patch.Nationality.Value))
+		patch.Nationality.Value = &nat
 	}
-	if patch.RelationshipGoalsSet {
-		if err := validateRelationshipGoals(patch.RelationshipGoals); err != nil {
+	if patch.RelationshipGoals.Set {
+		if err := validateRelationshipGoals(patch.RelationshipGoals.Value); err != nil {
 			return nil, err
 		}
 	}
-	if patch.BioSet {
-		if err := validateBio(patch.Bio); err != nil {
+	if patch.Bio.Set {
+		if err := validateBio(patch.Bio.Value); err != nil {
 			return nil, err
 		}
 	}
-	if patch.ProfileQuoteSet {
-		if err := validateProfileQuote(patch.ProfileQuote); err != nil {
+	if patch.ProfileQuote.Set {
+		if err := validateProfileQuote(patch.ProfileQuote.Value); err != nil {
 			return nil, err
 		}
 	}
-	if patch.DreamWishSet {
-		if err := validateDreamWish(patch.DreamWish); err != nil {
+	if patch.DreamWish.Set {
+		if err := validateDreamWish(patch.DreamWish.Value); err != nil {
 			return nil, err
 		}
 	}
@@ -561,7 +501,7 @@ func (s *Service) UploadPhoto(ctx context.Context, userID uuid.UUID, declaredCon
 
 	peek := make([]byte, 512)
 	n, err := io.ReadFull(r, peek)
-	if err != nil && err != io.ErrUnexpectedEOF && err != io.EOF {
+	if err != nil && !errors.Is(err, io.ErrUnexpectedEOF) && !errors.Is(err, io.EOF) {
 		return nil, fmt.Errorf("profiles: leer foto: %w", err)
 	}
 	peek = peek[:n]
@@ -577,12 +517,14 @@ func (s *Service) UploadPhoto(ctx context.Context, userID uuid.UUID, declaredCon
 
 	fullReader := io.MultiReader(bytes.NewReader(peek), r)
 
-	profile, err := s.repo.GetByUserID(ctx, userID)
+	profileID, err := s.profileID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
 
-	count, err := s.repo.CountPhotos(ctx, profile.ID)
+	// Rechazo rápido para no decodificar una foto que no cabe. NO es la
+	// garantía del límite: la comprobación real y atómica está en AddPhoto.
+	count, err := s.repo.CountPhotos(ctx, profileID)
 	if err != nil {
 		return nil, err
 	}
@@ -596,7 +538,7 @@ func (s *Service) UploadPhoto(ctx context.Context, userID uuid.UUID, declaredCon
 		return nil, err
 	}
 
-	base := fmt.Sprintf("profiles/%s/%s", profile.ID, uuid.NewString())
+	base := fmt.Sprintf("profiles/%s/%s", profileID, uuid.NewString())
 	key := base + processedExt
 	thumbKey := base + thumbKeySuffix + processedExt
 
@@ -609,7 +551,7 @@ func (s *Service) UploadPhoto(ctx context.Context, userID uuid.UUID, declaredCon
 	}
 
 	photo := &Photo{StorageKey: key, ThumbStorageKey: thumbKey, ContentType: processedContentType}
-	if err := s.repo.AddPhoto(ctx, profile.ID, photo); err != nil {
+	if err := s.repo.AddPhoto(ctx, profileID, photo, MaxPhotosPerProfile); err != nil {
 		s.deleteKeys(ctx, key, thumbKey)
 		return nil, err
 	}
@@ -618,20 +560,20 @@ func (s *Service) UploadPhoto(ctx context.Context, userID uuid.UUID, declaredCon
 }
 
 func (s *Service) ListPhotos(ctx context.Context, userID uuid.UUID) ([]Photo, error) {
-	profile, err := s.repo.GetByUserID(ctx, userID)
+	profileID, err := s.profileID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.ListPhotos(ctx, profile.ID)
+	return s.repo.ListPhotos(ctx, profileID)
 }
 
 func (s *Service) OpenPhoto(ctx context.Context, userID, photoID uuid.UUID, thumb bool) (io.ReadCloser, *Photo, error) {
-	profile, err := s.repo.GetByUserID(ctx, userID)
+	profileID, err := s.profileID(ctx, userID)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	ph, err := s.repo.GetPhoto(ctx, profile.ID, photoID)
+	ph, err := s.repo.GetPhoto(ctx, profileID, photoID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -664,31 +606,31 @@ func (s *Service) openPhotoFile(ctx context.Context, ph *Photo, thumb bool) (io.
 
 // SetPrimaryPhoto marca una foto del usuario como principal (position 0).
 func (s *Service) SetPrimaryPhoto(ctx context.Context, userID, photoID uuid.UUID) error {
-	profile, err := s.repo.GetByUserID(ctx, userID)
+	profileID, err := s.profileID(ctx, userID)
 	if err != nil {
 		return err
 	}
 
 	// Comprueba que la foto es de este perfil (ErrPhotoNotFound si no).
-	if _, err := s.repo.GetPhoto(ctx, profile.ID, photoID); err != nil {
+	if _, err := s.repo.GetPhoto(ctx, profileID, photoID); err != nil {
 		return err
 	}
 
-	return s.repo.SetPrimaryPhoto(ctx, profile.ID, photoID)
+	return s.repo.SetPrimaryPhoto(ctx, profileID, photoID)
 }
 
 func (s *Service) DeletePhoto(ctx context.Context, userID, photoID uuid.UUID) error {
-	profile, err := s.repo.GetByUserID(ctx, userID)
+	profileID, err := s.profileID(ctx, userID)
 	if err != nil {
 		return err
 	}
 
-	ph, err := s.repo.GetPhoto(ctx, profile.ID, photoID)
+	ph, err := s.repo.GetPhoto(ctx, profileID, photoID)
 	if err != nil {
 		return err
 	}
 
-	if err := s.repo.DeletePhoto(ctx, profile.ID, photoID); err != nil {
+	if err := s.repo.DeletePhoto(ctx, profileID, photoID); err != nil {
 		return err
 	}
 
@@ -698,7 +640,14 @@ func (s *Service) DeletePhoto(ctx context.Context, userID, photoID uuid.UUID) er
 
 // deleteKeys borra ficheros de storage ignorando claves vacías. Un fallo se
 // registra pero no se propaga: el dato ya no está en la base de datos.
+//
+// Se desacopla de la cancelación de la petición: si el cliente cierra la
+// conexión, ctx se cancela justo en los caminos donde más falta hace limpiar
+// (error a mitad de subida, borrado), y los ficheros quedarían huérfanos.
 func (s *Service) deleteKeys(ctx context.Context, keys ...string) {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 10*time.Second)
+	defer cancel()
+
 	for _, k := range keys {
 		if k == "" {
 			continue
@@ -719,40 +668,40 @@ func (s *Service) SetLanguage(ctx context.Context, userID uuid.UUID, languageCod
 		return nil, invalidField("level", fmt.Sprintf("debe estar entre %d y %d", MinLanguageLevel, MaxLanguageLevel))
 	}
 
-	profile, err := s.repo.GetByUserID(ctx, userID)
+	profileID, err := s.profileID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.UpsertProfileLanguage(ctx, profile.ID, languageCode, level)
+	return s.repo.UpsertProfileLanguage(ctx, profileID, languageCode, level)
 }
 
 func (s *Service) ListMyLanguages(ctx context.Context, userID uuid.UUID) ([]ProfileLanguage, error) {
-	profile, err := s.repo.GetByUserID(ctx, userID)
+	profileID, err := s.profileID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.ListProfileLanguages(ctx, profile.ID)
+	return s.repo.ListProfileLanguages(ctx, profileID)
 }
 
 func (s *Service) ListPublicLanguages(ctx context.Context, viewerUserID, profileID uuid.UUID) ([]ProfileLanguage, error) {
-	if _, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID); err != nil {
+	if err := s.repo.IsVisible(ctx, profileID, viewerUserID); err != nil {
 		return nil, err
 	}
 	return s.repo.ListProfileLanguages(ctx, profileID)
 }
 
 func (s *Service) DeleteLanguage(ctx context.Context, userID uuid.UUID, languageCode string) error {
-	profile, err := s.repo.GetByUserID(ctx, userID)
+	profileID, err := s.profileID(ctx, userID)
 	if err != nil {
 		return err
 	}
-	return s.repo.DeleteProfileLanguage(ctx, profile.ID, languageCode)
+	return s.repo.DeleteProfileLanguage(ctx, profileID, languageCode)
 }
 
 // --- Catálogo de intereses -----------------------------------------------
 
 func (s *Service) ListInterestCatalog(ctx context.Context) ([]InterestDefinition, error) {
-	return s.repo.ListInterestDefinitions(ctx)
+	return s.cachedInterestCatalog(ctx)
 }
 
 // --- Intereses del usuario -------------------------------------------------
@@ -764,7 +713,7 @@ func (s *Service) ListInterestCatalog(ctx context.Context) ([]InterestDefinition
 // 1-5; si no (HasLevel=false), level tiene que venir vacío — es una
 // simple etiqueta presente/ausente, puntuarla no significaría nada.
 func (s *Service) SetInterest(ctx context.Context, userID uuid.UUID, interestKey string, level *int) (*ProfileInterest, error) {
-	def, err := s.repo.GetInterestDefinition(ctx, interestKey)
+	def, err := s.cachedInterestDefinition(ctx, interestKey)
 	if err != nil {
 		if errors.Is(err, ErrInterestNotFound) {
 			return nil, invalidField("interest_key", "no existe ese interés en el catálogo")
@@ -782,23 +731,23 @@ func (s *Service) SetInterest(ctx context.Context, userID uuid.UUID, interestKey
 		return nil, invalidField("level", fmt.Sprintf("debe estar entre %d y %d", MinInterestLevel, MaxInterestLevel))
 	}
 
-	profile, err := s.repo.GetByUserID(ctx, userID)
+	profileID, err := s.profileID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.UpsertProfileInterest(ctx, profile.ID, interestKey, level)
+	return s.repo.UpsertProfileInterest(ctx, profileID, interestKey, level)
 }
 
 func (s *Service) ListMyInterests(ctx context.Context, userID uuid.UUID) ([]ProfileInterest, error) {
-	profile, err := s.repo.GetByUserID(ctx, userID)
+	profileID, err := s.profileID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.ListProfileInterests(ctx, profile.ID)
+	return s.repo.ListProfileInterests(ctx, profileID)
 }
 
 func (s *Service) ListPublicInterests(ctx context.Context, viewerUserID, profileID uuid.UUID) ([]ProfileInterest, error) {
-	if _, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID); err != nil {
+	if err := s.repo.IsVisible(ctx, profileID, viewerUserID); err != nil {
 		return nil, err
 	}
 	return s.repo.ListProfileInterests(ctx, profileID)
@@ -806,11 +755,11 @@ func (s *Service) ListPublicInterests(ctx context.Context, viewerUserID, profile
 
 // DeleteInterest vuelve un interés a "no seleccionado". Operación idempotente.
 func (s *Service) DeleteInterest(ctx context.Context, userID uuid.UUID, interestKey string) error {
-	profile, err := s.repo.GetByUserID(ctx, userID)
+	profileID, err := s.profileID(ctx, userID)
 	if err != nil {
 		return err
 	}
-	return s.repo.DeleteProfileInterest(ctx, profile.ID, interestKey)
+	return s.repo.DeleteProfileInterest(ctx, profileID, interestKey)
 }
 
 // --- Personalidad ---------------------------------------------------------
@@ -824,23 +773,23 @@ func (s *Service) SetPersonalityAnswer(ctx context.Context, userID uuid.UUID, st
 		return nil, invalidField("score", fmt.Sprintf("debe estar entre %d y %d", MinPersonalityScore, MaxPersonalityScore))
 	}
 
-	profile, err := s.repo.GetByUserID(ctx, userID)
+	profileID, err := s.profileID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.UpsertPersonalityAnswer(ctx, profile.ID, statementKey, score)
+	return s.repo.UpsertPersonalityAnswer(ctx, profileID, statementKey, score)
 }
 
 func (s *Service) GetMyPersonality(ctx context.Context, userID uuid.UUID) ([]ProfilePersonalityAnswer, []PersonalityTraitScore, error) {
-	profile, err := s.repo.GetByUserID(ctx, userID)
+	profileID, err := s.profileID(ctx, userID)
 	if err != nil {
 		return nil, nil, err
 	}
-	return s.getPersonality(ctx, profile.ID)
+	return s.getPersonality(ctx, profileID)
 }
 
 func (s *Service) GetPublicPersonality(ctx context.Context, viewerUserID, profileID uuid.UUID) ([]ProfilePersonalityAnswer, []PersonalityTraitScore, error) {
-	if _, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID); err != nil {
+	if err := s.repo.IsVisible(ctx, profileID, viewerUserID); err != nil {
 		return nil, nil, err
 	}
 	return s.getPersonality(ctx, profileID)
@@ -861,46 +810,46 @@ func (s *Service) getPersonality(ctx context.Context, profileID uuid.UUID) ([]Pr
 // --- Preferencias de pareja del usuario -------------------------------------
 
 func (s *Service) GetMyPartnerPreferences(ctx context.Context, userID uuid.UUID) (*PartnerPreferences, error) {
-	profile, err := s.repo.GetByUserID(ctx, userID)
+	profileID, err := s.profileID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.GetPartnerPreferences(ctx, profile.ID)
+	return s.repo.GetPartnerPreferences(ctx, profileID)
 }
 
 func (s *Service) GetPublicPartnerPreferences(ctx context.Context, viewerUserID, profileID uuid.UUID) (*PartnerPreferences, error) {
-	if _, err := s.repo.GetPublicByID(ctx, profileID, viewerUserID); err != nil {
+	if err := s.repo.IsVisible(ctx, profileID, viewerUserID); err != nil {
 		return nil, err
 	}
 	return s.repo.GetPartnerPreferences(ctx, profileID)
 }
 
 func (s *Service) UpdatePartnerPreferences(ctx context.Context, userID uuid.UUID, patch PartnerPreferencesPatch) (*PartnerPreferences, error) {
-	if patch.AgeMinSet && patch.AgeMaxSet && patch.AgeMin != nil && patch.AgeMax != nil && *patch.AgeMin > *patch.AgeMax {
+	if patch.AgeMin.Value != nil && patch.AgeMax.Value != nil && *patch.AgeMin.Value > *patch.AgeMax.Value {
 		return nil, invalidField("age_min", "no puede ser mayor que age_max")
 	}
-	if patch.HeightMinSet && patch.HeightMaxSet && patch.HeightMin != nil && patch.HeightMax != nil && *patch.HeightMin > *patch.HeightMax {
+	if patch.HeightMin.Value != nil && patch.HeightMax.Value != nil && *patch.HeightMin.Value > *patch.HeightMax.Value {
 		return nil, invalidField("height_min", "no puede ser mayor que height_max")
 	}
-	if patch.AboutPartnerTextSet && patch.AboutPartnerText != nil && len([]rune(*patch.AboutPartnerText)) > MaxAboutPartnerTextLen {
+	if text := patch.AboutPartnerText.Value; text != nil && len([]rune(*text)) > MaxAboutPartnerTextLen {
 		return nil, invalidField("about_partner_text", fmt.Sprintf("no puede superar %d caracteres", MaxAboutPartnerTextLen))
 	}
-	for _, imp := range []*int{
+	for _, imp := range []Field[*int]{
 		patch.ImportanceSharedThoughts, patch.ImportanceSharedHobbies, patch.ImportanceIntimacy,
 		patch.ImportanceRomanticLove, patch.ImportanceFinancialSecurity, patch.ImportanceFun,
 		patch.ImportanceSharedFriends, patch.ImportanceSharedHumor, patch.ImportancePersonalSpace,
 		patch.ImportanceIndependence,
 	} {
-		if imp != nil && (*imp < MinPartnerImportance || *imp > MaxPartnerImportance) {
+		if v := imp.Value; v != nil && (*v < MinPartnerImportance || *v > MaxPartnerImportance) {
 			return nil, invalidField("importance", fmt.Sprintf("debe estar entre %d y %d", MinPartnerImportance, MaxPartnerImportance))
 		}
 	}
 
-	profile, err := s.repo.GetByUserID(ctx, userID)
+	profileID, err := s.profileID(ctx, userID)
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.UpsertPartnerPreferences(ctx, profile.ID, patch)
+	return s.repo.UpsertPartnerPreferences(ctx, profileID, patch)
 }
 
 // --- Validaciones auxiliares ---

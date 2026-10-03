@@ -1,16 +1,14 @@
 package profiles
 
 import (
-	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
 
-	"dating-platform/backend/internal/auth"
 	"dating-platform/backend/internal/httpx"
 )
 
@@ -149,73 +147,32 @@ type photoResponse struct {
 }
 
 func toPhotoResponseSelf(ph *Photo) photoResponse {
-	url := fmt.Sprintf("/api/v1/profiles/me/photos/%s/file", ph.ID.String())
 	return photoResponse{
 		ID:        ph.ID.String(),
-		URL:       url,
-		ThumbURL:  url + "?size=thumb",
+		URL:       ownPhotoURL(ph.ID, false),
+		ThumbURL:  ownPhotoURL(ph.ID, true),
 		Position:  ph.Position,
 		CreatedAt: ph.CreatedAt.Format(time.RFC3339),
 	}
 }
 
 func toPhotoResponsePublic(ph *Photo, profileID uuid.UUID) photoResponse {
-	url := fmt.Sprintf("/api/v1/profiles/%s/photos/%s/file", profileID.String(), ph.ID.String())
 	return photoResponse{
 		ID:        ph.ID.String(),
-		URL:       url,
-		ThumbURL:  url + "?size=thumb",
+		URL:       publicPhotoURL(profileID, ph.ID, false),
+		ThumbURL:  publicPhotoURL(profileID, ph.ID, true),
 		Position:  ph.Position,
 		CreatedAt: ph.CreatedAt.Format(time.RFC3339),
 	}
 }
 
 type createProfileRequest struct {
-	DisplayName       string   `json:"display_name"`
-	BirthDate         string   `json:"birth_date"`
-	Gender            string   `json:"gender"`
-	CountryCode       string   `json:"country_code"`
-	Region            *string  `json:"region"`
-	RelationshipGoals []string `json:"relationship_goals"`
-	HasChildren       *string  `json:"has_children"`
-	WantsChildren     *string  `json:"wants_children"`
-	Bio               *string  `json:"bio"`
+	DisplayName string `json:"display_name"`
+	BirthDate   string `json:"birth_date"`
+	Gender      Gender `json:"gender"`
+	CountryCode string `json:"country_code"`
 
-	Height                *int     `json:"height"`
-	Weight                *int     `json:"weight"`
-	BodyType              *string  `json:"body_type"`
-	Ethnicity             *string  `json:"ethnicity"`
-	AppearanceRating      *string  `json:"appearance_rating"`
-	HairColor             *string  `json:"hair_color"`
-	EyeColor              *string  `json:"eye_color"`
-	BodyArt               []string `json:"body_art"`
-	SmokingHabit          *string  `json:"smoking_habit"`
-	DrinkingHabit         *string  `json:"drinking_habit"`
-	RelocationWillingness []string `json:"relocation_willingness"`
-	MaritalStatus         *string  `json:"marital_status"`
-	ChildrenCount         *int     `json:"children_count"`
-	YoungestChildAge      *int     `json:"youngest_child_age"`
-	OldestChildAge        *int     `json:"oldest_child_age"`
-	Occupation            *string  `json:"occupation"`
-	EmploymentStatus      *string  `json:"employment_status"`
-	IncomeLevel           *string  `json:"income_level"`
-	LivingSituation       *string  `json:"living_situation"`
-	Nationality           *string  `json:"nationality"`
-	EducationLevel        *string  `json:"education_level"`
-	EnglishAbility        *string  `json:"english_ability"`
-	Religion              *string  `json:"religion"`
-	ReligiousValues       *string  `json:"religious_values"`
-	StarSign              *string  `json:"star_sign"`
-
-	FutureVision       []string `json:"future_vision"`
-	Sports             []string `json:"sports"`
-	LikesPets          *string  `json:"likes_pets"`
-	PetsOwned          []string `json:"pets_owned"`
-	FavoriteSeason     *string  `json:"favorite_season"`
-	IdealVacationStyle []string `json:"ideal_vacation_style"`
-	VacationActivities []string `json:"vacation_activities"`
-	ProfileQuote       *string  `json:"profile_quote"`
-	DreamWish          *string  `json:"dream_wish"`
+	ProfileDetails
 }
 
 // --- DTOs: idiomas ----------------------------------------------------
@@ -320,14 +277,8 @@ type personalityResponse struct {
 }
 
 func toPersonalityResponse(answers []ProfilePersonalityAnswer, scores []PersonalityTraitScore) personalityResponse {
-	ar := make([]personalityAnswerResponse, 0, len(answers))
-	for _, a := range answers {
-		ar = append(ar, toPersonalityAnswerResponse(a))
-	}
-	sr := make([]personalityTraitScoreResponse, 0, len(scores))
-	for _, s := range scores {
-		sr = append(sr, toPersonalityTraitScoreResponse(s))
-	}
+	ar := mapSlice(answers, toPersonalityAnswerResponse)
+	sr := mapSlice(scores, toPersonalityTraitScoreResponse)
 	return personalityResponse{Answers: ar, TraitScores: sr}
 }
 
@@ -415,9 +366,8 @@ type fullProfileResponse struct {
 // --- Handlers: perfil -------------------------------------------------
 
 func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
@@ -427,6 +377,7 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 			httpx.WriteError(w, http.StatusNotFound, "profile_not_found", "Todavía no has creado tu perfil.")
 			return
 		}
+		slog.Error("profiles: obtener perfil propio", "error", err)
 		httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo obtener el perfil.")
 		return
 	}
@@ -435,9 +386,8 @@ func (h *Handler) Get(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
@@ -453,57 +403,17 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	goals := make([]RelationshipGoal, len(req.RelationshipGoals))
-	for i, g := range req.RelationshipGoals {
-		goals[i] = RelationshipGoal(g)
+	// Una lista de objetivos ausente se guarda como lista vacía (no NULL).
+	if req.RelationshipGoals == nil {
+		req.RelationshipGoals = []RelationshipGoal{}
 	}
 
-	p, err := h.svc.CreateProfile(r.Context(), userID, CreateProfileInput{
-		DisplayName:       req.DisplayName,
-		BirthDate:         birthDate,
-		Gender:            Gender(req.Gender),
-		CountryCode:       req.CountryCode,
-		Region:            req.Region,
-		RelationshipGoals: goals,
-		HasChildren:       req.HasChildren,
-		WantsChildren:     req.WantsChildren,
-		Bio:               req.Bio,
-
-		Height:                req.Height,
-		Weight:                req.Weight,
-		BodyType:              req.BodyType,
-		Ethnicity:             req.Ethnicity,
-		AppearanceRating:      req.AppearanceRating,
-		HairColor:             req.HairColor,
-		EyeColor:              req.EyeColor,
-		BodyArt:               req.BodyArt,
-		SmokingHabit:          req.SmokingHabit,
-		DrinkingHabit:         req.DrinkingHabit,
-		RelocationWillingness: req.RelocationWillingness,
-		MaritalStatus:         req.MaritalStatus,
-		ChildrenCount:         req.ChildrenCount,
-		YoungestChildAge:      req.YoungestChildAge,
-		OldestChildAge:        req.OldestChildAge,
-		Occupation:            req.Occupation,
-		EmploymentStatus:      req.EmploymentStatus,
-		IncomeLevel:           req.IncomeLevel,
-		LivingSituation:       req.LivingSituation,
-		Nationality:           req.Nationality,
-		EducationLevel:        req.EducationLevel,
-		EnglishAbility:        req.EnglishAbility,
-		Religion:              req.Religion,
-		ReligiousValues:       req.ReligiousValues,
-		StarSign:              req.StarSign,
-
-		FutureVision:       req.FutureVision,
-		Sports:             req.Sports,
-		LikesPets:          req.LikesPets,
-		PetsOwned:          req.PetsOwned,
-		FavoriteSeason:     req.FavoriteSeason,
-		IdealVacationStyle: req.IdealVacationStyle,
-		VacationActivities: req.VacationActivities,
-		ProfileQuote:       req.ProfileQuote,
-		DreamWish:          req.DreamWish,
+	p, err := h.svc.CreateProfile(r.Context(), userID, &Profile{
+		DisplayName:    req.DisplayName,
+		BirthDate:      birthDate,
+		Gender:         req.Gender,
+		CountryCode:    req.CountryCode,
+		ProfileDetails: req.ProfileDetails,
 	})
 	if err != nil {
 		writeProfileError(w, err)
@@ -514,21 +424,13 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
-	var raw map[string]json.RawMessage
-	if err := httpx.DecodeJSON(r, &raw); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_body", "El cuerpo de la petición no es válido.")
-		return
-	}
-
-	patch, err := buildProfilePatch(raw)
-	if err != nil {
-		writeProfileError(w, err)
+	var patch ProfilePatch
+	if !decodePatchOrWrite(w, r, &patch) {
 		return
 	}
 
@@ -541,160 +443,11 @@ func (h *Handler) Update(w http.ResponseWriter, r *http.Request) {
 	httpx.WriteJSON(w, http.StatusOK, toProfileResponse(p))
 }
 
-// buildProfilePatch traduce el JSON de la petición a un ProfilePatch
-func buildProfilePatch(raw map[string]json.RawMessage) (ProfilePatch, error) {
-	var patch ProfilePatch
-
-	parseString := func(key string, target **string, flag *bool) error {
-		if v, ok := raw[key]; ok {
-			*flag = true
-			if !isJSONNull(v) {
-				var s string
-				if err := json.Unmarshal(v, &s); err != nil {
-					return invalidField(key, "debe ser texto o null")
-				}
-				*target = &s
-			}
-		}
-		return nil
-	}
-
-	parseInt := func(key string, target **int, flag *bool) error {
-		if v, ok := raw[key]; ok {
-			*flag = true
-			if !isJSONNull(v) {
-				var i int
-				if err := json.Unmarshal(v, &i); err != nil {
-					return invalidField(key, "debe ser un entero o null")
-				}
-				*target = &i
-			}
-		}
-		return nil
-	}
-
-	parseSlice := func(key string, target *[]string, flag *bool) error {
-		if v, ok := raw[key]; ok {
-			*flag = true
-			if !isJSONNull(v) {
-				var sl []string
-				if err := json.Unmarshal(v, &sl); err != nil {
-					return invalidField(key, "debe ser una lista de textos o null")
-				}
-				*target = sl
-			}
-		}
-		return nil
-	}
-
-	if v, ok := raw["display_name"]; ok {
-		var s string
-		if err := json.Unmarshal(v, &s); err != nil {
-			return patch, invalidField("display_name", "debe ser texto")
-		}
-		patch.DisplayName = &s
-	}
-
-	if v, ok := raw["birth_date"]; ok {
-		var s string
-		if err := json.Unmarshal(v, &s); err != nil {
-			return patch, invalidField("birth_date", "debe ser texto")
-		}
-		t, err := time.Parse(dateLayout, s)
-		if err != nil {
-			return patch, invalidField("birth_date", "formato esperado YYYY-MM-DD")
-		}
-		patch.BirthDate = &t
-	}
-
-	if v, ok := raw["gender"]; ok {
-		var s string
-		if err := json.Unmarshal(v, &s); err != nil {
-			return patch, invalidField("gender", "debe ser texto")
-		}
-		g := Gender(s)
-		patch.Gender = &g
-	}
-
-	if v, ok := raw["country_code"]; ok {
-		var s string
-		if err := json.Unmarshal(v, &s); err != nil {
-			return patch, invalidField("country_code", "debe ser texto")
-		}
-		patch.CountryCode = &s
-	}
-
-	if v, ok := raw["relationship_goals"]; ok {
-		patch.RelationshipGoalsSet = true
-		if !isJSONNull(v) {
-			var ss []string
-			if err := json.Unmarshal(v, &ss); err != nil {
-				return patch, invalidField("relationship_goals", "debe ser una lista de textos o null")
-			}
-			goals := make([]RelationshipGoal, len(ss))
-			for i, s := range ss {
-				goals[i] = RelationshipGoal(s)
-			}
-			patch.RelationshipGoals = goals
-		}
-	}
-
-	if err := parseString("region", &patch.Region, &patch.RegionSet); err != nil { return patch, err }
-	if err := parseString("has_children", &patch.HasChildren, &patch.HasChildrenSet); err != nil { return patch, err }
-	if err := parseString("wants_children", &patch.WantsChildren, &patch.WantsChildrenSet); err != nil { return patch, err }
-	if err := parseString("bio", &patch.Bio, &patch.BioSet); err != nil { return patch, err }
-
-	if err := parseInt("height", &patch.Height, &patch.HeightSet); err != nil { return patch, err }
-	if err := parseInt("weight", &patch.Weight, &patch.WeightSet); err != nil { return patch, err }
-	if err := parseString("body_type", &patch.BodyType, &patch.BodyTypeSet); err != nil { return patch, err }
-	if err := parseString("ethnicity", &patch.Ethnicity, &patch.EthnicitySet); err != nil { return patch, err }
-	if err := parseString("appearance_rating", &patch.AppearanceRating, &patch.AppearanceRatingSet); err != nil { return patch, err }
-	if err := parseString("hair_color", &patch.HairColor, &patch.HairColorSet); err != nil { return patch, err }
-	if err := parseString("eye_color", &patch.EyeColor, &patch.EyeColorSet); err != nil { return patch, err }
-	if err := parseSlice("body_art", &patch.BodyArt, &patch.BodyArtSet); err != nil { return patch, err }
-
-	if err := parseString("smoking_habit", &patch.SmokingHabit, &patch.SmokingHabitSet); err != nil { return patch, err }
-	if err := parseString("drinking_habit", &patch.DrinkingHabit, &patch.DrinkingHabitSet); err != nil { return patch, err }
-	if err := parseSlice("relocation_willingness", &patch.RelocationWillingness, &patch.RelocationWillingnessSet); err != nil { return patch, err }
-	if err := parseString("marital_status", &patch.MaritalStatus, &patch.MaritalStatusSet); err != nil { return patch, err }
-	if err := parseInt("children_count", &patch.ChildrenCount, &patch.ChildrenCountSet); err != nil { return patch, err }
-	if err := parseInt("youngest_child_age", &patch.YoungestChildAge, &patch.YoungestChildAgeSet); err != nil { return patch, err }
-	if err := parseInt("oldest_child_age", &patch.OldestChildAge, &patch.OldestChildAgeSet); err != nil { return patch, err }
-	if err := parseString("occupation", &patch.Occupation, &patch.OccupationSet); err != nil { return patch, err }
-	if err := parseString("employment_status", &patch.EmploymentStatus, &patch.EmploymentStatusSet); err != nil { return patch, err }
-	if err := parseString("income_level", &patch.IncomeLevel, &patch.IncomeLevelSet); err != nil { return patch, err }
-	if err := parseString("living_situation", &patch.LivingSituation, &patch.LivingSituationSet); err != nil { return patch, err }
-
-	if err := parseString("nationality", &patch.Nationality, &patch.NationalitySet); err != nil { return patch, err }
-	if err := parseString("education_level", &patch.EducationLevel, &patch.EducationLevelSet); err != nil { return patch, err }
-	if err := parseString("english_ability", &patch.EnglishAbility, &patch.EnglishAbilitySet); err != nil { return patch, err }
-	if err := parseString("religion", &patch.Religion, &patch.ReligionSet); err != nil { return patch, err }
-	if err := parseString("religious_values", &patch.ReligiousValues, &patch.ReligiousValuesSet); err != nil { return patch, err }
-	if err := parseString("star_sign", &patch.StarSign, &patch.StarSignSet); err != nil { return patch, err }
-
-	if err := parseSlice("future_vision", &patch.FutureVision, &patch.FutureVisionSet); err != nil { return patch, err }
-	if err := parseSlice("sports", &patch.Sports, &patch.SportsSet); err != nil { return patch, err }
-	if err := parseString("likes_pets", &patch.LikesPets, &patch.LikesPetsSet); err != nil { return patch, err }
-	if err := parseSlice("pets_owned", &patch.PetsOwned, &patch.PetsOwnedSet); err != nil { return patch, err }
-	if err := parseString("favorite_season", &patch.FavoriteSeason, &patch.FavoriteSeasonSet); err != nil { return patch, err }
-	if err := parseSlice("ideal_vacation_style", &patch.IdealVacationStyle, &patch.IdealVacationStyleSet); err != nil { return patch, err }
-	if err := parseSlice("vacation_activities", &patch.VacationActivities, &patch.VacationActivitiesSet); err != nil { return patch, err }
-	if err := parseString("profile_quote", &patch.ProfileQuote, &patch.ProfileQuoteSet); err != nil { return patch, err }
-	if err := parseString("dream_wish", &patch.DreamWish, &patch.DreamWishSet); err != nil { return patch, err }
-
-	return patch, nil
-}
-
-func isJSONNull(raw json.RawMessage) bool {
-	return string(raw) == "null"
-}
-
 // --- Fotos -------------------------------------------------------------
 
 func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
@@ -723,9 +476,8 @@ func (h *Handler) UploadPhoto(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListPhotos(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
@@ -744,15 +496,13 @@ func (h *Handler) ListPhotos(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ServePhoto(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
-	photoID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de foto inválido.")
+	photoID, ok := pathUUID(w, r, "id", "foto")
+	if !ok {
 		return
 	}
 
@@ -763,21 +513,17 @@ func (h *Handler) ServePhoto(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rc.Close()
 
-	w.Header().Set("Content-Type", ph.ContentType)
-	w.Header().Set("Cache-Control", "private, max-age=86400")
-	_, _ = io.Copy(w, rc)
+	serveFile(w, rc, ph.ContentType)
 }
 
 func (h *Handler) DeletePhoto(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
-	photoID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de foto inválido.")
+	photoID, ok := pathUUID(w, r, "id", "foto")
+	if !ok {
 		return
 	}
 
@@ -791,15 +537,13 @@ func (h *Handler) DeletePhoto(w http.ResponseWriter, r *http.Request) {
 
 // SetPrimaryPhoto marca una foto del usuario como principal.
 func (h *Handler) SetPrimaryPhoto(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
-	photoID, err := uuid.Parse(r.PathValue("id"))
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de foto inválido.")
+	photoID, ok := pathUUID(w, r, "id", "foto")
+	if !ok {
 		return
 	}
 
@@ -816,16 +560,33 @@ func wantsThumb(r *http.Request) bool {
 	return r.URL.Query().Get("size") == "thumb"
 }
 
+// skipVisit dice si el cliente pide NO registrar la visita (?visit=0).
+func skipVisit(r *http.Request) bool {
+	return r.URL.Query().Get("visit") == "0"
+}
+
+// photoCacheControl: la URL de una foto lleva su UUID y el fichero no cambia,
+// pero sí puede dejar de ser accesible (borrada, o bloqueo entre las dos
+// personas). Por eso la caché es PRIVADA y de un día, y no un año "immutable":
+// una foto ya vista no debe seguir mostrándose indefinidamente en el navegador
+// de quien ya no tiene acceso. X-Content-Type-Options lo pone withSecurityHeaders.
+const photoCacheControl = "private, max-age=86400"
+
+// serveFile escribe el fichero de una foto con sus cabeceras.
+func serveFile(w http.ResponseWriter, rc io.Reader, contentType string) {
+	w.Header().Set("Content-Type", contentType)
+	w.Header().Set("Cache-Control", photoCacheControl)
+	_, _ = io.Copy(w, rc)
+}
+
 func (h *Handler) GetPublic(w http.ResponseWriter, r *http.Request) {
-	viewerID, ok := auth.UserIDFromContext(r.Context())
+	viewerID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
-	profileID, err := uuid.Parse(r.PathValue("profileID"))
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+	profileID, ok := pathUUID(w, r, "profileID", "perfil")
+	if !ok {
 		return
 	}
 
@@ -842,9 +603,8 @@ func (h *Handler) GetPublic(w http.ResponseWriter, r *http.Request) {
 // usuario autenticado en una sola petición. Es el endpoint que consume
 // la página de "mi perfil".
 func (h *Handler) GetMyFull(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
@@ -854,39 +614,7 @@ func (h *Handler) GetMyFull(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	photos := make([]photoResponse, 0, len(full.Photos))
-	for i := range full.Photos {
-		photos = append(photos, toPhotoResponseSelf(&full.Photos[i]))
-	}
-
-	languages := make([]profileLanguageResponse, 0, len(full.Languages))
-	for _, l := range full.Languages {
-		languages = append(languages, toProfileLanguageResponse(l))
-	}
-
-	interests := make([]profileInterestResponse, 0, len(full.Interests))
-	for _, pi := range full.Interests {
-		interests = append(interests, toProfileInterestResponse(pi))
-	}
-
-	interestCatalog := make([]interestDefinitionResponse, 0, len(full.InterestCatalog))
-	for _, def := range full.InterestCatalog {
-		interestCatalog = append(interestCatalog, toInterestDefinitionResponse(def))
-	}
-
-	httpx.WriteJSON(w, http.StatusOK, fullProfileResponse{
-		Profile:            toProfileResponse(full.Profile),
-		Photos:             photos,
-		Languages:          languages,
-		Interests:          interests,
-		InterestCatalog:    interestCatalog,
-		Personality:        toPersonalityResponse(full.PersonalityAnswers, full.PersonalityScores),
-		PartnerPreferences: toPartnerPreferencesResponse(full.PartnerPreferences),
-		Favorited:          false,
-		Liked:              false,
-		Matched:            false,
-		Blocked:            false,
-	})
+	httpx.WriteJSON(w, http.StatusOK, toFullProfileResponse(full, toPhotoResponseSelf))
 }
 
 // GetPublicFull sirve GET /profiles/{profileID}/full: el equivalente
@@ -897,69 +625,58 @@ func (h *Handler) GetMyFull(w http.ResponseWriter, r *http.Request) {
 // por cada perfil mostrado. Ahora también devuelve el catálogo de
 // intereses y los flags de interacción del visitante.
 func (h *Handler) GetPublicFull(w http.ResponseWriter, r *http.Request) {
-	viewerID, ok := auth.UserIDFromContext(r.Context())
+	viewerID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
-	profileID, err := uuid.Parse(r.PathValue("profileID"))
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+	profileID, ok := pathUUID(w, r, "profileID", "perfil")
+	if !ok {
 		return
 	}
 
-	full, err := h.svc.GetFullPublicProfile(r.Context(), viewerID, profileID)
+	full, err := h.svc.GetFullPublicProfile(r.Context(), viewerID, profileID, FullPublicOptions{SkipVisit: skipVisit(r)})
 	if err != nil {
 		writePublicProfileError(w, err)
 		return
 	}
 
+	toPhoto := func(ph *Photo) photoResponse { return toPhotoResponsePublic(ph, profileID) }
+	httpx.WriteJSON(w, http.StatusOK, toFullProfileResponse(full, toPhoto))
+}
+
+// toFullProfileResponse arma la respuesta agregada de /full. toPhoto decide la
+// URL de las fotos (propias o públicas); los flags de interacción vienen de
+// full (en el perfil propio son siempre false).
+func toFullProfileResponse(full *FullProfile, toPhoto func(*Photo) photoResponse) fullProfileResponse {
 	photos := make([]photoResponse, 0, len(full.Photos))
 	for i := range full.Photos {
-		photos = append(photos, toPhotoResponsePublic(&full.Photos[i], profileID))
+		photos = append(photos, toPhoto(&full.Photos[i]))
 	}
 
-	languages := make([]profileLanguageResponse, 0, len(full.Languages))
-	for _, l := range full.Languages {
-		languages = append(languages, toProfileLanguageResponse(l))
-	}
-
-	interests := make([]profileInterestResponse, 0, len(full.Interests))
-	for _, pi := range full.Interests {
-		interests = append(interests, toProfileInterestResponse(pi))
-	}
-
-	interestCatalog := make([]interestDefinitionResponse, 0, len(full.InterestCatalog))
-	for _, def := range full.InterestCatalog {
-		interestCatalog = append(interestCatalog, toInterestDefinitionResponse(def))
-	}
-
-	httpx.WriteJSON(w, http.StatusOK, fullProfileResponse{
+	return fullProfileResponse{
 		Profile:            toProfileResponse(full.Profile),
 		Photos:             photos,
-		Languages:          languages,
-		Interests:          interests,
-		InterestCatalog:    interestCatalog,
+		Languages:          mapSlice(full.Languages, toProfileLanguageResponse),
+		Interests:          mapSlice(full.Interests, toProfileInterestResponse),
+		InterestCatalog:    mapSlice(full.InterestCatalog, toInterestDefinitionResponse),
 		Personality:        toPersonalityResponse(full.PersonalityAnswers, full.PersonalityScores),
 		PartnerPreferences: toPartnerPreferencesResponse(full.PartnerPreferences),
 		Favorited:          full.Favorited,
 		Liked:              full.Liked,
 		Matched:            full.Matched,
-		Blocked:            full.Blocked,
-	})
+		Blocked:            false, // un bloqueo hace el perfil invisible (404): nunca se llega aquí bloqueado
+	}
 }
 
 func (h *Handler) ListPublicPhotos(w http.ResponseWriter, r *http.Request) {
-	viewerID, ok := auth.UserIDFromContext(r.Context())
+	viewerID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
-	profileID, err := uuid.Parse(r.PathValue("profileID"))
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+	profileID, ok := pathUUID(w, r, "profileID", "perfil")
+	if !ok {
 		return
 	}
 
@@ -978,20 +695,17 @@ func (h *Handler) ListPublicPhotos(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ServePublicPhoto(w http.ResponseWriter, r *http.Request) {
-	viewerID, ok := auth.UserIDFromContext(r.Context())
+	viewerID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
-	profileID, err := uuid.Parse(r.PathValue("profileID"))
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+	profileID, ok := pathUUID(w, r, "profileID", "perfil")
+	if !ok {
 		return
 	}
-	photoID, err := uuid.Parse(r.PathValue("photoID"))
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de foto inválido.")
+	photoID, ok := pathUUID(w, r, "photoID", "foto")
+	if !ok {
 		return
 	}
 
@@ -1002,17 +716,14 @@ func (h *Handler) ServePublicPhoto(w http.ResponseWriter, r *http.Request) {
 	}
 	defer rc.Close()
 
-	w.Header().Set("Content-Type", ph.ContentType)
-	w.Header().Set("Cache-Control", "private, max-age=86400")
-	_, _ = io.Copy(w, rc)
+	serveFile(w, rc, ph.ContentType)
 }
 
 // --- Handlers: idiomas del usuario -------------------------------------
 
 func (h *Handler) ListMyLanguages(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
@@ -1022,19 +733,15 @@ func (h *Handler) ListMyLanguages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := make([]profileLanguageResponse, 0, len(languages))
-	for _, l := range languages {
-		resp = append(resp, toProfileLanguageResponse(l))
-	}
+	resp := mapSlice(languages, toProfileLanguageResponse)
 	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
 // SetLanguage espera el código de idioma en el path (ej. PUT
 // /profiles/me/languages/{code}).
 func (h *Handler) SetLanguage(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
@@ -1056,9 +763,8 @@ func (h *Handler) SetLanguage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) DeleteLanguage(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
@@ -1073,15 +779,13 @@ func (h *Handler) DeleteLanguage(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListPublicLanguages(w http.ResponseWriter, r *http.Request) {
-	viewerID, ok := auth.UserIDFromContext(r.Context())
+	viewerID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
-	profileID, err := uuid.Parse(r.PathValue("profileID"))
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+	profileID, ok := pathUUID(w, r, "profileID", "perfil")
+	if !ok {
 		return
 	}
 
@@ -1091,10 +795,7 @@ func (h *Handler) ListPublicLanguages(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := make([]profileLanguageResponse, 0, len(languages))
-	for _, l := range languages {
-		resp = append(resp, toProfileLanguageResponse(l))
-	}
+	resp := mapSlice(languages, toProfileLanguageResponse)
 	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
@@ -1107,19 +808,15 @@ func (h *Handler) ListInterestCatalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := make([]interestDefinitionResponse, 0, len(defs))
-	for _, d := range defs {
-		resp = append(resp, toInterestDefinitionResponse(d))
-	}
+	resp := mapSlice(defs, toInterestDefinitionResponse)
 	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
 // --- Handlers: intereses del usuario -------------------------------------
 
 func (h *Handler) ListMyInterests(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
@@ -1129,19 +826,15 @@ func (h *Handler) ListMyInterests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := make([]profileInterestResponse, 0, len(interests))
-	for _, pi := range interests {
-		resp = append(resp, toProfileInterestResponse(pi))
-	}
+	resp := mapSlice(interests, toProfileInterestResponse)
 	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
 // SetInterest espera interest_key en el path (ej. PUT
 // /profiles/me/interests/{key}).
 func (h *Handler) SetInterest(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
@@ -1164,9 +857,8 @@ func (h *Handler) SetInterest(w http.ResponseWriter, r *http.Request) {
 
 // DeleteInterest vuelve un interés a "no seleccionado" (idempotente).
 func (h *Handler) DeleteInterest(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
@@ -1181,15 +873,13 @@ func (h *Handler) DeleteInterest(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) ListPublicInterests(w http.ResponseWriter, r *http.Request) {
-	viewerID, ok := auth.UserIDFromContext(r.Context())
+	viewerID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
-	profileID, err := uuid.Parse(r.PathValue("profileID"))
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+	profileID, ok := pathUUID(w, r, "profileID", "perfil")
+	if !ok {
 		return
 	}
 
@@ -1199,10 +889,7 @@ func (h *Handler) ListPublicInterests(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	resp := make([]profileInterestResponse, 0, len(interests))
-	for _, pi := range interests {
-		resp = append(resp, toProfileInterestResponse(pi))
-	}
+	resp := mapSlice(interests, toProfileInterestResponse)
 	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
@@ -1215,17 +902,13 @@ func (h *Handler) ListPersonalityCatalog(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	resp := make([]personalityStatementResponse, 0, len(stmts))
-	for _, s := range stmts {
-		resp = append(resp, toPersonalityStatementResponse(s))
-	}
+	resp := mapSlice(stmts, toPersonalityStatementResponse)
 	httpx.WriteJSON(w, http.StatusOK, resp)
 }
 
 func (h *Handler) GetMyPersonality(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
@@ -1239,9 +922,8 @@ func (h *Handler) GetMyPersonality(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) SetPersonalityAnswer(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
@@ -1263,15 +945,13 @@ func (h *Handler) SetPersonalityAnswer(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) GetPublicPersonality(w http.ResponseWriter, r *http.Request) {
-	viewerID, ok := auth.UserIDFromContext(r.Context())
+	viewerID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
-	profileID, err := uuid.Parse(r.PathValue("profileID"))
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+	profileID, ok := pathUUID(w, r, "profileID", "perfil")
+	if !ok {
 		return
 	}
 
@@ -1287,9 +967,8 @@ func (h *Handler) GetPublicPersonality(w http.ResponseWriter, r *http.Request) {
 // --- Handlers: preferencias de pareja ------------------------------------
 
 func (h *Handler) GetMyPartnerPreferences(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
@@ -1303,21 +982,13 @@ func (h *Handler) GetMyPartnerPreferences(w http.ResponseWriter, r *http.Request
 }
 
 func (h *Handler) UpdatePartnerPreferences(w http.ResponseWriter, r *http.Request) {
-	userID, ok := auth.UserIDFromContext(r.Context())
+	userID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
-	var raw map[string]json.RawMessage
-	if err := httpx.DecodeJSON(r, &raw); err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_body", "El cuerpo de la petición no es válido.")
-		return
-	}
-
-	patch, err := buildPartnerPreferencesPatch(raw)
-	if err != nil {
-		writeProfileError(w, err)
+	var patch PartnerPreferencesPatch
+	if !decodePatchOrWrite(w, r, &patch) {
 		return
 	}
 
@@ -1330,99 +1001,14 @@ func (h *Handler) UpdatePartnerPreferences(w http.ResponseWriter, r *http.Reques
 	httpx.WriteJSON(w, http.StatusOK, toPartnerPreferencesResponse(pp))
 }
 
-// buildPartnerPreferencesPatch traduce el JSON de la petición a un
-// PartnerPreferencesPatch. Mismo patrón que buildProfilePatch: cada
-// campo opcional solo se marca "Set" si su clave vino en el body,
-// distinguiendo "no tocar" (clave ausente) de "borrar" (clave a null).
-//
-// NOTA: esta función no llegó a transmitirse en el handler.go original
-// (el archivo se cortó antes de esta definición); se reconstruye aquí
-// a partir del patrón de buildProfilePatch y de los campos de
-// PartnerPreferencesPatch (partner_preferences.go). Verifica los
-// nombres de clave JSON contra tu implementación real si difieren de
-// los que ya usa partnerPreferencesResponse.
-func buildPartnerPreferencesPatch(raw map[string]json.RawMessage) (PartnerPreferencesPatch, error) {
-	var patch PartnerPreferencesPatch
-
-	parseString := func(key string, target **string, flag *bool) error {
-		if v, ok := raw[key]; ok {
-			*flag = true
-			if !isJSONNull(v) {
-				var s string
-				if err := json.Unmarshal(v, &s); err != nil {
-					return invalidField(key, "debe ser texto o null")
-				}
-				*target = &s
-			}
-		}
-		return nil
-	}
-
-	parseInt := func(key string, target **int, flag *bool) error {
-		if v, ok := raw[key]; ok {
-			*flag = true
-			if !isJSONNull(v) {
-				var i int
-				if err := json.Unmarshal(v, &i); err != nil {
-					return invalidField(key, "debe ser un entero o null")
-				}
-				*target = &i
-			}
-		}
-		return nil
-	}
-
-	parseSlice := func(key string, target *[]string, flag *bool) error {
-		if v, ok := raw[key]; ok {
-			*flag = true
-			if !isJSONNull(v) {
-				var sl []string
-				if err := json.Unmarshal(v, &sl); err != nil {
-					return invalidField(key, "debe ser una lista de textos o null")
-				}
-				*target = sl
-			}
-		}
-		return nil
-	}
-
-	if err := parseInt("age_min", &patch.AgeMin, &patch.AgeMinSet); err != nil { return patch, err }
-	if err := parseInt("age_max", &patch.AgeMax, &patch.AgeMaxSet); err != nil { return patch, err }
-	if err := parseInt("height_min", &patch.HeightMin, &patch.HeightMinSet); err != nil { return patch, err }
-	if err := parseInt("height_max", &patch.HeightMax, &patch.HeightMaxSet); err != nil { return patch, err }
-
-	if err := parseSlice("desired_traits", &patch.DesiredTraits, &patch.DesiredTraitsSet); err != nil { return patch, err }
-
-	if err := parseString("partner_may_have_children", &patch.PartnerMayHaveChildren, &patch.PartnerMayHaveChildrenSet); err != nil { return patch, err }
-	if err := parseString("partner_religion_preference", &patch.PartnerReligionPreference, &patch.PartnerReligionPreferenceSet); err != nil { return patch, err }
-	if err := parseString("about_partner_text", &patch.AboutPartnerText, &patch.AboutPartnerTextSet); err != nil { return patch, err }
-	if err := parseString("first_meeting_preference", &patch.FirstMeetingPreference, &patch.FirstMeetingPreferenceSet); err != nil { return patch, err }
-	if err := parseSlice("desired_living_place", &patch.DesiredLivingPlace, &patch.DesiredLivingPlaceSet); err != nil { return patch, err }
-
-	if err := parseInt("importance_shared_thoughts", &patch.ImportanceSharedThoughts, &patch.ImportanceSharedThoughtsSet); err != nil { return patch, err }
-	if err := parseInt("importance_shared_hobbies", &patch.ImportanceSharedHobbies, &patch.ImportanceSharedHobbiesSet); err != nil { return patch, err }
-	if err := parseInt("importance_intimacy", &patch.ImportanceIntimacy, &patch.ImportanceIntimacySet); err != nil { return patch, err }
-	if err := parseInt("importance_romantic_love", &patch.ImportanceRomanticLove, &patch.ImportanceRomanticLoveSet); err != nil { return patch, err }
-	if err := parseInt("importance_financial_security", &patch.ImportanceFinancialSecurity, &patch.ImportanceFinancialSecuritySet); err != nil { return patch, err }
-	if err := parseInt("importance_fun", &patch.ImportanceFun, &patch.ImportanceFunSet); err != nil { return patch, err }
-	if err := parseInt("importance_shared_friends", &patch.ImportanceSharedFriends, &patch.ImportanceSharedFriendsSet); err != nil { return patch, err }
-	if err := parseInt("importance_shared_humor", &patch.ImportanceSharedHumor, &patch.ImportanceSharedHumorSet); err != nil { return patch, err }
-	if err := parseInt("importance_personal_space", &patch.ImportancePersonalSpace, &patch.ImportancePersonalSpaceSet); err != nil { return patch, err }
-	if err := parseInt("importance_independence", &patch.ImportanceIndependence, &patch.ImportanceIndependenceSet); err != nil { return patch, err }
-
-	return patch, nil
-}
-
 func (h *Handler) GetPublicPartnerPreferences(w http.ResponseWriter, r *http.Request) {
-	viewerID, ok := auth.UserIDFromContext(r.Context())
+	viewerID, ok := requireUser(w, r)
 	if !ok {
-		httpx.WriteError(w, http.StatusUnauthorized, "unauthenticated", "Inicia sesión para continuar.")
 		return
 	}
 
-	profileID, err := uuid.Parse(r.PathValue("profileID"))
-	if err != nil {
-		httpx.WriteError(w, http.StatusBadRequest, "invalid_id", "ID de perfil inválido.")
+	profileID, ok := pathUUID(w, r, "profileID", "perfil")
+	if !ok {
 		return
 	}
 
@@ -1477,6 +1063,7 @@ func writeProfileError(w http.ResponseWriter, err error) {
 	case errors.Is(err, ErrInterestNotFound):
 		httpx.WriteError(w, http.StatusBadRequest, "interest_not_found", "Interés no encontrado en el catálogo.")
 	default:
+		slog.Error("profiles: error no controlado", "error", err)
 		httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo completar la operación.")
 	}
 }
@@ -1488,9 +1075,14 @@ func writeProfileError(w http.ResponseWriter, err error) {
 // ErrNotFound, sin distinguir "no existe" de "bloqueado" (ver nota de
 // reconstrucción arriba).
 func writePublicProfileError(w http.ResponseWriter, err error) {
-	if errors.Is(err, ErrNotFound) {
+	switch {
+	case errors.Is(err, ErrNotFound):
 		httpx.WriteError(w, http.StatusNotFound, "profile_not_found", "Perfil no encontrado.")
 		return
+	case errors.Is(err, ErrPhotoNotFound):
+		httpx.WriteError(w, http.StatusNotFound, "photo_not_found", "Foto no encontrada.")
+		return
 	}
+	slog.Error("profiles: error no controlado (público)", "error", err)
 	httpx.WriteError(w, http.StatusInternalServerError, "internal_error", "No se pudo completar la operación.")
 }

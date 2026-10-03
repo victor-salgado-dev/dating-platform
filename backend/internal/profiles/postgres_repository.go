@@ -37,6 +37,22 @@ const allProfileCols = `
 // renumerarlos a mano cada vez que se añade un campo nuevo.
 const profileColCount = 44
 
+// visiblePredicate es la regla de visibilidad pública: cuenta activa y sin
+// bloqueos en ningún sentido. ÚNICA definición: la usan GetPublicByID,
+// IsVisible, GetPublicPhoto e IDResolver.ResolveTarget. Si cambia una regla
+// (p. ej. shadow-ban) se cambia SOLO aquí.
+//
+// Contrato de la consulta que la use: `users u` unido a `profiles p`, y $2 =
+// user_id de quien mira. Los dos NOT EXISTS (en vez de un OR) permiten usar el
+// índice (blocker_id, blocked_id) en cada sentido.
+const visiblePredicate = `u.status = 'active' AND u.deleted_at IS NULL
+		  AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = p.user_id)
+		  AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = p.user_id AND b.blocked_id = $2)`
+
+// publicProfileCols son las columnas de perfil con alias `p`, calculadas una
+// sola vez (antes se recalculaban en cada GetPublicByID).
+var publicProfileCols = prefixCols("p", allProfileCols)
+
 func prefixCols(tableAlias, cols string) string {
 	parts := strings.Split(cols, ",")
 	prefixed := make([]string, 0, len(parts))
@@ -110,22 +126,33 @@ func (r *PostgresRepository) GetByUserID(ctx context.Context, userID uuid.UUID) 
 }
 
 func (r *PostgresRepository) GetPublicByID(ctx context.Context, id, viewerUserID uuid.UUID) (*Profile, error) {
-	aliasedCols := prefixCols("p", allProfileCols)
-
 	query := fmt.Sprintf(`
 		SELECT p.id, %s, p.created_at, p.updated_at
 		FROM profiles p
 		JOIN users u ON u.id = p.user_id
 		WHERE p.id = $1
-		  AND u.status = 'active' AND u.deleted_at IS NULL
-		  AND NOT EXISTS (
-		      SELECT 1 FROM blocks b
-		      WHERE (b.blocker_id = $2 AND b.blocked_id = p.user_id)
-		         OR (b.blocker_id = p.user_id AND b.blocked_id = $2)
-		  )
-	`, aliasedCols)
+		  AND %s
+	`, publicProfileCols, visiblePredicate)
 
 	return r.scanOne(ctx, query, id, viewerUserID)
+}
+
+func (r *PostgresRepository) IsVisible(ctx context.Context, id, viewerUserID uuid.UUID) error {
+	const query = `
+		SELECT 1
+		FROM profiles p
+		JOIN users u ON u.id = p.user_id
+		WHERE p.id = $1
+		  AND ` + visiblePredicate
+
+	var one int
+	if err := r.db.QueryRow(ctx, query, id, viewerUserID).Scan(&one); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("profiles: comprobar visibilidad: %w", err)
+	}
+	return nil
 }
 
 func (r *PostgresRepository) GetByIDAny(ctx context.Context, id uuid.UUID) (*Profile, error) {
@@ -139,71 +166,10 @@ func (r *PostgresRepository) GetByIDAny(ctx context.Context, id uuid.UUID) (*Pro
 }
 
 func (r *PostgresRepository) Update(ctx context.Context, userID uuid.UUID, patch ProfilePatch) (*Profile, error) {
-	var setClauses []string
-	var args []any
-	argN := 1
-
-	add := func(col string, val any) {
-		setClauses = append(setClauses, fmt.Sprintf("%s = $%d", col, argN))
-		args = append(args, val)
-		argN++
-	}
-
-	if patch.DisplayName != nil { add("display_name", *patch.DisplayName) }
-	if patch.BirthDate != nil { add("birth_date", *patch.BirthDate) }
-	if patch.Gender != nil { add("gender", string(*patch.Gender)) }
-	if patch.CountryCode != nil { add("country_code", *patch.CountryCode) }
-	if patch.RegionSet { add("region", patch.Region) }
-	if patch.RelationshipGoalsSet { add("relationship_goals", relationshipGoalsToDB(patch.RelationshipGoals)) }
-	if patch.HasChildrenSet { add("has_children", patch.HasChildren) }
-	if patch.WantsChildrenSet { add("wants_children", patch.WantsChildren) }
-	if patch.BioSet { add("bio", patch.Bio) }
-
-	if patch.HeightSet { add("height", patch.Height) }
-	if patch.WeightSet { add("weight", patch.Weight) }
-	if patch.BodyTypeSet { add("body_type", patch.BodyType) }
-	if patch.EthnicitySet { add("ethnicity", patch.Ethnicity) }
-	if patch.AppearanceRatingSet { add("appearance_rating", patch.AppearanceRating) }
-	if patch.HairColorSet { add("hair_color", patch.HairColor) }
-	if patch.EyeColorSet { add("eye_color", patch.EyeColor) }
-	if patch.BodyArtSet { add("body_art", patch.BodyArt) }
-	if patch.SmokingHabitSet { add("smoking_habit", patch.SmokingHabit) }
-	if patch.DrinkingHabitSet { add("drinking_habit", patch.DrinkingHabit) }
-	if patch.RelocationWillingnessSet { add("relocation_willingness", patch.RelocationWillingness) }
-	if patch.MaritalStatusSet { add("marital_status", patch.MaritalStatus) }
-	if patch.ChildrenCountSet { add("children_count", patch.ChildrenCount) }
-	if patch.YoungestChildAgeSet { add("youngest_child_age", patch.YoungestChildAge) }
-	if patch.OldestChildAgeSet { add("oldest_child_age", patch.OldestChildAge) }
-	if patch.OccupationSet { add("occupation", patch.Occupation) }
-	if patch.EmploymentStatusSet { add("employment_status", patch.EmploymentStatus) }
-	if patch.IncomeLevelSet { add("income_level", patch.IncomeLevel) }
-	if patch.LivingSituationSet { add("living_situation", patch.LivingSituation) }
-	if patch.NationalitySet { add("nationality", patch.Nationality) }
-	if patch.EducationLevelSet { add("education_level", patch.EducationLevel) }
-	if patch.EnglishAbilitySet { add("english_ability", patch.EnglishAbility) }
-	if patch.ReligionSet { add("religion", patch.Religion) }
-	if patch.ReligiousValuesSet { add("religious_values", patch.ReligiousValues) }
-	if patch.StarSignSet { add("star_sign", patch.StarSign) }
-
-	if patch.FutureVisionSet { add("future_vision", patch.FutureVision) }
-	if patch.SportsSet { add("sports", patch.Sports) }
-	if patch.LikesPetsSet { add("likes_pets", patch.LikesPets) }
-	if patch.PetsOwnedSet { add("pets_owned", patch.PetsOwned) }
-	if patch.FavoriteSeasonSet { add("favorite_season", patch.FavoriteSeason) }
-	if patch.IdealVacationStyleSet { add("ideal_vacation_style", patch.IdealVacationStyle) }
-	if patch.VacationActivitiesSet { add("vacation_activities", patch.VacationActivities) }
-	if patch.ProfileQuoteSet { add("profile_quote", patch.ProfileQuote) }
-	if patch.DreamWishSet { add("dream_wish", patch.DreamWish) }
-
-	if len(setClauses) == 0 {
+	query, args, ok := buildProfileUpdate(userID, patch)
+	if !ok {
 		return r.GetByUserID(ctx, userID)
 	}
-
-	query := fmt.Sprintf(
-		"UPDATE profiles SET %s WHERE user_id = $%d",
-		strings.Join(setClauses, ", "), argN,
-	)
-	args = append(args, userID)
 
 	tag, err := r.db.Exec(ctx, query, args...)
 	if err != nil {
@@ -218,6 +184,30 @@ func (r *PostgresRepository) Update(ctx context.Context, userID uuid.UUID, patch
 	}
 
 	return r.GetByUserID(ctx, userID)
+}
+
+// buildProfileUpdate arma el UPDATE de un patch. ok=false si el patch no
+// cambia nada (ninguna clave vino en el body).
+//
+// Los nombres de columna salen de las etiquetas de ProfilePatch (constantes del
+// código, ver setColumns); los valores van parametrizados.
+func buildProfileUpdate(userID uuid.UUID, patch ProfilePatch) (query string, args []any, ok bool) {
+	cols, args := setColumns(patch)
+	if len(cols) == 0 {
+		return "", nil, false
+	}
+
+	setClauses := make([]string, 0, len(cols)+1)
+	for i, col := range cols {
+		setClauses = append(setClauses, fmt.Sprintf("%s = $%d", col, i+1))
+	}
+	setClauses = append(setClauses, "updated_at = now()")
+
+	query = fmt.Sprintf(
+		"UPDATE profiles SET %s WHERE user_id = $%d",
+		strings.Join(setClauses, ", "), len(cols)+1,
+	)
+	return query, append(args, userID), true
 }
 
 func (r *PostgresRepository) scanOne(ctx context.Context, query string, args ...any) (*Profile, error) {
@@ -266,8 +256,35 @@ func relationshipGoalsToDB(goals []RelationshipGoal) []string {
 
 // --- Fotos ------------------------------------------------------------
 
-func (r *PostgresRepository) AddPhoto(ctx context.Context, profileID uuid.UUID, photo *Photo) error {
-	const query = `
+func (r *PostgresRepository) AddPhoto(ctx context.Context, profileID uuid.UUID, photo *Photo, maxPhotos int) error {
+	tx, err := r.db.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("profiles: guardar foto: %w", err)
+	}
+	// Tras Commit el Rollback es un no-op (devuelve ErrTxClosed, se ignora).
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	// Serializa las subidas del mismo perfil: la segunda espera aquí a que la
+	// primera confirme, y entonces ve el recuento ya actualizado. NO KEY UPDATE
+	// basta (no choca con los KEY SHARE que toman las FK de otras tablas).
+	var lockedID uuid.UUID
+	err = tx.QueryRow(ctx, `SELECT id FROM profiles WHERE id = $1 FOR NO KEY UPDATE`, profileID).Scan(&lockedID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("profiles: bloquear perfil: %w", err)
+	}
+
+	var count int
+	if err := tx.QueryRow(ctx, `SELECT COUNT(*) FROM profile_photos WHERE profile_id = $1`, profileID).Scan(&count); err != nil {
+		return fmt.Errorf("profiles: contar fotos: %w", err)
+	}
+	if count >= maxPhotos {
+		return ErrTooManyPhotos
+	}
+
+	const insert = `
 		INSERT INTO profile_photos (profile_id, storage_key, thumb_storage_key, content_type, position)
 		VALUES (
 			$1, $2, NULLIF($3, ''), $4,
@@ -275,11 +292,14 @@ func (r *PostgresRepository) AddPhoto(ctx context.Context, profileID uuid.UUID, 
 		)
 		RETURNING id, position, created_at
 	`
-
-	err := r.db.QueryRow(ctx, query, profileID, photo.StorageKey, photo.ThumbStorageKey, photo.ContentType).
+	err = tx.QueryRow(ctx, insert, profileID, photo.StorageKey, photo.ThumbStorageKey, photo.ContentType).
 		Scan(&photo.ID, &photo.Position, &photo.CreatedAt)
 	if err != nil {
 		return fmt.Errorf("profiles: guardar foto: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("profiles: confirmar foto: %w", err)
 	}
 
 	photo.ProfileID = profileID
@@ -340,6 +360,29 @@ func (r *PostgresRepository) GetPhoto(ctx context.Context, profileID, photoID uu
 			return nil, ErrPhotoNotFound
 		}
 		return nil, fmt.Errorf("profiles: consultar foto: %w", err)
+	}
+
+	return &ph, nil
+}
+
+func (r *PostgresRepository) GetPublicPhoto(ctx context.Context, profileID, viewerUserID, photoID uuid.UUID) (*Photo, error) {
+	const query = `
+		SELECT ph.id, ph.profile_id, ph.storage_key, COALESCE(ph.thumb_storage_key, ''), ph.content_type, ph.position, ph.created_at
+		FROM profile_photos ph
+		JOIN profiles p ON p.id = ph.profile_id
+		JOIN users u ON u.id = p.user_id
+		WHERE p.id = $1
+		  AND ph.id = $3
+		  AND ` + visiblePredicate
+
+	var ph Photo
+	err := r.db.QueryRow(ctx, query, profileID, viewerUserID, photoID).
+		Scan(&ph.ID, &ph.ProfileID, &ph.StorageKey, &ph.ThumbStorageKey, &ph.ContentType, &ph.Position, &ph.CreatedAt)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, ErrPhotoNotFound
+		}
+		return nil, fmt.Errorf("profiles: consultar foto pública: %w", err)
 	}
 
 	return &ph, nil
@@ -652,6 +695,36 @@ func (r *PostgresRepository) GetPersonalityTraitScores(ctx context.Context, prof
 
 // --- Preferencias de pareja ---------------------------------------------
 
+// buildPartnerPreferencesUpsert arma el INSERT ... ON CONFLICT de un patch. Sin
+// ninguna clave solo asegura que exista la fila, sin tocar nada.
+func buildPartnerPreferencesUpsert(profileID uuid.UUID, patch PartnerPreferencesPatch) (query string, args []any) {
+	patchCols, patchArgs := setColumns(patch)
+
+	cols := append([]string{"profile_id"}, patchCols...)
+	args = append([]any{profileID}, patchArgs...)
+	placeholders := make([]string, len(cols))
+	var setClauses []string
+	for i, col := range cols {
+		placeholders[i] = fmt.Sprintf("$%d", i+1)
+		if i > 0 {
+			setClauses = append(setClauses, fmt.Sprintf("%s = EXCLUDED.%s", col, col))
+		}
+	}
+
+	setSQL := "updated_at = profile_partner_preferences.updated_at"
+	if len(setClauses) > 0 {
+		setClauses = append(setClauses, "updated_at = now()")
+		setSQL = strings.Join(setClauses, ", ")
+	}
+
+	query = fmt.Sprintf(`
+		INSERT INTO profile_partner_preferences (%s)
+		VALUES (%s)
+		ON CONFLICT (profile_id) DO UPDATE SET %s
+	`, strings.Join(cols, ", "), strings.Join(placeholders, ", "), setSQL)
+	return query, args
+}
+
 func (r *PostgresRepository) GetPartnerPreferences(ctx context.Context, profileID uuid.UUID) (*PartnerPreferences, error) {
 	const query = `
 		SELECT profile_id, age_min, age_max, height_min, height_max, desired_traits,
@@ -686,51 +759,7 @@ func (r *PostgresRepository) GetPartnerPreferences(ctx context.Context, profileI
 }
 
 func (r *PostgresRepository) UpsertPartnerPreferences(ctx context.Context, profileID uuid.UUID, patch PartnerPreferencesPatch) (*PartnerPreferences, error) {
-	cols := []string{"profile_id"}
-	placeholders := []string{"$1"}
-	var setClauses []string
-	args := []any{profileID}
-	argN := 2
-
-	addCol := func(col string, val any) {
-		cols = append(cols, col)
-		placeholders = append(placeholders, fmt.Sprintf("$%d", argN))
-		setClauses = append(setClauses, fmt.Sprintf("%s = EXCLUDED.%s", col, col))
-		args = append(args, val)
-		argN++
-	}
-
-	if patch.AgeMinSet { addCol("age_min", patch.AgeMin) }
-	if patch.AgeMaxSet { addCol("age_max", patch.AgeMax) }
-	if patch.HeightMinSet { addCol("height_min", patch.HeightMin) }
-	if patch.HeightMaxSet { addCol("height_max", patch.HeightMax) }
-	if patch.DesiredTraitsSet { addCol("desired_traits", patch.DesiredTraits) }
-	if patch.PartnerMayHaveChildrenSet { addCol("partner_may_have_children", patch.PartnerMayHaveChildren) }
-	if patch.PartnerReligionPreferenceSet { addCol("partner_religion_preference", patch.PartnerReligionPreference) }
-	if patch.AboutPartnerTextSet { addCol("about_partner_text", patch.AboutPartnerText) }
-	if patch.FirstMeetingPreferenceSet { addCol("first_meeting_preference", patch.FirstMeetingPreference) }
-	if patch.DesiredLivingPlaceSet { addCol("desired_living_place", patch.DesiredLivingPlace) }
-	if patch.ImportanceSharedThoughtsSet { addCol("importance_shared_thoughts", patch.ImportanceSharedThoughts) }
-	if patch.ImportanceSharedHobbiesSet { addCol("importance_shared_hobbies", patch.ImportanceSharedHobbies) }
-	if patch.ImportanceIntimacySet { addCol("importance_intimacy", patch.ImportanceIntimacy) }
-	if patch.ImportanceRomanticLoveSet { addCol("importance_romantic_love", patch.ImportanceRomanticLove) }
-	if patch.ImportanceFinancialSecuritySet { addCol("importance_financial_security", patch.ImportanceFinancialSecurity) }
-	if patch.ImportanceFunSet { addCol("importance_fun", patch.ImportanceFun) }
-	if patch.ImportanceSharedFriendsSet { addCol("importance_shared_friends", patch.ImportanceSharedFriends) }
-	if patch.ImportanceSharedHumorSet { addCol("importance_shared_humor", patch.ImportanceSharedHumor) }
-	if patch.ImportancePersonalSpaceSet { addCol("importance_personal_space", patch.ImportancePersonalSpace) }
-	if patch.ImportanceIndependenceSet { addCol("importance_independence", patch.ImportanceIndependence) }
-
-	setSQL := "updated_at = profile_partner_preferences.updated_at"
-	if len(setClauses) > 0 {
-		setSQL = strings.Join(setClauses, ", ")
-	}
-
-	query := fmt.Sprintf(`
-		INSERT INTO profile_partner_preferences (%s)
-		VALUES (%s)
-		ON CONFLICT (profile_id) DO UPDATE SET %s
-	`, strings.Join(cols, ", "), strings.Join(placeholders, ", "), setSQL)
+	query, args := buildPartnerPreferencesUpsert(profileID, patch)
 
 	if _, err := r.db.Exec(ctx, query, args...); err != nil {
 		var pgErr *pgconn.PgError

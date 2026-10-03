@@ -306,9 +306,9 @@ func TestPostgresRepository_PartnerPreferences(t *testing.T) {
 
 	ageMin, ageMax := 38, 58
 	pp, err = repo.UpsertPartnerPreferences(ctx, profile.ID, PartnerPreferencesPatch{
-		AgeMinSet: true, AgeMin: &ageMin,
-		AgeMaxSet: true, AgeMax: &ageMax,
-		DesiredTraitsSet: true, DesiredTraits: []string{"humorous", "kind_hearted"},
+		AgeMin:        FieldOf(&ageMin),
+		AgeMax:        FieldOf(&ageMax),
+		DesiredTraits: FieldOf([]string{"humorous", "kind_hearted"}),
 	})
 	if err != nil {
 		t.Fatalf("UpsertPartnerPreferences (primer patch): %v", err)
@@ -319,7 +319,7 @@ func TestPostgresRepository_PartnerPreferences(t *testing.T) {
 
 	fun := 5
 	pp, err = repo.UpsertPartnerPreferences(ctx, profile.ID, PartnerPreferencesPatch{
-		ImportanceFunSet: true, ImportanceFun: &fun,
+		ImportanceFun: FieldOf(&fun),
 	})
 	if err != nil {
 		t.Fatalf("UpsertPartnerPreferences (segundo patch): %v", err)

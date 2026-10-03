@@ -28,6 +28,11 @@ type Repository interface {
 	// aparece.
 	GetPublicByID(ctx context.Context, id, viewerUserID uuid.UUID) (*Profile, error)
 
+	// IsVisible aplica exactamente las mismas reglas que GetPublicByID pero
+	// sin cargar el perfil (44 columnas): un SELECT 1. Devuelve ErrNotFound en
+	// los mismos casos. Úsalo cuando solo importa SI se puede ver el perfil.
+	IsVisible(ctx context.Context, id, viewerUserID uuid.UUID) error
+
 	// GetByIDAny devuelve un perfil por su ID sin aplicar ninguna regla
 	// de visibilidad (ni estado de cuenta ni bloqueos). Solo debe usarse
 	// para acciones que deben poder realizarse precisamente EN CONTRA de
@@ -42,10 +47,21 @@ type Repository interface {
 
 	// --- Fotos --------------------------------------------------------
 
-	AddPhoto(ctx context.Context, profileID uuid.UUID, photo *Photo) error
+	// AddPhoto inserta la foto solo si el perfil tiene menos de maxPhotos,
+	// de forma atómica (bloquea la fila del perfil durante la comprobación y
+	// el insert, así que dos subidas simultáneas no pueden pasar el límite).
+	// Devuelve ErrTooManyPhotos si ya se alcanzó, y ErrNotFound si el perfil
+	// no existe. Rellena photo.ID/Position/CreatedAt/ProfileID.
+	AddPhoto(ctx context.Context, profileID uuid.UUID, photo *Photo, maxPhotos int) error
 	ListPhotos(ctx context.Context, profileID uuid.UUID) ([]Photo, error)
 	CountPhotos(ctx context.Context, profileID uuid.UUID) (int, error)
 	GetPhoto(ctx context.Context, profileID, photoID uuid.UUID) (*Photo, error)
+
+	// GetPublicPhoto devuelve una foto de profileID solo si ese perfil es
+	// visible para viewerUserID (reglas de GetPublicByID), en UNA consulta.
+	// Devuelve ErrPhotoNotFound tanto si la foto no existe como si el perfil
+	// no es visible: no se distingue a propósito.
+	GetPublicPhoto(ctx context.Context, profileID, viewerUserID, photoID uuid.UUID) (*Photo, error)
 	DeletePhoto(ctx context.Context, profileID, photoID uuid.UUID) error
 
 	// SetPrimaryPhoto deja photoID en position 0 y renumera el resto sin

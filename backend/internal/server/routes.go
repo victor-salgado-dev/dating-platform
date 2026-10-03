@@ -131,8 +131,8 @@ func NewRouter(deps Dependencies) http.Handler {
 	mux.Handle("GET /api/v1/profiles/{profileID}/interests", requireAuth(http.HandlerFunc(deps.ProfilesHandler.ListPublicInterests)))
 	mux.Handle("GET /api/v1/profiles/{profileID}/personality", requireAuth(http.HandlerFunc(deps.ProfilesHandler.GetPublicPersonality)))
 	mux.Handle("GET /api/v1/profiles/{profileID}/partner-preferences", requireAuth(http.HandlerFunc(deps.ProfilesHandler.GetPublicPartnerPreferences)))
-	// ?visit=0 (precarga de Quick Match) no registra visita.
-	mux.Handle("GET /api/v1/profiles/{profileID}/full", requireAuth(profiles.SkipVisitFromQuery(http.HandlerFunc(deps.ProfilesHandler.GetPublicFull))))
+	// ?visit=0 (precarga de Quick Match) no registra visita: lo lee el handler.
+	mux.Handle("GET /api/v1/profiles/{profileID}/full", requireAuth(http.HandlerFunc(deps.ProfilesHandler.GetPublicFull)))
 	
 	// --- Search (Fase 5) ------------------------------------------------
 	mux.Handle("GET /api/v1/search/profiles", requireAuth(http.HandlerFunc(deps.SearchHandler.Search)))

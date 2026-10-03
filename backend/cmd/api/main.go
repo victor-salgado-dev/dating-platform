@@ -127,6 +127,7 @@ func main() {
 	// memoria del profile_id) para likes, favoritos, visitas y actividad.
 	idResolver := profiles.NewIDResolver(pool)
 	profilesService := profiles.NewService(profilesRepo, fileStorage)
+	profilesService.SetIDResolver(idResolver)
 	profilesHandler := profiles.NewHandler(profilesService)
 
 	searchRepo := search.NewPostgresRepository(pool)
@@ -160,7 +161,7 @@ func main() {
 	// así que se le pasa el repositorio de visitas, no visits.Service (cuyo
 	// Record espera el user_id de quien visita: con el servicio, la visita
 	// desde /full fallaba siempre con "perfil no encontrado").
-	profilesService.SetInteractionDeps(favoritesService, likesService, blockingService, visitsRepo)
+	profilesService.SetInteractionDeps(favoritesService, likesService, visitsRepo)
 
 	messagingRepo := messaging.NewPostgresRepository(pool)
 	messagingService := messaging.NewService(messagingRepo, profilesRepo, blockingRepo)

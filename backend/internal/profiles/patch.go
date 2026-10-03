@@ -1,151 +1,98 @@
 package profiles
 
-import "time"
-
-// ProfilePatch representa una actualización parcial de un perfil
-// (PATCH semántico). Para los campos obligatorios, un puntero nil
-// significa "no tocar" y un puntero no-nil trae el nuevo valor.
+// ProfilePatch es una actualización parcial de un perfil (PATCH semántico).
 //
-// Para los campos OPCIONALES la ambigüedad de un simple puntero no
-// basta (un JSON con la clave ausente y un JSON con la clave a `null`
-// deben comportarse distinto: el primero no toca nada, el segundo borra
-// el dato). Por eso cada campo opcional tiene un flag `...Set` aparte:
-// si es false, el campo no se toca; si es true, se aplica el valor
-// (que puede ser nil, es decir, "bórralo, ahora es desconocido").
+// Cada campo es un Field[T]: Set=false significa "la clave no vino en el body,
+// no tocar" y Set=true significa "aplicar Value" (que puede ser nil/vacío si
+// vino a null: "bórralo, ahora es desconocido"). Ver Field.
 //
-// Quien construye este struct a partir del JSON de la petición
-// (internal/profiles/handler.go) es responsable de fijar los flags
-// según qué claves vinieran realmente en el body.
+// El body JSON se decodifica directamente en este struct (ver
+// decodePatchOrWrite), y el repositorio recorre sus campos para construir el
+// UPDATE (ver setColumns): no hay código por campo en ningún otro sitio.
 //
-// Languages e Interests ya no están aquí: se gestionan por separado
-// (Service.SetLanguage / Service.SetInterest, un ítem cada vez), igual
-// que ya pasaba con las fotos.
+// CONTRATO: la etiqueta json de cada campo es a la vez el nombre de la clave
+// en la API y el de la columna de profiles (override con la etiqueta db si
+// algún día divergen). patch_test.go comprueba que no falta ni sobra ninguna
+// columna respecto a allProfileCols y a los DTOs de respuesta.
+//
+// Languages e Interests no están aquí: se gestionan aparte, un ítem cada vez
+// (Service.SetLanguage / Service.SetInterest).
 type ProfilePatch struct {
-	DisplayName *string
-	BirthDate   *time.Time
-	Gender      *Gender
-	CountryCode *string
+	DisplayName       Field[string]             `json:"display_name"`
+	BirthDate         Field[DateOnly]           `json:"birth_date"`
+	Gender            Field[Gender]             `json:"gender"`
+	CountryCode       Field[string]             `json:"country_code"`
+	Region            Field[*string]            `json:"region"`
+	RelationshipGoals Field[[]RelationshipGoal] `json:"relationship_goals"`
+	HasChildren       Field[*string]            `json:"has_children"`
+	WantsChildren     Field[*string]            `json:"wants_children"`
+	Bio               Field[*string]            `json:"bio"`
 
-	RegionSet bool
-	Region    *string
+	// --- Físico y apariencia ---
+	Height           Field[*int]     `json:"height"`
+	Weight           Field[*int]     `json:"weight"`
+	BodyType         Field[*string]  `json:"body_type"`
+	Ethnicity        Field[*string]  `json:"ethnicity"`
+	AppearanceRating Field[*string]  `json:"appearance_rating"`
+	HairColor        Field[*string]  `json:"hair_color"`
+	EyeColor         Field[*string]  `json:"eye_color"`
+	BodyArt          Field[[]string] `json:"body_art"`
 
-	RelationshipGoalsSet bool
-	RelationshipGoals    []RelationshipGoal
+	// --- Estilo de vida y familia ---
+	SmokingHabit          Field[*string]  `json:"smoking_habit"`
+	DrinkingHabit         Field[*string]  `json:"drinking_habit"`
+	RelocationWillingness Field[[]string] `json:"relocation_willingness"`
+	MaritalStatus         Field[*string]  `json:"marital_status"`
+	ChildrenCount         Field[*int]     `json:"children_count"`
+	YoungestChildAge      Field[*int]     `json:"youngest_child_age"`
+	OldestChildAge        Field[*int]     `json:"oldest_child_age"`
+	Occupation            Field[*string]  `json:"occupation"`
+	EmploymentStatus      Field[*string]  `json:"employment_status"`
+	IncomeLevel           Field[*string]  `json:"income_level"`
+	LivingSituation       Field[*string]  `json:"living_situation"`
 
-	// Cambiado de *bool a *string para soportar más opciones
-	HasChildrenSet bool
-	HasChildren    *string
-
-	// Cambiado de *bool a *string
-	WantsChildrenSet bool
-	WantsChildren    *string
-
-	BioSet bool
-	Bio    *string
-
-	// --- Físico y Apariencia ---
-	HeightSet bool
-	Height    *int
-
-	WeightSet bool
-	Weight    *int
-
-	BodyTypeSet bool
-	BodyType    *string
-
-	EthnicitySet bool
-	Ethnicity    *string
-
-	AppearanceRatingSet bool
-	AppearanceRating    *string
-
-	HairColorSet bool
-	HairColor    *string
-
-	EyeColorSet bool
-	EyeColor    *string
-
-	BodyArtSet bool
-	BodyArt    []string
-
-	// --- Estilo de Vida y Familia ---
-	SmokingHabitSet bool
-	SmokingHabit    *string
-
-	DrinkingHabitSet bool
-	DrinkingHabit    *string
-
-	RelocationWillingnessSet bool
-	RelocationWillingness    []string
-
-	MaritalStatusSet bool
-	MaritalStatus    *string
-
-	ChildrenCountSet bool
-	ChildrenCount    *int
-
-	YoungestChildAgeSet bool
-	YoungestChildAge    *int
-
-	OldestChildAgeSet bool
-	OldestChildAge    *int
-
-	OccupationSet bool
-	Occupation    *string
-
-	EmploymentStatusSet bool
-	EmploymentStatus    *string
-
-	IncomeLevelSet bool
-	IncomeLevel    *string
-
-	LivingSituationSet bool
-	LivingSituation    *string
-
-	// --- Fondo, Cultura y Valores ---
-	NationalitySet bool
-	Nationality    *string
-
-	EducationLevelSet bool
-	EducationLevel    *string
-
-	EnglishAbilitySet bool
-	EnglishAbility    *string
-
-	ReligionSet bool
-	Religion    *string
-
-	ReligiousValuesSet bool
-	ReligiousValues    *string
-
-	StarSignSet bool
-	StarSign    *string
+	// --- Fondo, cultura y valores ---
+	Nationality     Field[*string] `json:"nationality"`
+	EducationLevel  Field[*string] `json:"education_level"`
+	EnglishAbility  Field[*string] `json:"english_ability"`
+	Religion        Field[*string] `json:"religion"`
+	ReligiousValues Field[*string] `json:"religious_values"`
+	StarSign        Field[*string] `json:"star_sign"`
 
 	// --- Über mich / estilo de vida ---
-	FutureVisionSet bool
-	FutureVision    []string
+	FutureVision       Field[[]string] `json:"future_vision"`
+	Sports             Field[[]string] `json:"sports"`
+	LikesPets          Field[*string]  `json:"likes_pets"`
+	PetsOwned          Field[[]string] `json:"pets_owned"`
+	FavoriteSeason     Field[*string]  `json:"favorite_season"`
+	IdealVacationStyle Field[[]string] `json:"ideal_vacation_style"`
+	VacationActivities Field[[]string] `json:"vacation_activities"`
+	ProfileQuote       Field[*string]  `json:"profile_quote"`
+	DreamWish          Field[*string]  `json:"dream_wish"`
+}
 
-	SportsSet bool
-	Sports    []string
-
-	LikesPetsSet bool
-	LikesPets    *string
-
-	PetsOwnedSet bool
-	PetsOwned    []string
-
-	FavoriteSeasonSet bool
-	FavoriteSeason    *string
-
-	IdealVacationStyleSet bool
-	IdealVacationStyle    []string
-
-	VacationActivitiesSet bool
-	VacationActivities    []string
-
-	ProfileQuoteSet bool
-	ProfileQuote    *string
-
-	DreamWishSet bool
-	DreamWish    *string
+// PartnerPreferencesPatch es el equivalente de ProfilePatch para las
+// preferencias de pareja ("lo que busco"), con el mismo contrato: etiqueta json
+// == columna de profile_partner_preferences.
+type PartnerPreferencesPatch struct {
+	AgeMin                      Field[*int]     `json:"age_min"`
+	AgeMax                      Field[*int]     `json:"age_max"`
+	HeightMin                   Field[*int]     `json:"height_min"`
+	HeightMax                   Field[*int]     `json:"height_max"`
+	DesiredTraits               Field[[]string] `json:"desired_traits"`
+	PartnerMayHaveChildren      Field[*string]  `json:"partner_may_have_children"`
+	PartnerReligionPreference   Field[*string]  `json:"partner_religion_preference"`
+	AboutPartnerText            Field[*string]  `json:"about_partner_text"`
+	FirstMeetingPreference      Field[*string]  `json:"first_meeting_preference"`
+	DesiredLivingPlace          Field[[]string] `json:"desired_living_place"`
+	ImportanceSharedThoughts    Field[*int]     `json:"importance_shared_thoughts"`
+	ImportanceSharedHobbies     Field[*int]     `json:"importance_shared_hobbies"`
+	ImportanceIntimacy          Field[*int]     `json:"importance_intimacy"`
+	ImportanceRomanticLove      Field[*int]     `json:"importance_romantic_love"`
+	ImportanceFinancialSecurity Field[*int]     `json:"importance_financial_security"`
+	ImportanceFun               Field[*int]     `json:"importance_fun"`
+	ImportanceSharedFriends     Field[*int]     `json:"importance_shared_friends"`
+	ImportanceSharedHumor       Field[*int]     `json:"importance_shared_humor"`
+	ImportancePersonalSpace     Field[*int]     `json:"importance_personal_space"`
+	ImportanceIndependence      Field[*int]     `json:"importance_independence"`
 }
