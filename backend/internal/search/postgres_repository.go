@@ -3,15 +3,12 @@ package search
 import (
 	"context"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"dating-platform/backend/internal/profiles"
 )
-
-const onlineNowWindowSeconds = 15 * 60
 
 type PostgresRepository struct {
 	db *pgxpool.Pool
@@ -24,231 +21,10 @@ func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 var _ Repository = (*PostgresRepository)(nil)
 
 func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result, error) {
-	where := []string{
-		"u.status = 'active'", "u.deleted_at IS NULL", "p.user_id <> $1",
-		`NOT EXISTS (
-			SELECT 1 FROM blocks b
-			WHERE (b.blocker_id = $1 AND b.blocked_id = p.user_id)
-			   OR (b.blocker_id = p.user_id AND b.blocked_id = $1)
-		)`,
-	}
-	args := []any{params.ExcludeUserID}
-
-	add := func(clause string, val any) {
-		args = append(args, val)
-		where = append(where, fmt.Sprintf(clause, len(args)))
-	}
-
-	f := params.Filters
 	now := time.Now()
+	q := buildSearchQuery(params, now)
 
-	if len(f.Genders) > 0 {
-		genders := make([]string, len(f.Genders))
-		for i, g := range f.Genders {
-			genders[i] = string(g)
-		}
-		add("p.gender = ANY($%d)", genders)
-	}
-
-	// Filtros de edad
-	if f.MinAge != nil {
-		bound := now.AddDate(-*f.MinAge, 0, 0)
-		add("p.birth_date <= $%d", bound)
-	}
-	if f.MaxAge != nil {
-		bound := now.AddDate(-(*f.MaxAge + 1), 0, 1)
-		add("p.birth_date >= $%d", bound)
-	}
-
-	if f.CountryCode != nil {
-		add("p.country_code = $%d", *f.CountryCode)
-	}
-
-	// Idiomas: no viven en profiles p.languages, sino en la tabla profile_languages
-	if len(f.Languages) > 0 {
-		add(`EXISTS (
-			SELECT 1 FROM profile_languages pl
-			WHERE pl.profile_id = p.id AND pl.language_code = ANY($%d)
-		)`, f.Languages)
-	}
-
-	// Intereses: viven en la tabla profile_interests. Cada filtro es
-	// pertenencia simple, o pertenencia + rango de nivel si trae
-	// Min/Max (solo tiene sentido para intereses con has_level=true).
-	for _, itf := range f.Interests {
-		where = append(where, interestExistsClause(itf, &args))
-	}
-
-	// RelationshipGoals: columna text[] relationship_goals (índice GIN, migración 000020)
-	if len(f.RelationshipGoals) > 0 {
-		goals := make([]string, len(f.RelationshipGoals))
-		for i, g := range f.RelationshipGoals {
-			goals[i] = string(g)
-		}
-		add("p.relationship_goals && $%d", goals)
-	}
-
-	if f.HasChildren != nil {
-		add("p.has_children = $%d", *f.HasChildren)
-	}
-	if f.WantsChildren != nil {
-		add("p.wants_children = $%d", *f.WantsChildren)
-	}
-
-	// --- Físico y Apariencia ---
-	if f.MinHeight != nil {
-		add("p.height >= $%d", *f.MinHeight)
-	}
-	if f.MaxHeight != nil {
-		add("p.height <= $%d", *f.MaxHeight)
-	}
-	if f.MinWeight != nil {
-		add("p.weight >= $%d", *f.MinWeight)
-	}
-	if f.MaxWeight != nil {
-		add("p.weight <= $%d", *f.MaxWeight)
-	}
-	if f.BodyType != nil {
-		add("p.body_type = $%d", *f.BodyType)
-	}
-	if f.Ethnicity != nil {
-		add("p.ethnicity = $%d", *f.Ethnicity)
-	}
-	if f.AppearanceRating != nil {
-		add("p.appearance_rating = $%d", *f.AppearanceRating)
-	}
-	if f.HairColor != nil {
-		add("p.hair_color = $%d", *f.HairColor)
-	}
-	if f.EyeColor != nil {
-		add("p.eye_color = $%d", *f.EyeColor)
-	}
-	if len(f.BodyArt) > 0 {
-		add("p.body_art && $%d", f.BodyArt)
-	}
-
-	// --- Estilo de Vida y Familia ---
-	if f.SmokingHabit != nil {
-		add("p.smoking_habit = $%d", *f.SmokingHabit)
-	}
-	if f.DrinkingHabit != nil {
-		add("p.drinking_habit = $%d", *f.DrinkingHabit)
-	}
-	if len(f.RelocationWillingness) > 0 {
-		add("p.relocation_willingness && $%d", f.RelocationWillingness)
-	}
-	if f.MaritalStatus != nil {
-		add("p.marital_status = $%d", *f.MaritalStatus)
-	}
-	if f.MaxChildren != nil {
-		add("p.children_count <= $%d", *f.MaxChildren)
-	}
-	if f.Occupation != nil {
-		add("p.occupation = $%d", *f.Occupation)
-	}
-	if f.EmploymentStatus != nil {
-		add("p.employment_status = $%d", *f.EmploymentStatus)
-	}
-	if f.IncomeLevel != nil {
-		add("p.income_level = $%d", *f.IncomeLevel)
-	}
-	if f.LivingSituation != nil {
-		add("p.living_situation = $%d", *f.LivingSituation)
-	}
-
-	// --- Fondo, Cultura y Valores ---
-	if f.Nationality != nil {
-		add("p.nationality = $%d", *f.Nationality)
-	}
-	if f.EducationLevel != nil {
-		add("p.education_level = $%d", *f.EducationLevel)
-	}
-	if f.EnglishAbility != nil {
-		add("p.english_ability = $%d", *f.EnglishAbility)
-	}
-	if f.Religion != nil {
-		add("p.religion = $%d", *f.Religion)
-	}
-	if f.ReligiousValues != nil {
-		add("p.religious_values = $%d", *f.ReligiousValues)
-	}
-	if f.StarSign != nil {
-		add("p.star_sign = $%d", *f.StarSign)
-	}
-
-	// --- Estilo de vida adicional ---
-	if len(f.FutureVision) > 0 {
-		add("p.future_vision && $%d", f.FutureVision)
-	}
-	if len(f.Sports) > 0 {
-		add("p.sports && $%d", f.Sports)
-	}
-	if f.LikesPets != nil {
-		add("p.likes_pets = $%d", *f.LikesPets)
-	}
-	if len(f.PetsOwned) > 0 {
-		add("p.pets_owned && $%d", f.PetsOwned)
-	}
-	if f.FavoriteSeason != nil {
-		add("p.favorite_season = $%d", *f.FavoriteSeason)
-	}
-	if len(f.IdealVacationStyle) > 0 {
-		add("p.ideal_vacation_style && $%d", f.IdealVacationStyle)
-	}
-	if len(f.VacationActivities) > 0 {
-		add("p.vacation_activities && $%d", f.VacationActivities)
-	}
-
-	// --- Personalidad (Fase 2) ---
-	for _, pf := range f.PersonalityTraits {
-		where = append(where, personalityExistsClause(pf, &args))
-	}
-
-	// --- Filtro Online Now ---
-	if f.OnlineNow {
-		add("u.last_active_at >= now() - make_interval(secs => $%d::double precision)", float64(onlineNowWindowSeconds))
-	}
-
-	// Las condiciones acaban aquí: la consulta de recuento (página fuera de
-	// rango) usa exactamente los mismos argumentos.
-	whereSQL := strings.Join(where, " AND ")
-	filterArgs := len(args)
-
-	// La popularidad viene de la vista materializada profile_popularity
-	// (migración 000020); solo se une cuando el orden la necesita.
-	joins := `JOIN users u ON u.id = p.user_id
-		LEFT JOIN profiles me ON me.user_id = $1`
-	orderBy := orderByClause(params.Sort)
-	if f.OnlineNow {
-		// En online-now prima la actividad reciente, no la creación reciente.
-		orderBy = "u.last_active_at DESC, p.id ASC"
-	} else if params.Sort == SortPopular {
-		joins += `
-		LEFT JOIN profile_popularity pop ON pop.profile_id = p.id`
-	}
-
-	limitArg := len(args) + 1
-	offsetArg := len(args) + 2
-	args = append(args, params.PageSize, (params.Page-1)*params.PageSize)
-
-	query := fmt.Sprintf(`
-		SELECT
-			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
-			COALESCE(p.relationship_goals, '{}') AS relationship_goals, p.created_at,
-			(SELECT ph.id FROM profile_photos ph
-				WHERE ph.profile_id = p.id
-				ORDER BY ph.position ASC, ph.id ASC
-				LIMIT 1) AS photo_id,
-			%s,
-			COUNT(*) OVER() AS total_count
-		FROM profiles p
-		%s
-		WHERE %s
-		ORDER BY %s
-		LIMIT $%d OFFSET $%d
-	`, profiles.ViewerFlagsSQL("me", "p"), joins, whereSQL, orderBy, limitArg, offsetArg)
-
-	rows, err := r.db.Query(ctx, query, args...)
+	rows, err := r.db.Query(ctx, q.SQL, q.Args...)
 	if err != nil {
 		return nil, fmt.Errorf("search: consultar perfiles: %w", err)
 	}
@@ -296,13 +72,7 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 	// fuera de rango no hay ninguna y total saldría 0, con lo que el cliente
 	// no sabría a qué página volver. En ese caso (y solo ese) se cuenta aparte.
 	if len(items) == 0 && params.Page > 1 {
-		countQuery := fmt.Sprintf(`
-			SELECT COUNT(*)
-			FROM profiles p
-			JOIN users u ON u.id = p.user_id
-			WHERE %s
-		`, whereSQL)
-		if err := r.db.QueryRow(ctx, countQuery, args[:filterArgs]...).Scan(&total); err != nil {
+		if err := r.db.QueryRow(ctx, q.CountSQL, q.CountArgs...).Scan(&total); err != nil {
 			return nil, fmt.Errorf("search: contar perfiles: %w", err)
 		}
 	}
@@ -319,63 +89,4 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		PageSize:   params.PageSize,
 		TotalPages: totalPages,
 	}, nil
-}
-
-func interestExistsClause(itf InterestFilter, args *[]any) string {
-	*args = append(*args, itf.Key)
-	keyArg := len(*args)
-
-	var b strings.Builder
-	fmt.Fprintf(&b, `EXISTS (
-		SELECT 1 FROM profile_interests pi
-		WHERE pi.profile_id = p.id AND pi.interest_key = $%d`, keyArg)
-
-	if itf.Min != nil {
-		*args = append(*args, *itf.Min)
-		fmt.Fprintf(&b, " AND pi.level >= $%d", len(*args))
-	}
-	if itf.Max != nil {
-		*args = append(*args, *itf.Max)
-		fmt.Fprintf(&b, " AND pi.level <= $%d", len(*args))
-	}
-	b.WriteString(")")
-
-	return b.String()
-}
-
-func personalityExistsClause(pf PersonalityFilter, args *[]any) string {
-	*args = append(*args, pf.TraitKey)
-	keyArg := len(*args)
-
-	var b strings.Builder
-	fmt.Fprintf(&b, `EXISTS (
-		SELECT 1 FROM profile_personality_trait_scores pts
-		WHERE pts.profile_id = p.id AND pts.trait_key = $%d`, keyArg)
-
-	if pf.Min != nil {
-		*args = append(*args, *pf.Min)
-		fmt.Fprintf(&b, " AND pts.avg_score >= $%d", len(*args))
-	}
-	if pf.Max != nil {
-		*args = append(*args, *pf.Max)
-		fmt.Fprintf(&b, " AND pts.avg_score <= $%d", len(*args))
-	}
-	b.WriteString(")")
-
-	return b.String()
-}
-
-func orderByClause(sort Sort) string {
-	switch sort {
-	case SortAgeAsc:
-		return "p.birth_date DESC, p.id ASC"
-	case SortAgeDesc:
-		return "p.birth_date ASC, p.id ASC"
-	case SortPopular:
-		// pop viene de un LEFT JOIN a profile_popularity: los perfiles sin
-		// actividad reciente no tienen fila y cuentan como 0.
-		return "COALESCE(pop.score, 0) DESC, p.created_at DESC, p.id ASC"
-	default: // SortRecent
-		return "p.created_at DESC, p.id ASC"
-	}
 }

@@ -75,3 +75,16 @@ func TestCompletionPercent(t *testing.T) {
 		}
 	}
 }
+
+func TestPublicPhotoURL_IsTheSameRouteAsTheHandlerUses(t *testing.T) {
+	profileID, photoID := uuid.New(), uuid.New()
+	for _, thumb := range []bool{false, true} {
+		if got, want := PublicPhotoURL(profileID, photoID, thumb), publicPhotoURL(profileID, photoID, thumb); got != want {
+			t.Errorf("PublicPhotoURL(thumb=%v) = %s, se esperaba %s", thumb, got, want)
+		}
+	}
+	if pub := toPhotoResponsePublic(&Photo{ID: photoID}, profileID); pub.URL != PublicPhotoURL(profileID, photoID, false) ||
+		pub.ThumbURL != PublicPhotoURL(profileID, photoID, true) {
+		t.Errorf("la respuesta del handler de profiles y PublicPhotoURL deben coincidir: %+v", pub)
+	}
+}

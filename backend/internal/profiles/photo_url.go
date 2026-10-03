@@ -24,6 +24,12 @@ func publicPhotoURL(profileID, photoID uuid.UUID, thumb bool) string {
 	return withThumb(fmt.Sprintf("/api/v1/profiles/%s/photos/%s/file", profileID, photoID), thumb)
 }
 
+// PublicPhotoURL es publicPhotoURL para otros paquetes (search arma con ella la
+// foto de cada tarjeta), de modo que la ruta siga definida en un solo sitio.
+func PublicPhotoURL(profileID, photoID uuid.UUID, thumb bool) string {
+	return publicPhotoURL(profileID, photoID, thumb)
+}
+
 func withThumb(url string, thumb bool) string {
 	if thumb {
 		return url + thumbQuery

@@ -2,7 +2,6 @@ package search
 
 import (
 	"errors"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -10,6 +9,7 @@ import (
 
 	"dating-platform/backend/internal/auth"
 	"dating-platform/backend/internal/httpx"
+	"dating-platform/backend/internal/profiles"
 )
 
 type Handler struct {
@@ -36,9 +36,11 @@ type resultItemResponse struct {
 	// PhotoURL es la URL ya armada de la foto principal del perfil, o
 	// null si no tiene ninguna. Se resuelve en la misma consulta que
 	// trae la lista, para que el grid del cliente no haga una petición
-	// por tarjeta.
-	PhotoURL  *string `json:"photo_url"`
-	CreatedAt string  `json:"created_at"`
+	// por tarjeta. PhotoThumbURL es la miniatura (480 px) de esa misma
+	// foto: para las tarjetas basta y pesa mucho menos que la foto de 1600 px.
+	PhotoURL      *string `json:"photo_url"`
+	PhotoThumbURL *string `json:"photo_thumb_url"`
+	CreatedAt     string  `json:"created_at"`
 
 	// Relación con quien busca, resuelta en la misma consulta.
 	Liked            bool `json:"liked"`
@@ -71,7 +73,6 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 		PageSize:          q.Get("page_size"),
 		Sort:              q.Get("sort"),
 
-		// --- Nuevos filtros recibidos por Query Params ---
 		MinHeight:             q.Get("min_height"),
 		MaxHeight:             q.Get("max_height"),
 		MinWeight:             q.Get("min_weight"),
@@ -107,10 +108,8 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 		IdealVacationStyle: splitMulti(q["ideal_vacation_style"]),
 		VacationActivities: splitMulti(q["vacation_activities"]),
 
-		// --- Nivel de intereses (has_level=true) ---
-		InterestBounds: parseKeyedBounds(q, "interest_"),
-
-		// --- Personalidad (Fase 2) ---
+		// Límites de nivel de intereses (has_level=true) y de rasgos de personalidad.
+		InterestBounds:         parseKeyedBounds(q, "interest_"),
 		PersonalityTraitBounds: parseKeyedBounds(q, "trait_"),
 	}
 
@@ -188,11 +187,11 @@ func toSearchResponse(res *Result) searchResponse {
 			firstGoal = &goals[0]
 		}
 
-		var photoURL *string
+		var photoURL, photoThumbURL *string
 		if it.PhotoID != nil {
-			u := fmt.Sprintf("/api/v1/profiles/%s/photos/%s/file",
-				it.ProfileID.String(), it.PhotoID.String())
-			photoURL = &u
+			u := profiles.PublicPhotoURL(it.ProfileID, *it.PhotoID, false)
+			th := profiles.PublicPhotoURL(it.ProfileID, *it.PhotoID, true)
+			photoURL, photoThumbURL = &u, &th
 		}
 
 		items = append(items, resultItemResponse{
@@ -206,6 +205,7 @@ func toSearchResponse(res *Result) searchResponse {
 			RelationshipGoals: goals,
 			HasPhoto:          it.HasPhoto,
 			PhotoURL:          photoURL,
+			PhotoThumbURL:     photoThumbURL,
 			CreatedAt:         it.CreatedAt.Format(time.RFC3339),
 			Liked:             it.Liked,
 			Favorited:         it.Favorited,

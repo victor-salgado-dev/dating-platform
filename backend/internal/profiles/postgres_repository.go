@@ -49,6 +49,25 @@ const visiblePredicate = `u.status = 'active' AND u.deleted_at IS NULL
 		  AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = $2 AND b.blocked_id = p.user_id)
 		  AND NOT EXISTS (SELECT 1 FROM blocks b WHERE b.blocker_id = p.user_id AND b.blocked_id = $2)`
 
+// VisibleSQL devuelve la regla de visibilidad pública (cuenta activa y sin
+// bloqueos en ningún sentido) para consultas de OTROS paquetes, de modo que sigan
+// teniendo una única definición (search la usa). Mismo contrato que
+// visiblePredicate: alias `u` (users) unido a `p` (profiles); viewerParam es el
+// placeholder con el user_id de quien mira, p. ej. "$1". Cualquier otra cosa
+// entra en pánico: el valor se interpola en el SQL y no debe ser nunca entrada
+// de usuario.
+func VisibleSQL(viewerParam string) string {
+	if len(viewerParam) < 2 || viewerParam[0] != '$' || viewerParam[1] == '0' {
+		panic(fmt.Sprintf("profiles: placeholder no válido en VisibleSQL: %q", viewerParam))
+	}
+	for _, c := range viewerParam[1:] {
+		if c < '0' || c > '9' {
+			panic(fmt.Sprintf("profiles: placeholder no válido en VisibleSQL: %q", viewerParam))
+		}
+	}
+	return strings.ReplaceAll(visiblePredicate, "$2", viewerParam)
+}
+
 // publicProfileCols son las columnas de perfil con alias `p`, calculadas una
 // sola vez (antes se recalculaban en cada GetPublicByID).
 var publicProfileCols = prefixCols("p", allProfileCols)

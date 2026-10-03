@@ -31,13 +31,15 @@ const (
 	MinSearchAge    = 18 // V1 es solo para mayores de edad (sección 1)
 	MaxSearchAge    = 120
 
-	// MinInterestLevel/MaxInterestLevel acotan el nivel de un interés con
-	// has_level=true (profile_interests.level). Se asume la misma escala
-	// 1-5 que ya usan hobbies (antes de fusionarse en intereses) y
-	// personalidad — si el CHECK de la base de datos usa otro rango,
-	// ajustar aquí.
-	MinInterestLevel = 1
-	MaxInterestLevel = 5
+	// MaxPage y MaxInterestFilters acotan lo que una sola petición puede pedir:
+	// el OFFSET crece con la página, y cada filtro de interés es una subconsulta.
+	MaxPage            = 10_000
+	MaxInterestFilters = 25
+
+	// Límites del nivel de un interés con has_level=true: los mismos que valida
+	// profiles al guardarlo, para que no puedan desincronizarse.
+	MinInterestLevel = profiles.MinInterestLevel
+	MaxInterestLevel = profiles.MaxInterestLevel
 )
 
 // PersonalityFilter exige que la media de un rasgo de personalidad
@@ -91,7 +93,6 @@ type Filters struct {
 	Languages         []string
 	RelationshipGoals []profiles.RelationshipGoal
 
-	// Cambiados de *bool a *string
 	HasChildren   *string
 	WantsChildren *string
 	// Interests: varios filtros se combinan con AND (el perfil tiene que

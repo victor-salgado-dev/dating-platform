@@ -15,7 +15,6 @@ import (
 	"dating-platform/backend/internal/users"
 )
 
-// Cambiado wantsChildren de *bool a *string
 func createUserWithProfile(t *testing.T, ctx context.Context, usersRepo users.Repository, profilesRepo profiles.Repository, wantsChildren *string) uuid.UUID {
 	t.Helper()
 
@@ -25,12 +24,12 @@ func createUserWithProfile(t *testing.T, ctx context.Context, usersRepo users.Re
 	}
 
 	p := &profiles.Profile{
-		UserID:        u.ID,
-		DisplayName:   "Persona de prueba",
-		BirthDate:     time.Now().AddDate(-30, 0, 0),
-		Gender:        profiles.GenderOther,
-		CountryCode:   "ES",
-		WantsChildren: wantsChildren,
+		UserID:         u.ID,
+		DisplayName:    "Persona de prueba",
+		BirthDate:      time.Now().AddDate(-30, 0, 0),
+		Gender:         profiles.GenderOther,
+		CountryCode:    "ES",
+		ProfileDetails: profiles.ProfileDetails{WantsChildren: wantsChildren},
 	}
 	if err := profilesRepo.Create(ctx, p); err != nil {
 		t.Fatalf("crear perfil de prueba: %v", err)

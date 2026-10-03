@@ -61,3 +61,41 @@ func TestBuildPartnerPreferencesUpsert(t *testing.T) {
 		t.Errorf("patch vacío:\n got: %s (%d args)\nwant: %s", squish(query), len(args), want)
 	}
 }
+
+// VisibleSQL es la regla de visibilidad que reutilizan otros paquetes: debe ser
+// exactamente visiblePredicate con el placeholder cambiado.
+func TestVisibleSQL(t *testing.T) {
+	if got := VisibleSQL("$2"); got != visiblePredicate {
+		t.Errorf("con $2 debe devolver visiblePredicate tal cual:\n%s", got)
+	}
+
+	sql := VisibleSQL("$1")
+	if strings.Contains(sql, "$2") {
+		t.Errorf("no debe quedar ningún $2:\n%s", sql)
+	}
+	if n := strings.Count(sql, "$1"); n != 2 {
+		t.Errorf("el viewer aparece en los dos sentidos del bloqueo (2 veces), aparece %d:\n%s", n, sql)
+	}
+	for _, want := range []string{"u.status = 'active'", "u.deleted_at IS NULL",
+		"b.blocker_id = $1 AND b.blocked_id = p.user_id", "b.blocker_id = p.user_id AND b.blocked_id = $1"} {
+		if !strings.Contains(sql, want) {
+			t.Errorf("falta %q en:\n%s", want, sql)
+		}
+	}
+	if got := VisibleSQL("$12"); !strings.Contains(got, "$12") || strings.Contains(got, "$2 ") {
+		t.Errorf("placeholder de varios dígitos mal sustituido:\n%s", got)
+	}
+}
+
+func TestVisibleSQL_RejectsAnythingButAPlaceholder(t *testing.T) {
+	for _, bad := range []string{"", "$", "1", "$0", "$x", "$1; DROP TABLE users", "$1 OR 1=1", "@1", "$-1", " $1"} {
+		func() {
+			defer func() {
+				if recover() == nil {
+					t.Errorf("VisibleSQL(%q) debería entrar en pánico", bad)
+				}
+			}()
+			VisibleSQL(bad)
+		}()
+	}
+}
