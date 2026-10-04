@@ -75,15 +75,29 @@ func buildSearchQuery(params Params, now time.Time) builtQuery {
 	}
 	f := params.Filters
 
-	if len(f.Genders) > 0 {
-		genders := make([]string, len(f.Genders))
-		for i, g := range f.Genders {
+	// Género: si la petición trae gender= explícito manda ese; si no, se usa
+	// el género buscado por quien mira (obligatorio en su perfil).
+	wantedGenders := f.Genders
+	if len(wantedGenders) == 0 {
+		wantedGenders = params.Viewer.SeekingGenders
+	}
+	if len(wantedGenders) > 0 {
+		genders := make([]string, len(wantedGenders))
+		for i, g := range wantedGenders {
 			genders[i] = string(g)
 		}
 		b.add("p.gender = ANY($%d)", genders)
 	}
 
-	minBirth, maxBirth := ageBounds(now, f.MinAge, f.MaxAge)
+	// Edad: igual, el filtro explícito manda sobre las preferencias.
+	minAge, maxAge := f.MinAge, f.MaxAge
+	if minAge == nil {
+		minAge = params.Viewer.MinAge
+	}
+	if maxAge == nil {
+		maxAge = params.Viewer.MaxAge
+	}
+	minBirth, maxBirth := ageBounds(now, minAge, maxAge)
 	if minBirth != nil {
 		b.add("p.birth_date <= $%d", *minBirth)
 	}

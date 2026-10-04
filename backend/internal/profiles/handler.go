@@ -29,6 +29,7 @@ type profileResponse struct {
 	DisplayName       string   `json:"display_name"`
 	Age               int      `json:"age"`
 	Gender            string   `json:"gender"`
+	SeekingGenders    []string `json:"seeking_genders"`
 	CountryCode       string   `json:"country_code"`
 	Region            *string  `json:"region"`
 	RelationshipGoals []string `json:"relationship_goals"`
@@ -82,11 +83,17 @@ func toProfileResponse(p *Profile) profileResponse {
 		goals[i] = string(g)
 	}
 
+	seeking := make([]string, len(p.SeekingGenders))
+	for i, g := range p.SeekingGenders {
+		seeking[i] = string(g)
+	}
+
 	return profileResponse{
 		ID:                p.ID.String(),
 		DisplayName:       p.DisplayName,
 		Age:               p.Age(),
 		Gender:            string(p.Gender),
+		SeekingGenders:    seeking,
 		CountryCode:       p.CountryCode,
 		Region:            p.Region,
 		RelationshipGoals: goals,
@@ -171,6 +178,9 @@ type createProfileRequest struct {
 	BirthDate   string `json:"birth_date"`
 	Gender      Gender `json:"gender"`
 	CountryCode string `json:"country_code"`
+
+	// SeekingGenders es obligatorio: de 1 a 4 valores de Gender, sin repetir.
+	SeekingGenders []Gender `json:"seeking_genders"`
 
 	ProfileDetails
 }
@@ -403,6 +413,12 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if !ValidateSeekingGenders(req.SeekingGenders) {
+		httpx.WriteError(w, http.StatusBadRequest, "invalid_field",
+			"seeking_genders es obligatorio: de 1 a 4 valores válidos y sin repetir.")
+		return
+	}
+
 	// Una lista de objetivos ausente se guarda como lista vacía (no NULL).
 	if req.RelationshipGoals == nil {
 		req.RelationshipGoals = []RelationshipGoal{}
@@ -412,6 +428,7 @@ func (h *Handler) Create(w http.ResponseWriter, r *http.Request) {
 		DisplayName:    req.DisplayName,
 		BirthDate:      birthDate,
 		Gender:         req.Gender,
+		SeekingGenders: req.SeekingGenders,
 		CountryCode:    req.CountryCode,
 		ProfileDetails: req.ProfileDetails,
 	})

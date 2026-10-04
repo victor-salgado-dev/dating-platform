@@ -409,6 +409,9 @@ func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, p *Profil
 	if err := validateGender(p.Gender); err != nil {
 		return nil, err
 	}
+	if err := validateSeekingGenders(p.SeekingGenders); err != nil {
+		return nil, err
+	}
 	countryCode := strings.ToUpper(strings.TrimSpace(p.CountryCode))
 	if err := validateCountryCode(countryCode); err != nil {
 		return nil, err
@@ -456,6 +459,11 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, patch Pro
 	}
 	if patch.Gender.Set {
 		if err := validateGender(patch.Gender.Value); err != nil {
+			return nil, err
+		}
+	}
+	if patch.SeekingGenders.Set {
+		if err := validateSeekingGenders(patch.SeekingGenders.Value); err != nil {
 			return nil, err
 		}
 	}
@@ -878,6 +886,19 @@ func validateBirthDate(t time.Time) error {
 func validateGender(g Gender) error {
 	if !allowedGenders[g] {
 		return invalidField("gender", "valor no permitido")
+	}
+	return nil
+}
+
+// validateSeekingGenders: obligatorio, de 1 a MaxSeekingGenders valores
+// permitidos y sin repetir. Un null en el PATCH llega aquí como lista vacía y
+// se rechaza: no se puede borrar.
+func validateSeekingGenders(genders []Gender) error {
+	if len(genders) == 0 {
+		return invalidField("seeking_genders", "es obligatorio: elige al menos un valor")
+	}
+	if !ValidateSeekingGenders(genders) {
+		return invalidField("seeking_genders", "valores no permitidos o repetidos")
 	}
 	return nil
 }

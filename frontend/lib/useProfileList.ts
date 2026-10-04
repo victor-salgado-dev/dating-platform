@@ -23,7 +23,7 @@ export const HOME_TABS: HomeTab[] = ['recommended', 'popular', 'online', 'new'];
 export const PAGE_SIZE = 24;
 
 const ENDPOINTS: Record<HomeTab, string> = {
-  recommended: '/search/profiles',
+  recommended: '/search/recommended',
   popular: '/search/popular',
   online: '/search/online-now',
   new: '/search/new-members',

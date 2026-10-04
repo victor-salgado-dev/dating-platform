@@ -99,6 +99,7 @@ export const es = {
     messageCannotSelf: 'No puedes enviarte un mensaje a ti mismo.',
     messageError: 'No se pudo enviar el mensaje.',
     fieldGender: 'Género',
+    fieldSeeking: 'Interesado/a en',
     fieldHasChildren: '¿Tiene hijos?',
     fieldWantsChildren: '¿Quiere tener hijos?',
     fieldLookingFor: 'Busca',
@@ -379,6 +380,9 @@ export const es = {
     fieldDisplayName: 'Nombre visible',
     fieldBirthDate: 'Fecha de nacimiento',
     fieldGender: 'Género',
+    fieldSeeking: '¿Qué género buscas? (obligatorio)',
+    seekingHint: 'Marca al menos una opción. Condiciona los perfiles que ves en Recomendados.',
+    seekingRequired: 'Elige al menos un género que buscas.',
     fieldLocation: 'Ubicación',
     locationSaved: 'Guardado: {region}{country}',
     fieldRelationshipGoals: '¿Qué buscas? (puedes elegir varias)',
@@ -481,6 +485,7 @@ export const es = {
   },
   options: {
     gender: { female: 'Mujer', male: 'Hombre', non_binary: 'No binario', other: 'Otro' },
+    seeking: { male: 'Hombres', female: 'Mujeres', trans: 'Personas trans' },
     // Nombres de los LANGUAGE_OPTIONS. Un puñado son códigos poco comunes
     // (cr, uga, ber, pcm, ilo...); si alguno no es el idioma que esperabas,
     // dime cuál y lo corrijo — son fáciles de confundir con códigos vecinos.

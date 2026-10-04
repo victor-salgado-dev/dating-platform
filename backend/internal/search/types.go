@@ -152,6 +152,17 @@ type Filters struct {
 	OnlineNow bool
 }
 
+// ViewerScope son las restricciones que salen de QUIEN MIRA (sus
+// seeking_genders obligatorios y, en "recommended", su rango de edad de
+// profile_partner_preferences). No son filtros elegidos en la petición, por
+// eso NO van en Filters: así la caché de listados sigue activa y se aplican
+// en memoria sobre la lista compartida. Vacío/nil = sin restricción.
+type ViewerScope struct {
+	SeekingGenders []profiles.Gender
+	MinAge         *int
+	MaxAge         *int
+}
+
 // Params agrupa los filtros con la paginación/ordenación y quién busca
 // (para excluirlo de sus propios resultados).
 type Params struct {
@@ -160,6 +171,12 @@ type Params struct {
 	Sort          Sort
 	Page          int
 	PageSize      int
+
+	// UseAgePrefs: aplicar también el rango de edad de las preferencias de
+	// pareja de quien mira. Solo lo activa el listado "recommended".
+	UseAgePrefs bool
+	// Viewer lo rellena el repositorio (loadViewerScope), no el servicio.
+	Viewer ViewerScope
 }
 
 // ResultItem es la ficha resumida de un perfil en una lista de

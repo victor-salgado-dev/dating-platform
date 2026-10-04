@@ -73,6 +73,10 @@ type RawQuery struct {
 	// OnlineNow no proviene del query string. Lo asigna directamente el
 	// handler OnlineNow para activar el filtrado por last_active_at.
 	OnlineNow bool
+
+	// UseAgePrefs tampoco viene del query string: lo fija el handler
+	// Recommended para aplicar el rango de edad de las preferencias de pareja.
+	UseAgePrefs bool
 }
 
 type Service struct {
@@ -129,6 +133,7 @@ func buildParams(excludeUserID uuid.UUID, raw RawQuery) (Params, error) {
 		Sort:          sortValue,
 		Page:          page,
 		PageSize:      pageSize,
+		UseAgePrefs:   raw.UseAgePrefs,
 	}, nil
 }
 

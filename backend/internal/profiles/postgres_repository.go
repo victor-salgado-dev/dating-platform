@@ -20,7 +20,7 @@ const (
 
 // Listado de todas las columnas (excepto id, created_at, updated_at para inserts)
 const allProfileCols = `
-	user_id, display_name, birth_date, gender, country_code,
+	user_id, display_name, birth_date, gender, seeking_genders, country_code,
 	region, relationship_goals, has_children, wants_children, bio,
 	height, weight, body_type, ethnicity, appearance_rating, hair_color, eye_color, body_art,
 	smoking_habit, drinking_habit, relocation_willingness, marital_status,
@@ -35,7 +35,7 @@ const allProfileCols = `
 // columnas listadas en allProfileCols. Se usa solo para generar los
 // placeholders ($1, $2...) del INSERT sin tener que contarlos ni
 // renumerarlos a mano cada vez que se añade un campo nuevo.
-const profileColCount = 44
+const profileColCount = 45
 
 // visiblePredicate es la regla de visibilidad pública: cuenta activa y sin
 // bloqueos en ningún sentido. ÚNICA definición: la usan GetPublicByID,
@@ -107,7 +107,7 @@ func (r *PostgresRepository) Create(ctx context.Context, p *Profile) error {
 	`, allProfileCols, strings.Join(placeholders, ", "))
 
 	err := r.db.QueryRow(ctx, query,
-		p.UserID, p.DisplayName, p.BirthDate, string(p.Gender), p.CountryCode,
+		p.UserID, p.DisplayName, p.BirthDate, string(p.Gender), gendersToDB(p.SeekingGenders), p.CountryCode,
 		p.Region, relationshipGoalsToDB(p.RelationshipGoals), p.HasChildren, p.WantsChildren, p.Bio,
 		p.Height, p.Weight, p.BodyType, p.Ethnicity, p.AppearanceRating, p.HairColor, p.EyeColor, p.BodyArt,
 		p.SmokingHabit, p.DrinkingHabit, p.RelocationWillingness, p.MaritalStatus,
@@ -233,9 +233,10 @@ func (r *PostgresRepository) scanOne(ctx context.Context, query string, args ...
 	var p Profile
 	var genderStr string
 	var relGoalsStr []string
+	var seekingStr []string
 
 	err := r.db.QueryRow(ctx, query, args...).Scan(
-		&p.ID, &p.UserID, &p.DisplayName, &p.BirthDate, &genderStr, &p.CountryCode,
+		&p.ID, &p.UserID, &p.DisplayName, &p.BirthDate, &genderStr, &seekingStr, &p.CountryCode,
 		&p.Region, &relGoalsStr, &p.HasChildren, &p.WantsChildren, &p.Bio,
 		&p.Height, &p.Weight, &p.BodyType, &p.Ethnicity, &p.AppearanceRating, &p.HairColor, &p.EyeColor, &p.BodyArt,
 		&p.SmokingHabit, &p.DrinkingHabit, &p.RelocationWillingness, &p.MaritalStatus,
@@ -254,12 +255,24 @@ func (r *PostgresRepository) scanOne(ctx context.Context, query string, args ...
 	}
 
 	p.Gender = Gender(genderStr)
+	p.SeekingGenders = make([]Gender, len(seekingStr))
+	for i, g := range seekingStr {
+		p.SeekingGenders[i] = Gender(g)
+	}
 	p.RelationshipGoals = make([]RelationshipGoal, len(relGoalsStr))
 	for i, g := range relGoalsStr {
 		p.RelationshipGoals[i] = RelationshipGoal(g)
 	}
 
 	return &p, nil
+}
+
+func gendersToDB(genders []Gender) []string {
+	out := make([]string, len(genders))
+	for i, g := range genders {
+		out[i] = string(g)
+	}
+	return out
 }
 
 func relationshipGoalsToDB(goals []RelationshipGoal) []string {

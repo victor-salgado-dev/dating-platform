@@ -252,6 +252,8 @@ export type PublicProfile = {
   display_name: string;
   age: number;
   gender: string;
+  // Género(s) que busca (obligatorio). Valores de Gender del backend.
+  seeking_genders: string[];
   country_code: string;
   region: string | null;
   relationship_goals: string[] | null;

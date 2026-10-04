@@ -51,6 +51,10 @@ type Profile struct {
 	Gender      Gender
 	CountryCode string
 
+	// SeekingGenders: género(s) que busca. Obligatorio (1 a 4 valores de
+	// Gender, sin repetir), a diferencia de los campos de ProfileDetails.
+	SeekingGenders []Gender
+
 	ProfileDetails
 
 	CreatedAt time.Time
@@ -118,6 +122,28 @@ type ProfileDetails struct {
 	VacationActivities []string `json:"vacation_activities"`
 	ProfileQuote       *string  `json:"profile_quote"`
 	DreamWish          *string  `json:"dream_wish"`
+}
+
+// MaxSeekingGenders es el número de valores distintos de Gender.
+const MaxSeekingGenders = 4
+
+// ValidateSeekingGenders exige entre 1 y MaxSeekingGenders valores válidos y
+// sin duplicados. El CHECK de la BD no detecta duplicados, por eso se hace aquí.
+func ValidateSeekingGenders(genders []Gender) bool {
+	if len(genders) < 1 || len(genders) > MaxSeekingGenders {
+		return false
+	}
+	seen := make(map[Gender]struct{}, len(genders))
+	for _, g := range genders {
+		if !IsValidGender(g) {
+			return false
+		}
+		if _, dup := seen[g]; dup {
+			return false
+		}
+		seen[g] = struct{}{}
+	}
+	return true
 }
 
 // Age calcula la edad actual a partir de la fecha de nacimiento. No se

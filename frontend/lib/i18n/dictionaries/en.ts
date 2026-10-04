@@ -101,6 +101,7 @@ export const en: Dictionary = {
     messageCannotSelf: 'You cannot message yourself.',
     messageError: 'The message could not be sent.',
     fieldGender: 'Gender',
+    fieldSeeking: 'Interested in',
     fieldHasChildren: 'Has children?',
     fieldWantsChildren: 'Wants children?',
     fieldLookingFor: 'Looking for',
@@ -381,6 +382,9 @@ export const en: Dictionary = {
     fieldDisplayName: 'Display name',
     fieldBirthDate: 'Date of birth',
     fieldGender: 'Gender',
+    fieldSeeking: 'Who are you looking for? (required)',
+    seekingHint: 'Select at least one. It shapes the profiles you see in Recommended.',
+    seekingRequired: 'Choose at least one gender you are looking for.',
     fieldLocation: 'Location',
     locationSaved: 'Saved: {region}{country}',
     fieldRelationshipGoals: 'What are you looking for? (you can pick several)',
@@ -479,6 +483,7 @@ export const en: Dictionary = {
   },
   options: {
     gender: { female: 'Woman', male: 'Man', non_binary: 'Non-binary', other: 'Other' },
+    seeking: { male: 'Men', female: 'Women', trans: 'Trans people' },
     languages: {
       en: 'English',
       tl: 'Tagalog',

@@ -21,6 +21,7 @@ type ProfilePatch struct {
 	DisplayName       Field[string]             `json:"display_name"`
 	BirthDate         Field[DateOnly]           `json:"birth_date"`
 	Gender            Field[Gender]             `json:"gender"`
+	SeekingGenders    Field[[]Gender]           `json:"seeking_genders"`
 	CountryCode       Field[string]             `json:"country_code"`
 	Region            Field[*string]            `json:"region"`
 	RelationshipGoals Field[[]RelationshipGoal] `json:"relationship_goals"`

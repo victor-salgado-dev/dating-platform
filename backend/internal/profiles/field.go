@@ -63,6 +63,8 @@ func (f Field[T]) dbValue() any {
 		return v.Time()
 	case []RelationshipGoal:
 		return relationshipGoalsToDB(v)
+	case []Gender:
+		return gendersToDB(v)
 	}
 	return f.Value
 }

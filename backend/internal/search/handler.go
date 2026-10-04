@@ -132,6 +132,16 @@ func (h *Handler) OnlineNow(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// Recommended devuelve los perfiles recientes restringidos a lo que busca
+// quien mira: género buscado (obligatorio en su perfil) y rango de edad de
+// sus preferencias de pareja.
+func (h *Handler) Recommended(w http.ResponseWriter, r *http.Request) {
+	h.preset(w, r, "No se pudo obtener la lista de recomendados.", func(raw *RawQuery) {
+		raw.Sort = string(SortRecent)
+		raw.UseAgePrefs = true
+	})
+}
+
 // Popular devuelve los perfiles ordenados por popularidad: actividad de los
 // últimos 30 días (likes, favoritos, mensajes y visitas recibidos), según la
 // vista materializada profile_popularity.

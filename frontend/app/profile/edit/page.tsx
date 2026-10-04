@@ -58,6 +58,7 @@ import {
 import { useI18n } from '@/lib/i18n/context';
 import { tOption } from '@/lib/i18n/options';
 import type { Dictionary } from '@/lib/i18n/dictionaries/es';
+import { SEEKING_OPTIONS, seekingOptionsFromValues, seekingValuesFromOptions, type SeekingOptionId } from '@/lib/seekingGenders';
 import LocationAutocomplete from '@/components/LocationAutocomplete';
 import { PlaceSuggestion } from '@/lib/geocoding';
 import styles from './page.module.css';
@@ -70,6 +71,7 @@ type FormState = {
   display_name: string;
   birth_date: string;
   gender: string;
+  seeking: SeekingOptionId[];
   country_code: string;
   region: string;
   relationship_goals: string[];
@@ -122,7 +124,7 @@ type MultiSelectField = Extract<
 >;
 
 const emptyForm: FormState = {
-  display_name: '', birth_date: '', gender: '', country_code: '', region: '',
+  display_name: '', birth_date: '', gender: '', seeking: [], country_code: '', region: '',
   relationship_goals: [], has_children: '', wants_children: '', bio: '',
 
   height: '', weight: '', body_type: '', ethnicity: '', appearance_rating: '',
@@ -156,6 +158,7 @@ function formFromProfile(profile: PublicProfile): FormState {
     display_name: profile.display_name,
     birth_date: '',
     gender: profile.gender,
+    seeking: seekingOptionsFromValues(profile.seeking_genders),
     country_code: profile.country_code,
     region: profile.region ?? '',
     relationship_goals: profile.relationship_goals ?? [],
@@ -368,6 +371,13 @@ export default function EditProfilePage() {
     });
   }
 
+  function toggleSeeking(id: SeekingOptionId) {
+    setForm((current) => ({
+      ...current,
+      seeking: current.seeking.includes(id) ? current.seeking.filter((v) => v !== id) : [...current.seeking, id],
+    }));
+  }
+
   function toggleRelationshipGoal(value: string) {
     setForm((current) => {
       const next = current.relationship_goals.includes(value)
@@ -388,9 +398,17 @@ export default function EditProfilePage() {
     setError(null);
     setSaved(false);
 
+    // Obligatorio: al menos una opción de "qué busco".
+    if (form.seeking.length === 0) {
+      setError(dictionary.profileEdit.seekingRequired);
+      setSaving(false);
+      return;
+    }
+
     const body = {
       display_name: form.display_name,
       gender: form.gender,
+      seeking_genders: seekingValuesFromOptions(form.seeking),
       country_code: form.country_code,
       region: nullableString(form.region),
       relationship_goals: form.relationship_goals,
@@ -768,6 +786,19 @@ export default function EditProfilePage() {
                   ))}
                 </select>
               </label>
+
+              <fieldset className={styles.checkboxFieldset}>
+                <legend>{dictionary.profileEdit.fieldSeeking}</legend>
+                <div className={styles.checkboxGrid}>
+                  {SEEKING_OPTIONS.map((opt) => (
+                    <label key={opt.id} className={styles.checkboxLabel}>
+                      <input type="checkbox" checked={form.seeking.includes(opt.id)} onChange={() => toggleSeeking(opt.id)} />
+                      {tOption(dictionary, 'seeking', opt.id)}
+                    </label>
+                  ))}
+                </div>
+                <p className={styles.hint}>{dictionary.profileEdit.seekingHint}</p>
+              </fieldset>
 
               <label>{dictionary.profileEdit.fieldLocation}
                 <LocationAutocomplete
