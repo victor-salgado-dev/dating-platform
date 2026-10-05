@@ -111,6 +111,11 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 		// Límites de nivel de intereses (has_level=true) y de rasgos de personalidad.
 		InterestBounds:         parseKeyedBounds(q, "interest_"),
 		PersonalityTraitBounds: parseKeyedBounds(q, "trait_"),
+
+		// Discover y Quick Match usan este endpoint: si la búsqueda no trae
+		// edad, se aplica la de las preferencias de pareja (y lo mismo con el
+		// género, ya cubierto en el repositorio).
+		UseAgePrefs: true,
 	}
 
 	h.run(w, r, raw, "No se pudo completar la búsqueda.")

@@ -1,0 +1,7 @@
+﻿Fecha,Hora,Contenedor,CPU_Porcentaje,Memoria_Uso
+
+# ========================================================
+# TOP 5 CONSULTAS POSTGRESQL (TIEMPO REAL DE BASE DE DATOS)
+# ========================================================
+calls,mean_ms,total_ms,query
+1,225.1,225,UPDATE users SET last_active_at = now() - (random() * interval $1) WHERE random() < $2

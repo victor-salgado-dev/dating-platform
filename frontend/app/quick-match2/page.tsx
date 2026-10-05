@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { apiFetch, SearchResponse, SearchResultItem, LikeResult } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/context';
 import { useFullProfile, preloadFullProfile, recordProfileVisit } from '@/lib/useFullProfile';
+import { loadSavedFilters } from '@/lib/searchFilters';
 import { FullProfileSections } from '@/components/FullProfileSections';
 import styles from './page.module.css';
 
@@ -39,18 +40,11 @@ export default function QuickMatchPage() {
 
   const seenIds = useRef<Set<string>>(new Set());
 
-  // El filtro aplicado en Discover, guardado en localStorage. Sin filtro
-  // guardado, se busca sin restricciones extra (solo Partner preferences,
-  // que el backend ya aplica siempre).
+  // Filtros guardados desde Búsqueda. Lo que no esté en ellos lo completa el
+  // backend con el género que buscas y la edad de tus Partner preferences.
   const fetchNextBatch = useCallback(
     async (pageToFetch: number) => {
-      let savedFilters = '';
-      try {
-        savedFilters = window.localStorage.getItem('discoveryFilters') ?? '';
-      } catch {
-        // localStorage no disponible — se busca sin filtro guardado
-      }
-
+      const savedFilters = await loadSavedFilters();
       const params = new URLSearchParams(savedFilters);
       params.set('page', String(pageToFetch));
       params.set('page_size', '50');

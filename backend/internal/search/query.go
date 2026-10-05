@@ -89,13 +89,12 @@ func buildSearchQuery(params Params, now time.Time) builtQuery {
 		b.add("p.gender = ANY($%d)", genders)
 	}
 
-	// Edad: igual, el filtro explícito manda sobre las preferencias.
+	// Edad: el rango se trata como una unidad. Si en la búsqueda se rellenó
+	// min_age y/o max_age, manda ese rango (el límite vacío = sin límite). Solo
+	// si no se rellenó ninguno se usa el rango de las preferencias de pareja.
 	minAge, maxAge := f.MinAge, f.MaxAge
-	if minAge == nil {
-		minAge = params.Viewer.MinAge
-	}
-	if maxAge == nil {
-		maxAge = params.Viewer.MaxAge
+	if minAge == nil && maxAge == nil {
+		minAge, maxAge = params.Viewer.MinAge, params.Viewer.MaxAge
 	}
 	minBirth, maxBirth := ageBounds(now, minAge, maxAge)
 	if minBirth != nil {

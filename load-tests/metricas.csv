@@ -1,0 +1,175 @@
+﻿Fecha,Hora,Contenedor,CPU_Porcentaje,Memoria_Uso
+2026-10-05,17:05:59,dating-platform-postgres-1,7.90%,96.13MiB / 3.825GiB
+2026-10-05,17:05:59,dating-platform-backend-1,93.28%,37.9MiB / 3.825GiB
+2026-10-05,17:06:04,dating-platform-postgres-1,1.22%,96.22MiB / 3.825GiB
+2026-10-05,17:06:04,dating-platform-backend-1,93.09%,38.39MiB / 3.825GiB
+2026-10-05,17:06:09,dating-platform-postgres-1,12.07%,98.6MiB / 3.825GiB
+2026-10-05,17:06:09,dating-platform-backend-1,2.24%,42.13MiB / 3.825GiB
+2026-10-05,17:06:14,dating-platform-postgres-1,3.53%,99.75MiB / 3.825GiB
+2026-10-05,17:06:14,dating-platform-backend-1,2.13%,40.41MiB / 3.825GiB
+2026-10-05,17:06:19,dating-platform-postgres-1,6.33%,101.1MiB / 3.825GiB
+2026-10-05,17:06:19,dating-platform-backend-1,1.95%,40.41MiB / 3.825GiB
+2026-10-05,17:06:24,dating-platform-postgres-1,24.18%,105.4MiB / 3.825GiB
+2026-10-05,17:06:24,dating-platform-backend-1,6.93%,43.51MiB / 3.825GiB
+2026-10-05,17:06:29,dating-platform-postgres-1,9.93%,106.8MiB / 3.825GiB
+2026-10-05,17:06:29,dating-platform-backend-1,2.41%,43.13MiB / 3.825GiB
+2026-10-05,17:06:34,dating-platform-postgres-1,4.19%,107.3MiB / 3.825GiB
+2026-10-05,17:06:34,dating-platform-backend-1,2.05%,40.56MiB / 3.825GiB
+2026-10-05,17:06:39,dating-platform-postgres-1,11.02%,108.4MiB / 3.825GiB
+2026-10-05,17:06:39,dating-platform-backend-1,3.55%,43.92MiB / 3.825GiB
+2026-10-05,17:06:44,dating-platform-postgres-1,7.33%,117.2MiB / 3.825GiB
+2026-10-05,17:06:44,dating-platform-backend-1,7.91%,43.35MiB / 3.825GiB
+2026-10-05,17:06:49,dating-platform-postgres-1,11.07%,118.9MiB / 3.825GiB
+2026-10-05,17:06:49,dating-platform-backend-1,4.17%,41.97MiB / 3.825GiB
+2026-10-05,17:06:54,dating-platform-postgres-1,10.01%,119.4MiB / 3.825GiB
+2026-10-05,17:06:54,dating-platform-backend-1,6.45%,41.82MiB / 3.825GiB
+2026-10-05,17:06:59,dating-platform-postgres-1,28.78%,120.3MiB / 3.825GiB
+2026-10-05,17:06:59,dating-platform-backend-1,11.53%,42.07MiB / 3.825GiB
+2026-10-05,17:07:04,dating-platform-postgres-1,24.39%,121.8MiB / 3.825GiB
+2026-10-05,17:07:04,dating-platform-backend-1,5.46%,43.11MiB / 3.825GiB
+2026-10-05,17:07:10,dating-platform-postgres-1,17.55%,140.5MiB / 3.825GiB
+2026-10-05,17:07:10,dating-platform-backend-1,5.97%,46.09MiB / 3.825GiB
+2026-10-05,17:07:14,dating-platform-postgres-1,16.81%,142.7MiB / 3.825GiB
+2026-10-05,17:07:14,dating-platform-backend-1,7.21%,44.73MiB / 3.825GiB
+2026-10-05,17:07:20,dating-platform-postgres-1,10.51%,143.8MiB / 3.825GiB
+2026-10-05,17:07:20,dating-platform-backend-1,5.20%,47.46MiB / 3.825GiB
+2026-10-05,17:07:24,dating-platform-postgres-1,12.56%,144.3MiB / 3.825GiB
+2026-10-05,17:07:24,dating-platform-backend-1,6.52%,47.78MiB / 3.825GiB
+2026-10-05,17:07:29,dating-platform-postgres-1,10.16%,144.8MiB / 3.825GiB
+2026-10-05,17:07:29,dating-platform-backend-1,5.81%,45.57MiB / 3.825GiB
+2026-10-05,17:07:34,dating-platform-postgres-1,28.41%,146.8MiB / 3.825GiB
+2026-10-05,17:07:34,dating-platform-backend-1,7.57%,46.06MiB / 3.825GiB
+2026-10-05,17:07:39,dating-platform-postgres-1,15.51%,147.9MiB / 3.825GiB
+2026-10-05,17:07:39,dating-platform-backend-1,11.97%,48.62MiB / 3.825GiB
+2026-10-05,17:07:44,dating-platform-postgres-1,16.29%,151.4MiB / 3.825GiB
+2026-10-05,17:07:44,dating-platform-backend-1,11.72%,46.22MiB / 3.825GiB
+2026-10-05,17:07:49,dating-platform-postgres-1,19.80%,152.2MiB / 3.825GiB
+2026-10-05,17:07:49,dating-platform-backend-1,10.87%,46.7MiB / 3.825GiB
+2026-10-05,17:07:54,dating-platform-postgres-1,19.86%,153.2MiB / 3.825GiB
+2026-10-05,17:07:54,dating-platform-backend-1,9.21%,48.5MiB / 3.825GiB
+2026-10-05,17:07:59,dating-platform-postgres-1,17.46%,153.5MiB / 3.825GiB
+2026-10-05,17:07:59,dating-platform-backend-1,10.85%,46.5MiB / 3.825GiB
+2026-10-05,17:08:04,dating-platform-postgres-1,16.70%,154.1MiB / 3.825GiB
+2026-10-05,17:08:04,dating-platform-backend-1,13.86%,49.88MiB / 3.825GiB
+2026-10-05,17:08:09,dating-platform-postgres-1,21.06%,154.3MiB / 3.825GiB
+2026-10-05,17:08:09,dating-platform-backend-1,13.48%,47.44MiB / 3.825GiB
+2026-10-05,17:08:14,dating-platform-postgres-1,33.58%,156.4MiB / 3.825GiB
+2026-10-05,17:08:14,dating-platform-backend-1,15.74%,48.5MiB / 3.825GiB
+2026-10-05,17:08:19,dating-platform-postgres-1,23.60%,156.6MiB / 3.825GiB
+2026-10-05,17:08:19,dating-platform-backend-1,17.02%,51.42MiB / 3.825GiB
+2026-10-05,17:08:24,dating-platform-postgres-1,26.76%,157.6MiB / 3.825GiB
+2026-10-05,17:08:24,dating-platform-backend-1,15.71%,48.07MiB / 3.825GiB
+2026-10-05,17:08:29,dating-platform-postgres-1,23.92%,158.1MiB / 3.825GiB
+2026-10-05,17:08:29,dating-platform-backend-1,15.72%,49.25MiB / 3.825GiB
+2026-10-05,17:08:34,dating-platform-postgres-1,24.21%,159.3MiB / 3.825GiB
+2026-10-05,17:08:34,dating-platform-backend-1,19.84%,49.22MiB / 3.825GiB
+2026-10-05,17:08:39,dating-platform-postgres-1,25.00%,160.3MiB / 3.825GiB
+2026-10-05,17:08:39,dating-platform-backend-1,17.10%,48.92MiB / 3.825GiB
+2026-10-05,17:08:44,dating-platform-postgres-1,26.49%,160.5MiB / 3.825GiB
+2026-10-05,17:08:44,dating-platform-backend-1,23.49%,49.75MiB / 3.825GiB
+2026-10-05,17:08:49,dating-platform-postgres-1,40.49%,160.2MiB / 3.825GiB
+2026-10-05,17:08:49,dating-platform-backend-1,22.24%,52.5MiB / 3.825GiB
+2026-10-05,17:08:54,dating-platform-postgres-1,31.63%,160.5MiB / 3.825GiB
+2026-10-05,17:08:54,dating-platform-backend-1,22.19%,50.07MiB / 3.825GiB
+2026-10-05,17:08:59,dating-platform-postgres-1,48.91%,161.7MiB / 3.825GiB
+2026-10-05,17:08:59,dating-platform-backend-1,18.02%,50.24MiB / 3.825GiB
+2026-10-05,17:09:04,dating-platform-postgres-1,39.48%,161.1MiB / 3.825GiB
+2026-10-05,17:09:04,dating-platform-backend-1,17.14%,51.62MiB / 3.825GiB
+2026-10-05,17:09:09,dating-platform-postgres-1,51.20%,161.3MiB / 3.825GiB
+2026-10-05,17:09:09,dating-platform-backend-1,22.85%,52.15MiB / 3.825GiB
+2026-10-05,17:09:14,dating-platform-postgres-1,33.98%,161.4MiB / 3.825GiB
+2026-10-05,17:09:14,dating-platform-backend-1,23.93%,50.74MiB / 3.825GiB
+2026-10-05,17:09:19,dating-platform-postgres-1,39.54%,161.3MiB / 3.825GiB
+2026-10-05,17:09:19,dating-platform-backend-1,19.97%,53.26MiB / 3.825GiB
+2026-10-05,17:09:24,dating-platform-postgres-1,43.31%,161.4MiB / 3.825GiB
+2026-10-05,17:09:24,dating-platform-backend-1,28.71%,50.85MiB / 3.825GiB
+2026-10-05,17:09:29,dating-platform-postgres-1,49.06%,162.9MiB / 3.825GiB
+2026-10-05,17:09:29,dating-platform-backend-1,28.76%,51.04MiB / 3.825GiB
+2026-10-05,17:09:34,dating-platform-postgres-1,42.25%,161.7MiB / 3.825GiB
+2026-10-05,17:09:34,dating-platform-backend-1,23.88%,54.15MiB / 3.825GiB
+2026-10-05,17:09:39,dating-platform-postgres-1,43.36%,161.9MiB / 3.825GiB
+2026-10-05,17:09:39,dating-platform-backend-1,24.42%,50.46MiB / 3.825GiB
+2026-10-05,17:09:44,dating-platform-postgres-1,35.44%,161.6MiB / 3.825GiB
+2026-10-05,17:09:44,dating-platform-backend-1,27.24%,52.69MiB / 3.825GiB
+2026-10-05,17:09:50,dating-platform-postgres-1,61.98%,164.5MiB / 3.825GiB
+2026-10-05,17:09:50,dating-platform-backend-1,38.01%,52.82MiB / 3.825GiB
+2026-10-05,17:09:54,dating-platform-postgres-1,52.36%,161.8MiB / 3.825GiB
+2026-10-05,17:09:54,dating-platform-backend-1,33.55%,51.37MiB / 3.825GiB
+2026-10-05,17:09:59,dating-platform-postgres-1,56.77%,162.6MiB / 3.825GiB
+2026-10-05,17:09:59,dating-platform-backend-1,36.76%,52.06MiB / 3.825GiB
+2026-10-05,17:10:04,dating-platform-postgres-1,61.95%,161.8MiB / 3.825GiB
+2026-10-05,17:10:04,dating-platform-backend-1,36.60%,54.93MiB / 3.825GiB
+2026-10-05,17:10:09,dating-platform-postgres-1,44.40%,161.9MiB / 3.825GiB
+2026-10-05,17:10:09,dating-platform-backend-1,31.49%,52.55MiB / 3.825GiB
+2026-10-05,17:10:14,dating-platform-postgres-1,69.14%,162.4MiB / 3.825GiB
+2026-10-05,17:10:14,dating-platform-backend-1,41.19%,53.58MiB / 3.825GiB
+2026-10-05,17:10:20,dating-platform-postgres-1,73.34%,163.7MiB / 3.825GiB
+2026-10-05,17:10:20,dating-platform-backend-1,40.00%,53.75MiB / 3.825GiB
+2026-10-05,17:10:24,dating-platform-postgres-1,74.28%,162.2MiB / 3.825GiB
+2026-10-05,17:10:24,dating-platform-backend-1,36.06%,52.97MiB / 3.825GiB
+2026-10-05,17:10:30,dating-platform-postgres-1,77.59%,162.1MiB / 3.825GiB
+2026-10-05,17:10:30,dating-platform-backend-1,44.03%,55.02MiB / 3.825GiB
+2026-10-05,17:10:34,dating-platform-postgres-1,71.82%,162.4MiB / 3.825GiB
+2026-10-05,17:10:34,dating-platform-backend-1,40.47%,53.64MiB / 3.825GiB
+2026-10-05,17:10:39,dating-platform-postgres-1,83.98%,162.7MiB / 3.825GiB
+2026-10-05,17:10:39,dating-platform-backend-1,49.83%,58.07MiB / 3.825GiB
+2026-10-05,17:10:44,dating-platform-postgres-1,85.27%,162.4MiB / 3.825GiB
+2026-10-05,17:10:44,dating-platform-backend-1,45.62%,57.7MiB / 3.825GiB
+2026-10-05,17:10:49,dating-platform-postgres-1,89.95%,162.8MiB / 3.825GiB
+2026-10-05,17:10:49,dating-platform-backend-1,53.39%,58.43MiB / 3.825GiB
+2026-10-05,17:10:54,dating-platform-postgres-1,94.62%,164MiB / 3.825GiB
+2026-10-05,17:10:54,dating-platform-backend-1,50.45%,58.79MiB / 3.825GiB
+2026-10-05,17:10:59,dating-platform-postgres-1,93.36%,165MiB / 3.825GiB
+2026-10-05,17:10:59,dating-platform-backend-1,47.86%,59.9MiB / 3.825GiB
+2026-10-05,17:11:04,dating-platform-postgres-1,91.74%,163.1MiB / 3.825GiB
+2026-10-05,17:11:04,dating-platform-backend-1,48.59%,59.29MiB / 3.825GiB
+2026-10-05,17:11:10,dating-platform-postgres-1,94.69%,162.6MiB / 3.825GiB
+2026-10-05,17:11:10,dating-platform-backend-1,50.84%,66.1MiB / 3.825GiB
+2026-10-05,17:11:14,dating-platform-postgres-1,101.61%,162.7MiB / 3.825GiB
+2026-10-05,17:11:14,dating-platform-backend-1,54.84%,62.73MiB / 3.825GiB
+2026-10-05,17:11:20,dating-platform-postgres-1,92.19%,163.3MiB / 3.825GiB
+2026-10-05,17:11:20,dating-platform-backend-1,54.76%,63.82MiB / 3.825GiB
+2026-10-05,17:11:25,dating-platform-postgres-1,95.31%,163.1MiB / 3.825GiB
+2026-10-05,17:11:25,dating-platform-backend-1,54.27%,68.87MiB / 3.825GiB
+2026-10-05,17:11:30,dating-platform-postgres-1,95.43%,162.8MiB / 3.825GiB
+2026-10-05,17:11:30,dating-platform-backend-1,47.42%,64.36MiB / 3.825GiB
+2026-10-05,17:11:35,dating-platform-postgres-1,97.91%,163.4MiB / 3.825GiB
+2026-10-05,17:11:35,dating-platform-backend-1,50.04%,62.4MiB / 3.825GiB
+2026-10-05,17:11:40,dating-platform-postgres-1,105.37%,164.1MiB / 3.825GiB
+2026-10-05,17:11:40,dating-platform-backend-1,59.99%,65.46MiB / 3.825GiB
+2026-10-05,17:11:45,dating-platform-postgres-1,92.82%,163.5MiB / 3.825GiB
+2026-10-05,17:11:45,dating-platform-backend-1,51.49%,62.09MiB / 3.825GiB
+2026-10-05,17:11:51,dating-platform-postgres-1,73.18%,163.1MiB / 3.825GiB
+2026-10-05,17:11:51,dating-platform-backend-1,47.68%,62.04MiB / 3.825GiB
+2026-10-05,17:11:55,dating-platform-postgres-1,52.14%,162.4MiB / 3.825GiB
+2026-10-05,17:11:55,dating-platform-backend-1,32.90%,63.11MiB / 3.825GiB
+2026-10-05,17:12:00,dating-platform-postgres-1,18.20%,162.1MiB / 3.825GiB
+2026-10-05,17:12:00,dating-platform-backend-1,13.87%,59.85MiB / 3.825GiB
+2026-10-05,17:12:05,dating-platform-postgres-1,4.09%,162.5MiB / 3.825GiB
+2026-10-05,17:12:05,dating-platform-backend-1,4.14%,59.8MiB / 3.825GiB
+2026-10-05,17:12:10,dating-platform-postgres-1,0.33%,162.2MiB / 3.825GiB
+2026-10-05,17:12:10,dating-platform-backend-1,0.04%,59.8MiB / 3.825GiB
+
+# ========================================================
+# RESUMEN K6: TIEMPOS DE RESPUESTA Y LATENCIAS
+# ========================================================
+Metrica,Valor
+Usuarios_Maximos_VUs,400
+Peticiones_Totales,48520
+Peticiones_Por_Segundo_RPS,129.87
+Latencia_Media,148.97 ms
+Latencia_Mediana,16.52 ms
+Latencia_P90,496.84 ms
+Latencia_P95,736.83 ms
+Latencia_Maxima,2267.27 ms
+Porcentaje_Fallos,0%
+
+# ========================================================
+# TOP 5 CONSULTAS POSTGRESQL (TIEMPO REAL DE BASE DE DATOS)
+# ========================================================
+calls,mean_ms,total_ms,query
+17896,4.3,77124,"SELECT p.id, EXISTS (SELECT $3 FROM likes fl WHERE fl.from_profile_id = me.id AND fl.to_profile_id = p.id) AS liked, EXISTS (SELECT $4 FROM favorites ff WHERE ff.user_id = me.user_id AND ff.favorite_profile_id = p.id) AS favorited, EXISTS (SELECT $5 FROM likes rl WHERE rl.from_profile_id = p.id AND rl.to_profile_id = me.id) AS received_like, EXISTS (SELECT $6 FROM favorites rf WHERE rf.user_id = p.user_id AND rf.favorite_profile_id = me.id) AS received_favorite FROM profiles p JOIN users u ON u.id = p.user_id LEFT JOIN profiles me ON me.user_id = $1 WHERE p.id = ANY($2) AND p.user_id <> $1 AND u.status = $7 AND u.deleted_at IS NULL AND NOT EXISTS (SELECT $8 FROM blocks b WHERE b.blocker_id = $1 AND b.blocked_id = p.user_id) AND NOT EXISTS (SELECT $9 FROM blocks b WHERE b.blocker_id = p.user_id AND b.blocked_id = $1)"
+2297,19.1,43805,SELECT COUNT(*) FROM profiles p JOIN users u ON u.id = p.user_id WHERE u.status = $7 AND u.deleted_at IS NULL AND NOT EXISTS (SELECT $8 FROM blocks b WHERE b.blocker_id = $1 AND b.blocked_id = p.user_id) AND NOT EXISTS (SELECT $9 FROM blocks b WHERE b.blocker_id = p.user_id AND b.blocked_id = $1) AND p.user_id <> $1 AND p.gender = ANY($2) AND p.birth_date <= $3 AND p.birth_date >= $4 AND EXISTS ( SELECT $10 FROM profile_interests pi WHERE pi.profile_id = p.id AND pi.interest_key = $5) AND EXISTS ( SELECT $11 FROM profile_interests pi WHERE pi.profile_id = p.id AND pi.interest_key = $6)
+901,36.8,33189,"SELECT p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region, COALESCE(p.relationship_goals, $8) AS relationship_goals, p.created_at, (SELECT ph.id FROM profile_photos ph WHERE ph.profile_id = p.id ORDER BY ph.position ASC, ph.id ASC LIMIT $9) AS photo_id, EXISTS (SELECT $10 FROM likes fl WHERE fl.from_profile_id = me.id AND fl.to_profile_id = p.id) AS liked, EXISTS (SELECT $11 FROM favorites ff WHERE ff.user_id = me.user_id AND ff.favorite_profile_id = p.id) AS favorited, EXISTS (SELECT $12 FROM likes rl WHERE rl.from_profile_id = p.id AND rl.to_profile_id = me.id) AS received_like, EXISTS (SELECT $13 FROM favorites rf WHERE rf.user_id = p.user_id AND rf.favorite_profile_id = me.id) AS received_favorite, COUNT(*) OVER() AS total_count FROM profiles p JOIN users u ON u.id = p.user_id LEFT JOIN profiles me ON me.user_id = $1 WHERE u.status = $14 AND u.deleted_at IS NULL AND NOT EXISTS (SELECT $15 FROM blocks b WHERE b.blocker_id = $1 AND b.blocked_id = p.user_id) AND NOT EXISTS (SELECT $16 FROM blocks b WHERE b.blocker_id = p.user_id AND b.blocked_id = $1) AND p.user_id <> $1 AND p.gender = ANY($2) AND p.birth_date <= $3 AND p.birth_date >= $4 AND EXISTS ( SELECT $17 FROM profile_interests pi WHERE pi.profile_id = p.id AND pi.interest_key = $5) ORDER BY p.birth_date DESC, p.id ASC LIMIT $6 OFFSET $7"
+890,36.8,32726,"SELECT p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region, COALESCE(p.relationship_goals, $8) AS relationship_goals, p.created_at, (SELECT ph.id FROM profile_photos ph WHERE ph.profile_id = p.id ORDER BY ph.position ASC, ph.id ASC LIMIT $9) AS photo_id, EXISTS (SELECT $10 FROM likes fl WHERE fl.from_profile_id = me.id AND fl.to_profile_id = p.id) AS liked, EXISTS (SELECT $11 FROM favorites ff WHERE ff.user_id = me.user_id AND ff.favorite_profile_id = p.id) AS favorited, EXISTS (SELECT $12 FROM likes rl WHERE rl.from_profile_id = p.id AND rl.to_profile_id = me.id) AS received_like, EXISTS (SELECT $13 FROM favorites rf WHERE rf.user_id = p.user_id AND rf.favorite_profile_id = me.id) AS received_favorite, COUNT(*) OVER() AS total_count FROM profiles p JOIN users u ON u.id = p.user_id LEFT JOIN profiles me ON me.user_id = $1 WHERE u.status = $14 AND u.deleted_at IS NULL AND NOT EXISTS (SELECT $15 FROM blocks b WHERE b.blocker_id = $1 AND b.blocked_id = p.user_id) AND NOT EXISTS (SELECT $16 FROM blocks b WHERE b.blocker_id = p.user_id AND b.blocked_id = $1) AND p.user_id <> $1 AND p.gender = ANY($2) AND p.birth_date <= $3 AND p.birth_date >= $4 AND EXISTS ( SELECT $17 FROM profile_interests pi WHERE pi.profile_id = p.id AND pi.interest_key = $5) ORDER BY p.birth_date ASC, p.id ASC LIMIT $6 OFFSET $7"
+1640,19.0,31081,SELECT COUNT(*) FROM profiles p JOIN users u ON u.id = p.user_id WHERE u.status = $8 AND u.deleted_at IS NULL AND NOT EXISTS (SELECT $9 FROM blocks b WHERE b.blocker_id = $1 AND b.blocked_id = p.user_id) AND NOT EXISTS (SELECT $10 FROM blocks b WHERE b.blocker_id = p.user_id AND b.blocked_id = $1) AND p.user_id <> $1 AND p.gender = ANY($2) AND p.birth_date <= $3 AND p.birth_date >= $4 AND EXISTS ( SELECT $11 FROM profile_interests pi WHERE pi.profile_id = p.id AND pi.interest_key = $5) AND EXISTS ( SELECT $12 FROM profile_interests pi WHERE pi.profile_id = p.id AND pi.interest_key = $6) AND EXISTS ( SELECT $13 FROM profile_interests pi WHERE pi.profile_id = p.id AND pi.interest_key = $7)

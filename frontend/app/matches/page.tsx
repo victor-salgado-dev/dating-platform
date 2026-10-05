@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 
-import { apiFetch, SearchResponse, SearchResultItem } from '@/lib/api';
+import { apiFetch, SearchResponse, SearchResultItem, LikeResult } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/context';
-import { useProfileInteractions } from '@/lib/useProfileInteractions';
-import { useFullProfile, preloadFullProfile } from '@/lib/useFullProfile';
+import { useFullProfile, preloadFullProfile, recordProfileVisit } from '@/lib/useFullProfile';
+import { loadSavedFilters } from '@/lib/searchFilters';
 import { FullProfileSections } from '@/components/FullProfileSections';
 import styles from './page.module.css';
 
@@ -21,8 +21,12 @@ function shuffle<T>(arr: T[]): T[] {
 
 export default function QuickMatchPage() {
   const { dictionary } = useI18n();
-  const { likedIds, favoritedIds, receivedLikeIds, receivedFavIds, toggleLike, toggleFavorite } =
-    useProfileInteractions();
+  // like/favorito de las cartas de esta sesión: se parte de los flags que
+  // trae cada ficha y se sobreescribe al pulsar los botones.
+  const [overrides, setOverrides] = useState<Record<string, { liked?: boolean; favorited?: boolean }>>({});
+  const setFlag = useCallback((id: string, patch: { liked?: boolean; favorited?: boolean }) => {
+    setOverrides((prev) => ({ ...prev, [id]: { ...prev[id], ...patch } }));
+  }, []);
 
   const [queue, setQueue] = useState<SearchResultItem[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -35,31 +39,22 @@ export default function QuickMatchPage() {
   const [showMatchNotice, setShowMatchNotice] = useState<string | null>(null);
 
   const seenIds = useRef<Set<string>>(new Set());
-  const interactionsReady = useRef(false);
 
-  // El filtro aplicado en Discover, guardado en localStorage. Sin filtro
-  // guardado, se busca sin restricciones extra (solo Partner preferences,
-  // que el backend ya aplica siempre).
+  // Filtros guardados desde Búsqueda. Lo que no esté en ellos lo completa el
+  // backend con el género que buscas y la edad de tus Partner preferences.
   const fetchNextBatch = useCallback(
     async (pageToFetch: number) => {
-      let savedFilters = '';
-      try {
-        savedFilters = window.localStorage.getItem('discoveryFilters') ?? '';
-      } catch {
-        // localStorage no disponible — se busca sin filtro guardado
-      }
-
+      const savedFilters = await loadSavedFilters();
       const params = new URLSearchParams(savedFilters);
       params.set('page', String(pageToFetch));
       params.set('page_size', '50');
 
       try {
         const res = await apiFetch<SearchResponse>(`/search/profiles?${params.toString()}`);
+        // Los flags vienen en cada ficha: ya no hace falta descargar antes
+        // las listas de likes y favoritos para no repetir perfiles.
         const fresh = res.items.filter(
-          (item) =>
-            !likedIds.has(item.profile_id) &&
-            !favoritedIds.has(item.profile_id) &&
-            !seenIds.current.has(item.profile_id)
+          (item) => !item.liked && !item.favorited && !seenIds.current.has(item.profile_id)
         );
         fresh.forEach((item) => seenIds.current.add(item.profile_id));
 
@@ -73,14 +68,14 @@ export default function QuickMatchPage() {
         setQueueLoading(false);
       }
     },
-    [likedIds, favoritedIds]
+    []
   );
 
-  // Primera carga: espera a que useProfileInteractions termine de traer
-  // los likes/favoritos ya dados, para no meterlos en la cola desde el principio.
+  // Primera carga
+  const started = useRef(false);
   useEffect(() => {
-    if (interactionsReady.current) return;
-    interactionsReady.current = true;
+    if (started.current) return;
+    started.current = true;
     fetchNextBatch(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -98,7 +93,9 @@ export default function QuickMatchPage() {
   }, [currentIndex, queue.length]);
 
   const current = queue[currentIndex];
-  const full = useFullProfile(current?.profile_id);
+  // visit=0: la visita real se registra abajo, cuando la carta se muestra; si
+  // no, precargar la siguiente contaría como visita a alguien aún no visto.
+  const full = useFullProfile(current?.profile_id, { recordVisit: false });
 
   // Mientras se mira la carta actual, se precarga la siguiente en segundo
   // plano: cuando el usuario le dé a "Siguiente" ya estará en caché y
@@ -113,22 +110,26 @@ export default function QuickMatchPage() {
     setShowMatchNotice(null);
   }, [current?.profile_id]);
 
-  const liked = current ? likedIds.has(current.profile_id) : false;
-  const favorited = current ? favoritedIds.has(current.profile_id) : false;
+  // Registra la visita cuando la carta ya está en pantalla.
+  const visitedShown = full.profile?.id;
+  useEffect(() => {
+    if (visitedShown) recordProfileVisit(visitedShown);
+  }, [visitedShown]);
+
+  const liked = current ? overrides[current.profile_id]?.liked ?? current.liked : false;
+  const favorited = current ? overrides[current.profile_id]?.favorited ?? current.favorited : false;
 
   async function handleLike() {
     if (!current || likeBusy) return;
     setLikeBusy(true);
     const next = !liked;
-    toggleLike(current.profile_id, next);
+    setFlag(current.profile_id, { liked: next });
     try {
-      await apiFetch(`/likes/${current.profile_id}`, { method: next ? 'POST' : 'DELETE' });
-      if (next) {
-        const status = await apiFetch<{ matched: boolean }>(`/matches/${current.profile_id}`);
-        if (status.matched) setShowMatchNotice(current.display_name);
-      }
+      // POST /likes/{id} devuelve { matched }: ya no hace falta pedir /matches/{id} aparte.
+      const res = await apiFetch<LikeResult | undefined>(`/likes/${current.profile_id}`, { method: next ? 'POST' : 'DELETE' });
+      if (next && res?.matched) setShowMatchNotice(current.display_name);
     } catch {
-      toggleLike(current.profile_id, !next);
+      setFlag(current.profile_id, { liked: !next });
     } finally {
       setLikeBusy(false);
     }
@@ -138,11 +139,11 @@ export default function QuickMatchPage() {
     if (!current || favoriteBusy) return;
     setFavoriteBusy(true);
     const next = !favorited;
-    toggleFavorite(current.profile_id, next);
+    setFlag(current.profile_id, { favorited: next });
     try {
       await apiFetch(`/favorites/${current.profile_id}`, { method: next ? 'POST' : 'DELETE' });
     } catch {
-      toggleFavorite(current.profile_id, !next);
+      setFlag(current.profile_id, { favorited: !next });
     } finally {
       setFavoriteBusy(false);
     }

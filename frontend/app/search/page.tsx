@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { useRouter } from 'next/navigation';
 
 import { apiFetch, InterestDefinition } from '@/lib/api';
 import { useI18n } from '@/lib/i18n/context';
 import type { Dictionary } from '@/lib/i18n/dictionaries/es';
 import { sortedCountryOptions } from '@/lib/countryOptions';
+import { loadSavedFilters, saveFilters, clearSavedFilters } from '@/lib/searchFilters';
 import {
   HAS_CHILDREN_OPTIONS,
   WANTS_CHILDREN_OPTIONS,
@@ -86,6 +87,19 @@ type Comparator = 'gte' | 'lte' | 'eq' | 'any';
 interface ComparatorRow {
   comparator: Comparator | 'none';
   value: string;
+}
+
+// Convierte los límites guardados (?interest_x_min / _max, ?trait_x_min / _max)
+// en la fila del formulario. Min y max iguales = "=", solo min = ">=", solo
+// max = "<=". Un rango con min y max distintos no cabe en un único comparador:
+// se conserva el mínimo (">=").
+function rowFromBounds(min: string | null, max: string | null): ComparatorRow {
+  const lo = (min ?? '').trim();
+  const hi = (max ?? '').trim();
+  if (lo && hi && lo === hi) return { comparator: 'eq', value: lo };
+  if (lo) return { comparator: 'gte', value: lo };
+  if (hi) return { comparator: 'lte', value: hi };
+  return { comparator: 'none', value: '' };
 }
 
 // -----------------------------------------------------------------------------
@@ -325,6 +339,96 @@ export default function SearchPage() {
     Object.fromEntries(PERSONALITY_TRAIT_KEYS.map((k) => [k, { comparator: 'none', value: '' }])),
   );
 
+  // --- Rellenar el formulario con los filtros guardados --------------------
+  // Búsqueda es quien guarda los filtros (al enviar) y los muestra al entrar;
+  // Discover y Quick Match los leen del mismo sitio (lib/searchFilters.ts).
+  const [savedQuery, setSavedQuery] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    loadSavedFilters().then((q) => {
+      if (alive) setSavedQuery(q);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // Campos simples, listas y personalidad (no dependen del catálogo).
+  useEffect(() => {
+    if (savedQuery === null) return;
+    const p = new URLSearchParams(savedQuery);
+    const one = (key: string) => p.get(key) ?? '';
+    const many = (key: string) =>
+      (p.get(key) ?? '')
+        .split(',')
+        .map((v) => v.trim())
+        .filter(Boolean);
+
+    setMinAge(one('min_age')); setMaxAge(one('max_age'));
+    setCountry(one('country')); setNationality(one('nationality'));
+    setMinHeight(one('min_height')); setMaxHeight(one('max_height'));
+    setMinWeight(one('min_weight')); setMaxWeight(one('max_weight'));
+    setMaxChildren(one('max_children'));
+    setHasChildren(one('has_children')); setWantsChildren(one('wants_children'));
+    setBodyType(one('body_type')); setEthnicity(one('ethnicity'));
+    setAppearanceRating(one('appearance_rating'));
+    setHairColor(one('hair_color')); setEyeColor(one('eye_color'));
+    setSmokingHabit(one('smoking_habit')); setDrinkingHabit(one('drinking_habit'));
+    setMaritalStatus(one('marital_status')); setOccupation(one('occupation'));
+    setEmploymentStatus(one('employment_status')); setIncomeLevel(one('income_level'));
+    setLivingSituation(one('living_situation'));
+    setEducationLevel(one('education_level')); setEnglishAbility(one('english_ability'));
+    setReligion(one('religion')); setReligiousValues(one('religious_values'));
+    setStarSign(one('star_sign'));
+    setLikesPets(one('likes_pets')); setFavoriteSeason(one('favorite_season'));
+    setSort(one('sort'));
+
+    setGenders(many('gender'));
+    setRelationshipGoals(many('relationship_goals'));
+    setLanguages(many('language'));
+    setBodyArt(many('body_art'));
+    setRelocationWillingness(many('relocation_willingness'));
+    setFutureVision(many('future_vision'));
+    setSports(many('sports'));
+    setPetsOwned(many('pets_owned'));
+    setIdealVacationStyle(many('ideal_vacation_style'));
+    setVacationActivities(many('vacation_activities'));
+
+    setPersonality(
+      Object.fromEntries(
+        PERSONALITY_TRAIT_KEYS.map((trait) => [trait, rowFromBounds(p.get(`trait_${trait}_min`), p.get(`trait_${trait}_max`))]),
+      ),
+    );
+  }, [savedQuery]);
+
+  // Intereses: necesitan el catálogo (para saber cuáles llevan nivel), así que
+  // se rellenan cuando llegan tanto el catálogo como los filtros guardados.
+  const interestsHydrated = useRef(false);
+  useEffect(() => {
+    if (savedQuery === null || interests.length === 0 || interestsHydrated.current) return;
+    interestsHydrated.current = true;
+
+    const p = new URLSearchParams(savedQuery);
+    const bare = (p.get('interests') ?? '')
+      .split(',')
+      .map((v) => v.trim())
+      .filter(Boolean);
+    const leveled = interests.filter((i) => i.has_level);
+    const leveledKeys = new Set(leveled.map((i) => i.key));
+
+    setSelectedInterests(bare.filter((key) => !leveledKeys.has(key)));
+    setInterestLevels(
+      Object.fromEntries(
+        leveled.map((i) => [
+          i.key,
+          bare.includes(i.key)
+            ? ({ comparator: 'any', value: '' } as ComparatorRow)
+            : rowFromBounds(p.get(`interest_${i.key}_min`), p.get(`interest_${i.key}_max`)),
+        ]),
+      ),
+    );
+  }, [savedQuery, interests]);
+
   function toggleValue(list: string[], setList: (v: string[]) => void, value: string) {
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   }
@@ -440,12 +544,17 @@ export default function SearchPage() {
     return params;
   }
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    router.push(`/discover?${buildParams().toString()}`);
+    const query = buildParams().toString();
+    // Se guarda antes de navegar (vacío = borra los filtros guardados), para
+    // que Discover y Quick Match ya lo encuentren al cargar.
+    await saveFilters(query);
+    router.push(`/discover?${query}`);
   }
 
   function handleReset() {
+    void clearSavedFilters();
     setMinAge(''); setMaxAge(''); setCountry(''); setNationality('');
     setMinHeight(''); setMaxHeight(''); setMinWeight(''); setMaxWeight(''); setMaxChildren('');
     setHasChildren(''); setWantsChildren(''); setBodyType(''); setEthnicity(''); setAppearanceRating('');

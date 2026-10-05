@@ -958,7 +958,7 @@ export const en: Dictionary = {
   },
   quickMatch: {
     title: 'Quick Match',
-    filterHint: "Uses whatever filter you have saved in Discover. If you haven't saved one, profiles matching your Partner preferences are shown.",
+    filterHint: "Uses the filters you set in Search. Anything you leave blank falls back to the gender you look for and your Partner preferences.",
     loading: 'Finding profiles...',
     noMoreProfiles: 'No more profiles with these filters for now.',
     adjustFilters: 'Adjust search filters',

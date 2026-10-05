@@ -963,7 +963,7 @@ export const es = {
   },
   quickMatch: {
     title: 'Quick Match',
-    filterHint: 'Usa el filtro que tengas guardado en Discover. Si no has guardado ninguno, se muestran perfiles compatibles con tus Partner preferences.',
+    filterHint: 'Usa los filtros que pongas en Búsqueda. Lo que dejes en blanco usa el género que buscas y tus Partner preferences.',
     loading: 'Buscando perfiles...',
     noMoreProfiles: 'No quedan más perfiles con estos filtros por ahora.',
     adjustFilters: 'Ajustar filtros de búsqueda',

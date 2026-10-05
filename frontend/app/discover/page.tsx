@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
 import { apiFetch, ApiError, SearchResponse } from '@/lib/api';
+import { loadSavedFilters, saveFilters } from '@/lib/searchFilters';
 import { useI18n } from '@/lib/i18n/context';
 import { ProfileCard } from '@/components/ProfileCard';
 import styles from './page.module.css';
@@ -14,8 +15,24 @@ import styles from './page.module.css';
 // -----------------------------------------------------------------------------
 function DiscoverContent() {
   const searchParams = useSearchParams();
-  const searchString = searchParams.toString();
+  const urlString = searchParams.toString();
   const { dictionary } = useI18n();
+
+  // Filtros efectivos: los de la URL si vienen (acaban de enviarse desde
+  // Búsqueda) y, si no, los que Búsqueda dejó guardados. Se leen en el cliente
+  // tras montar (null = todavía no leídos), para no desajustar la hidratación.
+  const [saved, setSaved] = useState<string | null>(null);
+  useEffect(() => {
+    let alive = true;
+    loadSavedFilters().then((s) => {
+      if (alive) setSaved(s);
+    });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  const searchString = urlString || saved || '';
+  const ready = urlString !== '' || saved !== null;
 
   const [data, setData] = useState<SearchResponse | null>(null);
   const [page, setPage] = useState(1);
@@ -32,20 +49,15 @@ function DiscoverContent() {
     setPage(1);
   }
 
-  // Guarda el filtro aplicado para que Quick Match pueda reutilizarlo sin
-  // tener que aplicarlo dos veces. Es un dato por-navegador (no viaja entre
-  // dispositivos); si eso hace falta más adelante, necesitará un endpoint.
+  // Búsqueda es quien guarda los filtros al enviar el formulario. Aquí solo se
+  // refleja lo que llegue por la URL, por si se entra con un enlace con filtros.
   useEffect(() => {
-    if (!searchString) return;
-    try {
-      window.localStorage.setItem('discoveryFilters', searchString);
-    } catch {
-      // localStorage no disponible (modo privado, SSR, etc.) — no es crítico
-    }
-  }, [searchString]);
+    if (urlString) saveFilters(urlString);
+  }, [urlString]);
 
   // Cargar perfiles según los filtros (de la URL, vienen de /search) y la página
   useEffect(() => {
+    if (!ready) return;
     const currentKey = `${page}-${searchString}`;
     if (lastSearchKey.current === currentKey) return;
     lastSearchKey.current = currentKey;
@@ -81,7 +93,7 @@ function DiscoverContent() {
       isMounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, searchString]);
+  }, [page, searchString, ready]);
 
   const profiles = data?.items ?? [];
   const totalPages = data?.total_pages ?? 1;
