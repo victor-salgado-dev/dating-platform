@@ -52,7 +52,7 @@ func TestPageOfCards(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cards, total := pageOfCards(e, tt.excluded, tt.page, tt.siz)
+			cards, total := pageOfCards(e, tt.excluded, ViewerScope{}, time.Now(), tt.page, tt.siz)
 			if got := names(cards); got != tt.want {
 				t.Errorf("tarjetas = %q, quería %q", got, tt.want)
 			}

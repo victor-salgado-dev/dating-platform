@@ -200,7 +200,7 @@ func TestProfilePatch_CoversExactlyTheProfileColumns(t *testing.T) {
 }
 
 func TestProfileFieldsStayInSync(t *testing.T) {
-	required := []string{"display_name", "birth_date", "gender", "country_code"}
+	required := []string{"display_name", "birth_date", "gender", "seeking_genders", "country_code"}
 
 	details := jsonNames(reflect.TypeOf(ProfileDetails{}))
 	patch := jsonNames(reflect.TypeOf(ProfilePatch{}))
@@ -209,7 +209,7 @@ func TestProfileFieldsStayInSync(t *testing.T) {
 	wantPatch := append(append([]string{}, details...), required...)
 	sort.Strings(wantPatch)
 	if !reflect.DeepEqual(patch, wantPatch) {
-		t.Errorf("ProfilePatch debe ser ProfileDetails + los 4 obligatorios\n patch: %v\n  want: %v", patch, wantPatch)
+		t.Errorf("ProfilePatch debe ser ProfileDetails + los 5 obligatorios\n patch: %v\n  want: %v", patch, wantPatch)
 	}
 
 	// Todo lo que se puede escribir debe poder leerse en la respuesta, salvo la

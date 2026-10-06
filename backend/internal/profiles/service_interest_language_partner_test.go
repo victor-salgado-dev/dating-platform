@@ -79,6 +79,9 @@ func (f *fakeRepository) IsVisible(ctx context.Context, profileID, viewerUserID 
 func (f *fakeRepository) DeletePhoto(ctx context.Context, profileID, photoID uuid.UUID) error {
 	return nil
 }
+func (f *fakeRepository) SetPrimaryPhoto(ctx context.Context, profileID, photoID uuid.UUID) error {
+	return nil
+}
 
 // --- Idiomas -------------------------------------------------------------
 

@@ -80,6 +80,7 @@ func validProfile() *Profile {
 		DisplayName: "  Ana  ",
 		BirthDate:   time.Date(1990, 5, 17, 0, 0, 0, 0, time.UTC),
 		Gender:      GenderFemale,
+		SeekingGenders: []Gender{GenderMale},
 		CountryCode: " es ",
 		ProfileDetails: ProfileDetails{
 			Nationality:       &nat,
