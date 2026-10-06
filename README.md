@@ -244,49 +244,91 @@ frontend/
 │   └── popular/                 # Redirección a la pestaña de populares
 ├── components/                  # Componentes React reutilizables
 │   ├── InteractionListSection.tsx
+│   ├── ListSectionState.tsx      # Utilidades de estado vacío/error usadas por InteractionListSection
+│   ├── ListSection.module.css    # Estilos asociados a ListSectionState e InteractionListSection
 │   └── ProfileCard.tsx
 ├── lib/
-│   ├── api.ts                   # Cliente de API tipado y caché de GET
+│   ├── api.ts                   # Cliente de API tipado, caché de GET y tipos compartidos
 │   ├── geocoding.ts             # Autocompletado de ubicaciones con Photon
 │   ├── i18n/
-│   │   ├── config.ts            # Configuración del locale
-│   │   ├── context.tsx          # Provider de idioma
+│   │   ├── config.ts            # Locales soportados (es/en), locale por defecto y cookie
+│   │   ├── context.tsx          # I18nProvider y useI18n
 │   │   ├── dictionaries/
 │   │   │   └── es.ts            # Diccionario base en español
-│   │   └── options.ts           # Resolución de etiquetas traducidas
-│   ├── seekingGenders.ts        # Definición de opciones "Qué busco"
-│   ├── useProfileInteractions.ts # Estado global de likes/favoritos
-│   └── useProfileList.ts        # Paginación de listas de perfiles
+│   │   └── options.ts           # Helpers de traducción de opciones (`tOption`, `tOptionList`)
+│   ├── seekingGenders.ts        # Mapeo de opciones "Qué busco" a valores del backend
+│   ├── useProfileInteractions.ts # Estado global de likes/favoritos enviados/recibidos
+│   └── useProfileList.ts        # Paginación de listas de perfiles para Home
 ├── messages/                    # Archivos JSON de traducción (opcionales)
 │   ├── es.json
 │   └── en.json
+├── next-env.d.ts                # Tipos globales autogenerados por Next.js (no editar)
 ├── package.json                 # Dependencias y scripts del frontend
 └── tsconfig.json                # Configuración de TypeScript
 ```
 
 #### Utilidades frontend relevantes
 
-- **api.ts**: implementa `apiFetch` y `apiMutateQuiet`, maneja errores
-  `ApiError`, caché de GET de 60 s, deduplicación de peticiones en vuelo y
-  limpieza de caché tras mutaciones. Exporta los tipos principales de las
-  respuestas de la API (`SearchResponse`, `PublicProfile`, `MessageItem`,
-  `PartnerPreferences`, etc.).
-- **useProfileList.ts**: hook usado por las pestañas de Home para cargar
-  páginas de `recommended`, `popular`, `online-now` y `new-members`,
-  manteniendo los datos anteriores mientras se carga una página nueva.
-- **useProfileInteractions.ts**: hook global que centraliza la carga de
-  likes/favoritos enviados y recibidos y expone los conjuntos de IDs y las
-  funciones `toggleLike` y `toggleFavorite`.
-- **geocoding.ts**: autocompletado de ubicaciones usando Photon
-  (OpenStreetMap). Devuelve `PlaceSuggestion` con `label`, `city`, `state`,
-  `country` y `countryCode`.
-- **seekingGenders.ts**: mapea las opciones seleccionadas por el usuario
-  (`male`, `female`, `trans`) a los valores de `Gender` del backend.
-- **i18n/context.tsx**: define `I18nProvider` y `useI18n` para inyectar el
-  locale y el diccionario en los componentes cliente.
-- **i18n/options.ts**: funciones `tOption` y `tOptionList` para resolver
-  labels traducidas de valores técnicos como `relationshipGoal`,
-  `bodyType`, etc.
+- **api.ts**
+  - Implementa `apiFetch`, `apiMutateQuiet` y `peekApiCache`.
+  - Usa `NEXT_PUBLIC_API_URL`; si no está definida, cae a
+    `http://localhost/api/v1`.
+  - Incluye caché de GET con TTL de 60s y deduplicación de peticiones en vuelo.
+  - Limpia la caché de GET después de cualquier mutación exitosa.
+  - Maneja `ApiError` con `status` y `code`.
+  - Exporta los tipos principales de las respuestas de la API:
+    `SearchResponse`, `PublicProfile`, `FullProfileEnvelope`, `MessageItem`,
+    `PartnerPreferences`, `ProfilePhoto`, `ProfileLanguage`,
+    `ProfileInterest`, `PersonalityResponse`, etc.
+
+- **useProfileList.ts**
+  - Hook usado por las pestañas de Home (`recommended`, `popular`, `online`,
+    `new`).
+  - Los cuatro endpoints devuelven `SearchResponse`, por lo que no hay mapeo
+    adicional.
+  - Conserva los datos de la pestaña anterior durante la carga de una nueva
+    página de la misma pestaña.
+  - La pestaña `online` salta la caché de 60s con `{ cache: 'no-store' }`.
+  - `PAGE_SIZE` está fijada en 24.
+
+- **useProfileInteractions.ts**
+  - Centraliza la carga de likes y favoritos enviados/recibidos para evitar
+    múltiples peticiones repetidas durante la sesión.
+  - Carga `/likes/sent`, `/favorites`, `/likes/received` y
+    `/favorites/received` con `page_size=100`.
+  - Usa `useSyncExternalStore` para exponer los conjuntos de IDs.
+  - Ofrece `toggleLike` y `toggleFavorite` para actualizar el estado local
+    optimista.
+
+- **geocoding.ts**
+  - Autocompletado de ubicaciones con Photon (`https://photon.komoot.io/api/`).
+  - Devuelve `PlaceSuggestion` con `label`, `city`, `state`, `country` y
+    `countryCode` (ISO-3166-1 alpha-2 en mayúsculas).
+  - Diseñado para ayudar a rellenar región/país, no para ser fuente de verdad;
+    el backend valida `country_code`.
+
+- **seekingGenders.ts**
+  - Mapea las opciones de la interfaz (`male`, `female`, `trans`) a los
+    valores reales del backend (`male`, `female`, `non_binary`, `other`).
+  - `trans` envía `non_binary` y `other` juntos.
+
+- **i18n**
+  - `config.ts`: define `LOCALES = ['es', 'en']`, `DEFAULT_LOCALE = 'es'` y
+    `LOCALE_COOKIE_NAME = 'NEXT_LOCALE'`.
+  - `context.tsx`: expone `I18nProvider` y `useI18n` para acceder a `locale`
+    y `dictionary`.
+  - `dictionaries/es.ts`: diccionario base en español con toda la UI actual.
+  - `options.ts`: `tOption` y `tOptionList` para traducir valores técnicos
+    como `relationshipGoal`, `bodyType`, etc.
+
+- **package.json**
+  - Next.js 14.2.5, React 18.3.1, TypeScript 5.5.4.
+  - Scripts: `dev`, `build`, `start`, `lint`.
+
+- **tsconfig.json**
+  - TypeScript estricto, ESNext, JSX preserve, bundler module resolution.
+  - Path alias `@/*` -> `./*`.
+  - Incluye `next-env.d.ts` y `.next/types/**/*.ts`.
 
 ### Scripts (`scripts/`)
 
@@ -312,9 +354,12 @@ desarrollo.
 
 - No hay tokens CSRF explícitos. `SameSite=Lax` cubre el caso habitual, pero
   no sustituye una solución CSRF completa.
-- El enrutado i18n no está activado, aunque ya existen diccionarios
-  TypeScript en `frontend/lib/i18n/dictionaries` y archivos JSON en
-  `frontend/messages`.
+- El enrutamiento i18n por URL no está activado; el frontend soporta cambio de
+  idioma en runtime mediante `I18nProvider`, usando los diccionarios
+  TypeScript ya presentes.
 - El almacenamiento local (`backend_uploads`) es adecuado para desarrollo y
   una sola instancia; para varias instancias debe usarse S3 u otro
   almacenamiento compatible.
+- Photon (geocoding) es un servicio público sin SLA ni rate limit
+  documentado. Para producción con tráfico serio conviene migrar a una
+  instancia propia de Photon/Nominatim o a un proveedor de pago.
