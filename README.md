@@ -168,7 +168,9 @@ Las listas comentadas están en `.env.example` y `.env.production.example`.
 URL interna para llamadas desde el servidor de Next.js dentro de la red
 Docker.
 
-## Estructura
+## Estructura del proyecto
+
+### Raíz
 
 ```text
 .
@@ -178,30 +180,128 @@ Docker.
 ├── Caddyfile.prod              # Proxy de producción (HTTPS automático)
 ├── Makefile                    # Targets principales
 ├── seed_profiles.ps1           # Generación de perfiles de demostración
-├── backend/
-│   ├── cmd/api/                # Servidor HTTP
-│   ├── cmd/promote-admin/      # Promoción a administrador
-│   ├── internal/               # Módulos de dominio e infraestructura
-│   └── migrations/             # Migraciones SQL versionadas
-├── frontend/
-│   ├── app/                    # Páginas y rutas de Next.js
-│   ├── lib/                    # Cliente de API compartido
-│   └── messages/               # Primeros archivos de traducción
-└── scripts/
-    ├── smoke-test.sh
-    ├── backup.sh
-    └── restore.sh
+├── backend/                    # Servicio Go
+├── frontend/                   # Aplicación Next.js
+└── scripts/                    # Scripts auxiliares
+```
+
+### Backend (`backend/`)
+
+```text
+backend/
+├── cmd/
+│   ├── api/                     # Servidor HTTP de la API
+│   └── promote-admin/           # Comando para promover un usuario a admin
+├── internal/
+│   ├── activity/                # Actividad reciente del usuario
+│   ├── admin/                   # Gestión administrativa y validaciones
+│   ├── apperr/                  # Errores globales de aplicación
+│   ├── auth/                    # Autenticación, sesiones y contraseñas
+│   ├── blocking/                # Bloqueo de usuarios
+│   ├── config/                  # Carga de configuración desde variables de entorno
+│   ├── consent/                 # Tipos de consentimiento
+│   ├── contact/                 # Formulario de contacto
+│   ├── email/                   # Envío de correos (noop/smtp)
+│   ├── favorites/               # Gestión de favoritos
+│   ├── httpx/                   # Utilidades HTTP (JSON, errores, IP)
+│   ├── likes/                   # Likes enviados y recibidos
+│   ├── messaging/               # Mensajería y conversaciones
+│   ├── profiles/                # Perfiles, fotos, preferencias, idiomas, etc.
+│   ├── ratelimit/               # Limitación de peticiones usando Redis
+│   ├── redisclient/             # Cliente Redis
+│   ├── reports/                 # Reportes de usuarios
+│   ├── search/                  # Búsqueda y filtros de perfiles
+│   ├── server/                  # Middlewares y utilidades de servidor HTTP
+│   ├── storage/                 # Almacenamiento de archivos (local/s3)
+│   └── visits/                  # Visitas a perfiles
+└── migrations/                  # Migraciones SQL versionadas
+```
+
+#### Módulos backend destacados
+
+- **profiles**: contiene los tipos de `Gender`, `RelationshipGoal`,
+  `BaseListItem`, `ProfileDetails`, `PartnerPreferences`, `PersonalityTrait`,
+  así como la resolución de IDs, URLs de fotos y validaciones de género.
+- **search**: define los filtros de búsqueda (`ViewerScope`, `RawBounds`,
+  `PersonalityFilter`, `InterestFilter`) y los tipos de resultado.
+- **auth**: expone la configuración de contraseñas (`MinPasswordLength`),
+  sesiones y resumen de cuenta (`AccountSummary`).
+- **storage**: define la interfaz `Storage` con `Save`, `Open`, `Delete` y
+  los drivers `local` y `s3`.
+- **httpx**: provee `WriteJSON`, `WriteError` y `ClientIP` para respuestas
+  HTTP consistentes.
+- **ratelimit**: implementa el límite de peticiones apoyado en Redis.
+
+### Frontend (`frontend/`)
+
+```text
+frontend/
+├── app/                         # Rutas y páginas de Next.js
+│   ├── discover/                # Página de descubrimiento de perfiles
+│   ├── legal/contact/           # Página de contacto legal
+│   ├── new-members/             # Redirección a la pestaña de nuevos miembros
+│   ├── online-now/              # Redirección a la pestaña de online now
+│   └── popular/                 # Redirección a la pestaña de populares
+├── components/                  # Componentes React reutilizables
+│   ├── InteractionListSection.tsx
+│   └── ProfileCard.tsx
+├── lib/
+│   ├── api.ts                   # Cliente de API tipado y caché de GET
+│   ├── geocoding.ts             # Autocompletado de ubicaciones con Photon
+│   ├── i18n/
+│   │   ├── config.ts            # Configuración del locale
+│   │   ├── context.tsx          # Provider de idioma
+│   │   ├── dictionaries/
+│   │   │   └── es.ts            # Diccionario base en español
+│   │   └── options.ts           # Resolución de etiquetas traducidas
+│   ├── seekingGenders.ts        # Definición de opciones "Qué busco"
+│   ├── useProfileInteractions.ts # Estado global de likes/favoritos
+│   └── useProfileList.ts        # Paginación de listas de perfiles
+├── messages/                    # Archivos JSON de traducción (opcionales)
+│   ├── es.json
+│   └── en.json
+├── package.json                 # Dependencias y scripts del frontend
+└── tsconfig.json                # Configuración de TypeScript
+```
+
+#### Utilidades frontend relevantes
+
+- **api.ts**: implementa `apiFetch` y `apiMutateQuiet`, maneja errores
+  `ApiError`, caché de GET de 60 s, deduplicación de peticiones en vuelo y
+  limpieza de caché tras mutaciones. Exporta los tipos principales de las
+  respuestas de la API (`SearchResponse`, `PublicProfile`, `MessageItem`,
+  `PartnerPreferences`, etc.).
+- **useProfileList.ts**: hook usado por las pestañas de Home para cargar
+  páginas de `recommended`, `popular`, `online-now` y `new-members`,
+  manteniendo los datos anteriores mientras se carga una página nueva.
+- **useProfileInteractions.ts**: hook global que centraliza la carga de
+  likes/favoritos enviados y recibidos y expone los conjuntos de IDs y las
+  funciones `toggleLike` y `toggleFavorite`.
+- **geocoding.ts**: autocompletado de ubicaciones usando Photon
+  (OpenStreetMap). Devuelve `PlaceSuggestion` con `label`, `city`, `state`,
+  `country` y `countryCode`.
+- **seekingGenders.ts**: mapea las opciones seleccionadas por el usuario
+  (`male`, `female`, `trans`) a los valores de `Gender` del backend.
+- **i18n/context.tsx**: define `I18nProvider` y `useI18n` para inyectar el
+  locale y el diccionario en los componentes cliente.
+- **i18n/options.ts**: funciones `tOption` y `tOptionList` para resolver
+  labels traducidas de valores técnicos como `relationshipGoal`,
+  `bodyType`, etc.
+
+### Scripts (`scripts/`)
+
+```text
+scripts/
+├── smoke-test.sh
+├── backup.sh
+└── restore.sh
 ```
 
 ## Datos de demostración
 
 `seed_profiles.ps1` genera **5.000** perfiles de demostración en un entorno
 local. Requiere PowerShell y fotos `.jpg` en la ruta configurada dentro del
-script:
-
-```text
-C:\Users\Victor\Downloads\fotos\Nueva carpeta (4)
-```
+script.
 
 El script registra o inicia sesión con cuentas `user1@datingdemo.com` ...
 `user5000@datingdemo.com`, crea perfiles, idiomas, intereses, personalidad,
@@ -212,8 +312,9 @@ desarrollo.
 
 - No hay tokens CSRF explícitos. `SameSite=Lax` cubre el caso habitual, pero
   no sustituye una solución CSRF completa.
-- El enrutado i18n no está activado, aunque ya existen
-  `frontend/messages/es.json` y `frontend/messages/en.json`.
+- El enrutado i18n no está activado, aunque ya existen diccionarios
+  TypeScript en `frontend/lib/i18n/dictionaries` y archivos JSON en
+  `frontend/messages`.
 - El almacenamiento local (`backend_uploads`) es adecuado para desarrollo y
   una sola instancia; para varias instancias debe usarse S3 u otro
   almacenamiento compatible.
