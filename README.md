@@ -6,21 +6,20 @@ Compose.
 
 ## Estado actual
 
-La implementación cubre las fases 1 a 14 del roadmap original:
+La implementación cubre las funcionalidades principales del producto:
 
 - cuentas, sesiones, verificación de email y recuperación de contraseña;
-- perfiles propios con fotos y perfiles públicos;
-- búsqueda paginada con filtros;
-- favoritos, mensajería 1:1, bloqueos y reportes;
+- perfiles propios con fotos, personalidad e intereses;
+- búsqueda paginada con filtros de género, edad, ubicación, idioma, objetivos,
+  hijos, intereses y rasgos de personalidad;
+- likes, matches, favoritos, mensajería 1:1, bloqueos y reportes;
 - administración de usuarios y moderación de reportes;
 - rate limiting, cabeceras de seguridad, límites de peticiones y validación
   del contenido real de las imágenes;
 - consentimiento de términos y privacidad, páginas legales y contacto;
-- imágenes de producción, HTTPS automático, email SMTP, almacenamiento S3 y
-  backups de PostgreSQL.
+- despliegue con HTTPS automático, email SMTP, almacenamiento S3 y backups.
 
-El proyecto sigue siendo una V1. Hay limitaciones conocidas documentadas al
-final de este archivo.
+Sigue siendo una V1 con limitaciones conocidas al final de este archivo.
 
 ## Requisitos
 
@@ -175,9 +174,10 @@ por el `Content-Type` declarado por el cliente.
 
 `GET /api/v1/search/profiles` devuelve fichas resumidas de otros perfiles,
 paginadas. Admite `gender`, `min_age`, `max_age`, `country`, `language`,
-`relationship_goal`, `has_children`, `wants_children`, `interests`, `sort`,
-`page` y `page_size` (máximo 50). Los valores de `relationship_goal` son
-`casual`, `long_term`, `friendship`, `marriage` y `not_sure`.
+`relationship_goal`, `has_children`, `wants_children`, `interests`, filtros
+de personalidad, `sort`, `page` y `page_size` (máximo 50). Los valores de
+`relationship_goal` son `casual`, `long_term`, `friendship`, `marriage` y
+`not_sure`.
 
 Los filtros que exigen un dato excluyen perfiles que lo tienen en `NULL`; sin
 filtro, esos perfiles siguen siendo visibles.
@@ -237,8 +237,9 @@ Caddy y el mismo origen.
 
 | Ruta | Función |
 | --- | --- |
-| `/` | Página inicial con perfiles populares/paginados. |
-| `/discover` | Resultados de búsqueda. |
+| `/` | Página inicial con perfiles populares, online y nuevos mediante tabs. |
+| `/discover` | Resultados de búsqueda paginados; procesa filtros vía query params (`?gender=&min_age=...`). |
+| `/search` | Formulario de búsqueda avanzada con filtros (género, rango de edad, objetivo de relación, país, intereses, personalidad). |
 | `/profiles/[id]` | Perfil público, fotos, favorito, bloqueo, reporte y primer mensaje. |
 | `/profile` | Visualización del perfil propio. |
 | `/profile/edit` | Creación, edición y gestión de fotos del perfil propio. |
@@ -257,21 +258,14 @@ Caddy y el mismo origen.
 | `/legal/privacy` | Política de privacidad. |
 | `/legal/impressum` | Aviso legal. |
 | `/legal/contact` | Página de contacto. |
-| `/` | Página inicial con perfiles populares/paginados. |
-| `/search` | Formulario de búsqueda avanzada con filtros (género, rango de edad, objetivo de relación, país). |
-| `/discover` | Resultados de búsqueda paginados; procesa filtros dinámicos vía query params (`?gender=&min_age=...`). |
-| `/profiles/[id]` | Perfil público, fotos, favorito, bloqueo, reporte y primer mensaje. |
+| `/popular` | Redirección a `/` con tab popular. |
+| `/online-now` | Redirección a `/` con tab online. |
+| `/new-members` | Redirección a `/` con tab new. |
 
 Las páginas legales son plantillas con placeholders y deben revisarse con
 asesoramiento legal antes de una publicación real. Los archivos de
-traducciones `frontend/messages/es.json` y `en.json` existen como base, pero
-no hay routing i18n activo todavía.
-
-La navegación contiene enlaces a `/activity`, `/online` y `/new`, pero esas
-páginas todavía no tienen implementación propia.
-
-
-
+traducciones `frontend/messages/es.json` y `en.json` existen como base y la
+estructura i18n está preparada, pero el routing i18n todavía no está activo.
 
 ## Seguridad
 
@@ -289,7 +283,6 @@ no sustituye una solución CSRF completa. En desarrollo el backend está
 publicado directamente en el host, por lo que `X-Forwarded-For` puede ser
 falseado; en producción el tráfico externo debe entrar solo por Caddy.
 
-
 ### Rate Limiting en desarrollo local
 
 El rate limiting por IP puede verse activado involuntariamente en el entorno de desarrollo debido al comportamiento de React Strict Mode (ejecución doble de efectos) y el Hot Reloading de Next.js, provocando errores HTTP `429 (Too Many Requests)`.
@@ -300,7 +293,7 @@ Para mitigar esto en local:
 
 ```bash
 docker compose restart redis
-
+```
 
 ## Tests y calidad
 
@@ -435,8 +428,8 @@ ese valor debe corregirse antes de usar el script para una carga completa.
 ## Limitaciones conocidas
 
 - No hay tokens CSRF explícitos.
-- `/activity`, `/online` y `/new` aparecen en la navegación, pero aún no son
-  páginas implementadas.
+- Las rutas `/online-now`, `/new-members` y `/popular` son redirecciones a la
+  home con la pestaña correspondiente; no tienen contenido propio.
 - El routing i18n no está activado.
 - El almacenamiento local con el volumen `backend_uploads` es apropiado para
   desarrollo y una sola instancia, no para varias instancias.
