@@ -70,6 +70,9 @@ func (f *fakeRepository) CountPhotos(ctx context.Context, profileID uuid.UUID) (
 func (f *fakeRepository) GetPhoto(ctx context.Context, profileID, photoID uuid.UUID) (*Photo, error) {
 	return nil, ErrPhotoNotFound
 }
+func (f *fakeRepository) GetPublicPhoto(ctx context.Context, profileID, photoID uuid.UUID) (*Photo, error) {
+	return nil, ErrPhotoNotFound
+}
 func (f *fakeRepository) DeletePhoto(ctx context.Context, profileID, photoID uuid.UUID) error {
 	return nil
 }
