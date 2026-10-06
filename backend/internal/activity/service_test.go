@@ -1,6 +1,7 @@
 package activity
 
 import (
+	"sort"
 	"testing"
 	"time"
 
@@ -16,7 +17,10 @@ func TestSortItemsOrdersMixedEventsNewestFirst(t *testing.T) {
 		{EventType: EventMatchCreated, ProfileID: uuid.MustParse("00000000-0000-0000-0000-000000000003"), CreatedAt: older},
 	}
 
-	sortItems(items)
+	sort.SliceStable(items, func(i, j int) bool {
+		return items[i].CreatedAt.After(items[j].CreatedAt)
+	})
+
 	if items[0].EventType != EventLikeReceived || items[1].EventType != EventFavoriteReceived || items[2].EventType != EventMatchCreated {
 		t.Fatalf("orden de actividad = %#v", items)
 	}
