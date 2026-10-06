@@ -485,7 +485,6 @@ export const es = {
   },
   options: {
     gender: { female: 'Mujer', male: 'Hombre', non_binary: 'No binario', other: 'Otro' },
-    seeking: { male: 'Hombres', female: 'Mujeres', trans: 'Personas trans' },
     // Nombres de los LANGUAGE_OPTIONS. Un puñado son códigos poco comunes
     // (cr, uga, ber, pcm, ilo...); si alguno no es el idioma que esperabas,
     // dime cuál y lo corrijo — son fáciles de confundir con códigos vecinos.

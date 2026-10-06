@@ -483,7 +483,6 @@ export const en: Dictionary = {
   },
   options: {
     gender: { female: 'Woman', male: 'Man', non_binary: 'Non-binary', other: 'Other' },
-    seeking: { male: 'Men', female: 'Women', trans: 'Trans people' },
     languages: {
       en: 'English',
       tl: 'Tagalog',

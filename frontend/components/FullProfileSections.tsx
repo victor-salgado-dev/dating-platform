@@ -12,7 +12,6 @@ import type {
 import { PARTNER_IMPORTANCE_FIELDS } from '@/lib/profileOptions';
 import { useI18n } from '@/lib/i18n/context';
 import { tOption, tOptionList } from '@/lib/i18n/options';
-import { seekingOptionsFromValues } from '@/lib/seekingGenders';
 import styles from './FullProfileSections.module.css';
 
 export function FullProfileSections({
@@ -69,7 +68,7 @@ export function FullProfileSections({
         {profile.seeking_genders && profile.seeking_genders.length > 0 && (
           <>
             <dt>{dictionary.profilePublic.fieldSeeking}</dt>
-            <dd>{tOptionList(dictionary, 'seeking', seekingOptionsFromValues(profile.seeking_genders))}</dd>
+            <dd>{tOptionList(dictionary, 'gender', profile.seeking_genders)}</dd>
           </>
         )}
         <dt>{dictionary.profilePublic.fieldHasChildren}</dt>
