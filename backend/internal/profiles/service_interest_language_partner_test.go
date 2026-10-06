@@ -73,8 +73,8 @@ func (f *fakeRepository) GetPhoto(ctx context.Context, profileID, photoID uuid.U
 func (f *fakeRepository) GetPublicPhoto(ctx context.Context, profileID, photoID, viewerUserID uuid.UUID) (*Photo, error) {
 	return nil, ErrPhotoNotFound
 }
-func (f *fakeRepository) IsVisible(ctx context.Context, profileID, viewerUserID uuid.UUID) (bool, error) {
-	return true, nil
+func (f *fakeRepository) IsVisible(ctx context.Context, profileID, viewerUserID uuid.UUID) error {
+	return nil
 }
 func (f *fakeRepository) DeletePhoto(ctx context.Context, profileID, photoID uuid.UUID) error {
 	return nil
