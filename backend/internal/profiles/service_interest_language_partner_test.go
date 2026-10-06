@@ -58,7 +58,7 @@ func (f *fakeRepository) Update(ctx context.Context, userID uuid.UUID, patch Pro
 	return f.profile, nil
 }
 
-func (f *fakeRepository) AddPhoto(ctx context.Context, profileID uuid.UUID, photo *Photo) error {
+func (f *fakeRepository) AddPhoto(ctx context.Context, profileID uuid.UUID, photo *Photo, position int) error {
 	return nil
 }
 func (f *fakeRepository) ListPhotos(ctx context.Context, profileID uuid.UUID) ([]Photo, error) {
@@ -366,8 +366,8 @@ func TestUpdatePartnerPreferences(t *testing.T) {
 		svc := newTestService(repo)
 
 		patch := PartnerPreferencesPatch{
-			AgeMinSet: true, AgeMin: intPtr(30),
-			AgeMaxSet: true, AgeMax: intPtr(50),
+			AgeMin: Field[*int]{Set: true, Value: intPtr(30)},
+			AgeMax: Field[*int]{Set: true, Value: intPtr(50)},
 		}
 		if _, err := svc.UpdatePartnerPreferences(context.Background(), uuid.New(), patch); err != nil {
 			t.Errorf("no se esperaba error: %v", err)
@@ -379,8 +379,8 @@ func TestUpdatePartnerPreferences(t *testing.T) {
 		svc := newTestService(repo)
 
 		patch := PartnerPreferencesPatch{
-			AgeMinSet: true, AgeMin: intPtr(50),
-			AgeMaxSet: true, AgeMax: intPtr(30),
+			AgeMin: Field[*int]{Set: true, Value: intPtr(50)},
+			AgeMax: Field[*int]{Set: true, Value: intPtr(30)},
 		}
 		_, err := svc.UpdatePartnerPreferences(context.Background(), uuid.New(), patch)
 		var valErr *ValidationError
@@ -397,8 +397,8 @@ func TestUpdatePartnerPreferences(t *testing.T) {
 		svc := newTestService(repo)
 
 		patch := PartnerPreferencesPatch{
-			HeightMinSet: true, HeightMin: intPtr(190),
-			HeightMaxSet: true, HeightMax: intPtr(160),
+			HeightMin: Field[*int]{Set: true, Value: intPtr(190)},
+			HeightMax: Field[*int]{Set: true, Value: intPtr(160)},
 		}
 		_, err := svc.UpdatePartnerPreferences(context.Background(), uuid.New(), patch)
 		var valErr *ValidationError
@@ -416,7 +416,7 @@ func TestUpdatePartnerPreferences(t *testing.T) {
 			tooLong[i] = 'a'
 		}
 		s := string(tooLong)
-		patch := PartnerPreferencesPatch{AboutPartnerTextSet: true, AboutPartnerText: &s}
+		patch := PartnerPreferencesPatch{AboutPartnerText: Field[*string]{Set: true, Value: &s}}
 
 		_, err := svc.UpdatePartnerPreferences(context.Background(), uuid.New(), patch)
 		var valErr *ValidationError
@@ -429,7 +429,7 @@ func TestUpdatePartnerPreferences(t *testing.T) {
 		repo := &fakeRepository{}
 		svc := newTestService(repo)
 
-		patch := PartnerPreferencesPatch{ImportanceFunSet: true, ImportanceFun: intPtr(9)}
+		patch := PartnerPreferencesPatch{ImportanceFun: Field[*int]{Set: true, Value: intPtr(9)}}
 		_, err := svc.UpdatePartnerPreferences(context.Background(), uuid.New(), patch)
 		var valErr *ValidationError
 		if !errors.As(err, &valErr) {
