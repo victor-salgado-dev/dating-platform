@@ -112,6 +112,11 @@ ON CONFLICT (profile_id) DO UPDATE SET
 
 COMMIT;
 
+-- La carga/actualización masiva cambia la distribución que usa el planner.
+-- Refrescar estadísticas evita que las búsquedas planifiquen como si estas
+-- tablas siguieran vacías, especialmente justo después de preparar los datos.
+ANALYZE;
+
 -- ---------------------------------------------------------------------
 -- Comprobación rápida
 -- ---------------------------------------------------------------------

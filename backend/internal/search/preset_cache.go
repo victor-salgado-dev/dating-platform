@@ -31,11 +31,11 @@ const (
 	// presetCacheTTL es lo que tarda en reflejarse un perfil nuevo, una foto
 	// nueva o un cambio de orden. Los bloqueos NO dependen de este valor: se
 	// consultan en cada petición.
-	presetCacheTTL = 15 * time.Second
+	presetCacheTTL = 60 * time.Second
 
 	// presetCacheMaxProfiles acota la memoria: ~250 B por perfil y orden, es
-	// decir, unos 12 MB por orden con 50.000 perfiles.
-	presetCacheMaxProfiles = 50_000
+	// decir, unos 25 MB por orden con 100.000 perfiles.
+	presetCacheMaxProfiles = 100_000
 
 	// presetOversizeTTL: cuando hay más perfiles de los que caben, se recuerda
 	// durante este tiempo para no reintentar la carga completa en cada TTL.
