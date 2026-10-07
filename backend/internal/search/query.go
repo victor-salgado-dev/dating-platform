@@ -5,6 +5,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"dating-platform/backend/internal/profiles"
 )
 
@@ -12,13 +14,21 @@ import (
 const onlineNowWindowSeconds = 15 * 60
 
 // builtQuery es una búsqueda lista para ejecutar.
+//
+// La búsqueda se reparte para que su coste no crezca con el número de perfiles:
+//   - SQL devuelve solo los ids de la página, sin recuento: con LIMIT, Postgres
+//     se detiene en cuanto junta PageSize coincidencias en lugar de recorrerlas
+//     todas.
+//   - El repositorio carga después los datos de tarjeta de esos pocos ids
+//     (loadCards).
+//   - El total sale de CountSQL, solo cuando hace falta y cacheado unos segundos
+//     (ver count_cache.go).
 type builtQuery struct {
-	SQL  string
+	SQL  string // fase 1: ids de la página pedida
 	Args []any
 
 	// CountSQL/CountArgs cuentan los perfiles que cumplen los filtros, sin
-	// paginación. Solo se usan cuando la página pedida queda fuera de rango (no
-	// hay filas de las que leer COUNT(*) OVER()).
+	// paginación. Se usan para el total cuando la página no lo da por sí sola.
 	CountSQL  string
 	CountArgs []any
 }
@@ -191,8 +201,7 @@ func buildSearchQuery(params Params, now time.Time) builtQuery {
 
 	// La popularidad viene de la vista materializada profile_popularity; solo se
 	// une cuando el orden la necesita.
-	joins := `JOIN users u ON u.id = p.user_id
-		LEFT JOIN profiles me ON me.user_id = $1`
+	joins := `JOIN users u ON u.id = p.user_id`
 	orderBy := orderByClause(params.Sort)
 	if f.OnlineNow {
 		// En online-now prima la actividad reciente, no la creación reciente.
@@ -207,21 +216,13 @@ func buildSearchQuery(params Params, now time.Time) builtQuery {
 	args := append(b.args, params.PageSize, (params.Page-1)*params.PageSize)
 
 	sql := fmt.Sprintf(`
-		SELECT
-			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
-			COALESCE(p.relationship_goals, '{}') AS relationship_goals, p.created_at,
-			(SELECT ph.id FROM profile_photos ph
-				WHERE ph.profile_id = p.id
-				ORDER BY ph.position ASC, ph.id ASC
-				LIMIT 1) AS photo_id,
-			%s,
-			COUNT(*) OVER() AS total_count
+		SELECT p.id
 		FROM profiles p
 		%s
 		WHERE %s
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d
-	`, profiles.ViewerFlagsSQL("me", "p"), joins, whereSQL, orderBy, limitArg, offsetArg)
+	`, joins, whereSQL, orderBy, limitArg, offsetArg)
 
 	countSQL := fmt.Sprintf(`
 			SELECT COUNT(*)
@@ -230,7 +231,14 @@ func buildSearchQuery(params Params, now time.Time) builtQuery {
 			WHERE %s
 		`, whereSQL)
 
-	return builtQuery{SQL: sql, Args: args, CountSQL: countSQL, CountArgs: args[:filterArgs]}
+	// El recuento se hace SIN el usuario que busca (uuid.Nil: no excluye bloqueos
+	// ni a uno mismo), igual que hace la caché de listados. Así el mismo recuento
+	// lo comparten todos los usuarios con los mismos filtros. A cambio, el total
+	// puede sobrar en unas pocas unidades (uno mismo y sus bloqueos).
+	countArgs := append([]any(nil), args[:filterArgs]...)
+	countArgs[0] = uuid.Nil
+
+	return builtQuery{SQL: sql, Args: args, CountSQL: countSQL, CountArgs: countArgs}
 }
 
 func (b *queryBuilder) interestExists(itf InterestFilter) {

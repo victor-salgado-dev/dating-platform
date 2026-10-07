@@ -20,7 +20,7 @@ func NewPool(ctx context.Context, cfg config.PostgresConfig) (*pgxpool.Pool, err
 		return nil, fmt.Errorf("db: config inválida: %w", err)
 	}
 
-	poolCfg.MaxConns = 10
+	poolCfg.MaxConns = 16
 	poolCfg.MinConns = 1
 	poolCfg.HealthCheckPeriod = 30 * time.Second
 
