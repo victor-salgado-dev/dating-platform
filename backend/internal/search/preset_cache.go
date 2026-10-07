@@ -54,7 +54,6 @@ type presetCard struct {
 	Region            *string
 	RelationshipGoals []profiles.RelationshipGoal
 	CreatedAt         time.Time
-	PhotoID           *uuid.UUID
 }
 
 // presetEntry es una lista ya ordenada. Es inmutable una vez publicada: se

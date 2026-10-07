@@ -67,8 +67,8 @@ func (r *PostgresRepository) searchPreset(ctx context.Context, params Params, no
 				CountryCode:       c.CountryCode,
 				Region:            c.Region,
 				RelationshipGoals: c.RelationshipGoals,
-				HasPhoto:          c.PhotoID != nil,
-				PhotoID:           c.PhotoID,
+				HasPhoto:          f.photoID != nil,
+				PhotoID:           f.photoID,
 				CreatedAt:         c.CreatedAt,
 				Liked:             f.liked,
 				Favorited:         f.favorited,
@@ -105,11 +105,7 @@ func (r *PostgresRepository) buildPresetEntry(ctx context.Context, sort Sort) (*
 	query := fmt.Sprintf(`
 		SELECT
 			p.id, p.display_name, p.birth_date, p.gender, p.country_code, p.region,
-			COALESCE(p.relationship_goals, '{}'), p.created_at,
-			(SELECT ph.id FROM profile_photos ph
-				WHERE ph.profile_id = p.id
-				ORDER BY ph.position ASC, ph.id ASC
-				LIMIT 1)
+			COALESCE(p.relationship_goals, '{}'), p.created_at
 		FROM profiles p
 		JOIN users u ON u.id = p.user_id
 		%s
@@ -134,7 +130,7 @@ func (r *PostgresRepository) buildPresetEntry(ctx context.Context, sort Sort) (*
 		)
 		if err := rows.Scan(
 			&c.ProfileID, &c.DisplayName, &c.BirthDate, &genderStr, &c.CountryCode, &c.Region,
-			&goals, &c.CreatedAt, &c.PhotoID,
+			&goals, &c.CreatedAt,
 		); err != nil {
 			return nil, fmt.Errorf("search: leer listado en caché: %w", err)
 		}
@@ -196,6 +192,7 @@ func (r *PostgresRepository) excludedProfileIDs(ctx context.Context, viewerUserI
 }
 
 type viewerFlags struct {
+	photoID                                          *uuid.UUID
 	liked, favorited, receivedLike, receivedFavorite bool
 }
 
@@ -205,10 +202,12 @@ type viewerFlags struct {
 // profiles.VisibleSQL: los que ya no la cumplan no aparecen en el mapa.
 func (r *PostgresRepository) viewerFlagsFor(ctx context.Context, viewerUserID uuid.UUID, profileIDs []uuid.UUID) (map[uuid.UUID]viewerFlags, error) {
 	query := fmt.Sprintf(`
-		SELECT p.id, %s
-		FROM profiles p
-		JOIN users u ON u.id = p.user_id
-		LEFT JOIN profiles me ON me.user_id = $1
+		SELECT p.id,
+            (SELECT ph.id FROM profile_photos ph WHERE ph.profile_id = p.id ORDER BY ph.position ASC, ph.id ASC LIMIT 1),
+            %s
+        FROM profiles p
+        JOIN users u ON u.id = p.user_id
+        LEFT JOIN profiles me ON me.user_id = $1
 		WHERE p.id = ANY($2)
 		  AND p.user_id <> $1
 		  AND %s
@@ -226,7 +225,7 @@ func (r *PostgresRepository) viewerFlagsFor(ctx context.Context, viewerUserID uu
 			id uuid.UUID
 			f  viewerFlags
 		)
-		if err := rows.Scan(&id, &f.liked, &f.favorited, &f.receivedLike, &f.receivedFavorite); err != nil {
+		if err := rows.Scan(&id, &f.photoID, &f.liked, &f.favorited, &f.receivedLike, &f.receivedFavorite); err != nil {
 			return nil, fmt.Errorf("search: leer relación con el perfil: %w", err)
 		}
 		out[id] = f
