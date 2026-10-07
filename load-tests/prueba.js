@@ -6,6 +6,7 @@ const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 const TOTAL_USERS = parseInt(__ENV.USERS || '100', 10);
 const MAX_PAGE = parseInt(__ENV.MAX_PAGE || '3', 10);
 const DISCOVER_FILTER_MODE = __ENV.DISCOVER_FILTER_MODE || 'random';
+const INCLUDE_TOTAL = __ENV.INCLUDE_TOTAL !== 'false';
 const PASSWORD = __ENV.PASSWORD || 'DemoPass123!';
 const rateLimited = new Counter('rate_limited_429');
 const smoke = __ENV.MODE === 'smoke';
@@ -40,15 +41,17 @@ export const options = {
         { duration: '1m', target: 400 },
         { duration: '30s', target: 0 },
       ],
-  thresholds: {
-    http_req_failed: [{ threshold: 'rate<0.05', abortOnFail: true, delayAbortEval: '30s' }],
-    http_req_duration: ['p(95)<600'],
-    'http_req_duration{endpoint:recommended}': ['p(95)<300'],
-    'http_req_duration{endpoint:popular}': ['p(95)<300'],
-    'http_req_duration{endpoint:discover}': ['p(95)<500'],
-    'http_req_duration{endpoint:online}': ['p(95)<300'],
-    'http_req_duration{endpoint:qm_batch}': ['p(95)<500'],
-  },
+  thresholds: smoke
+    ? { http_req_failed: ['rate<0.05'] }
+    : {
+        http_req_failed: [{ threshold: 'rate<0.05', abortOnFail: true, delayAbortEval: '30s' }],
+        http_req_duration: ['p(95)<600'],
+        'http_req_duration{endpoint:recommended}': ['p(95)<300'],
+        'http_req_duration{endpoint:popular}': ['p(95)<300'],
+        'http_req_duration{endpoint:discover}': ['p(95)<500'],
+        'http_req_duration{endpoint:online}': ['p(95)<300'],
+        'http_req_duration{endpoint:qm_batch}': ['p(95)<500'],
+      },
 };
 
 export function setup() {
@@ -100,6 +103,7 @@ function buildDiscoverUrl(page) {
   } else {
     query += '&relationship_goals=' + encodeURIComponent(pick(SAMPLE_RELATIONSHIP_GOALS));
   }
+  if (!INCLUDE_TOTAL) query += '&include_total=false';
   return BASE_URL + '/api/v1/search/profiles?' + query;
 }
 
@@ -119,24 +123,34 @@ export default function (data) {
       const body = parseJson(res);
       check(res, { 'discover status 200': (r) => r.status === 200 }, { endpoint: 'discover' });
       check(body, { 'discover valid items': (b) => b !== null && Array.isArray(b.items) }, { endpoint: 'discover' });
+      check(body, { 'discover pagination metadata': (b) => b !== null && typeof b.has_more === 'boolean' && b.total_exact === INCLUDE_TOTAL }, { endpoint: 'discover' });
     } else if (roll < 50) {
-      const res = http.get(BASE_URL + '/api/v1/search/profiles?page=1&page_size=50', authHeaders('qm_batch'));
+      const includeTotal = INCLUDE_TOTAL ? '' : '&include_total=false';
+      const res = http.get(BASE_URL + '/api/v1/search/profiles?page=1&page_size=50' + includeTotal, authHeaders('qm_batch'));
       checkRateLimit(res);
       check(res, { 'quick match batch status 200': (r) => r.status === 200 }, { endpoint: 'qm_batch' });
+      const body = parseJson(res);
+      check(body, { 'quick match batch pagination metadata': (b) => b !== null && typeof b.has_more === 'boolean' }, { endpoint: 'qm_batch' });
     } else if (roll < 70) {
-      const res = http.get(BASE_URL + '/api/v1/search/recommended?page=1&page_size=24', authHeaders('recommended'));
+      const includeTotal = INCLUDE_TOTAL ? '' : '&include_total=false';
+      const res = http.get(BASE_URL + '/api/v1/search/recommended?page=1&page_size=24' + includeTotal, authHeaders('recommended'));
       checkRateLimit(res);
       check(res, { 'recommended status 200': (r) => r.status === 200 }, { endpoint: 'recommended' });
     } else if (roll < 80) {
-      const res = http.get(BASE_URL + '/api/v1/search/online-now?page=1&page_size=24', authHeaders('online'));
+      const includeTotal = INCLUDE_TOTAL ? '' : '&include_total=false';
+      const res = http.get(BASE_URL + '/api/v1/search/online-now?page=1&page_size=24' + includeTotal, authHeaders('online'));
       checkRateLimit(res);
       check(res, { 'online status 200': (r) => r.status === 200 }, { endpoint: 'online' });
+      const body = parseJson(res);
+      check(body, { 'online pagination metadata': (b) => b !== null && typeof b.has_more === 'boolean' }, { endpoint: 'online' });
     } else if (roll < 90) {
-      const res = http.get(BASE_URL + '/api/v1/search/popular?page=1&page_size=24', authHeaders('popular'));
+      const includeTotal = INCLUDE_TOTAL ? '' : '&include_total=false';
+      const res = http.get(BASE_URL + '/api/v1/search/popular?page=1&page_size=24' + includeTotal, authHeaders('popular'));
       checkRateLimit(res);
       check(res, { 'popular status 200': (r) => r.status === 200 }, { endpoint: 'popular' });
     } else {
-      const res = http.get(BASE_URL + '/api/v1/search/new-members?page=1&page_size=24', authHeaders('new'));
+      const includeTotal = INCLUDE_TOTAL ? '' : '&include_total=false';
+      const res = http.get(BASE_URL + '/api/v1/search/new-members?page=1&page_size=24' + includeTotal, authHeaders('new'));
       checkRateLimit(res);
       check(res, { 'new members status 200': (r) => r.status === 200 }, { endpoint: 'new' });
     }

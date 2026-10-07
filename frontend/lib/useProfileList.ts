@@ -33,6 +33,8 @@ interface Loaded {
   tab: HomeTab;
   items: SearchResultItem[];
   totalPages: number;
+  totalExact: boolean;
+  hasMore: boolean;
 }
 
 export function useProfileList(tab: HomeTab, page: number) {
@@ -46,13 +48,19 @@ export function useProfileList(tab: HomeTab, page: number) {
     setLoading(true);
     setError(false);
 
-    const path = `${ENDPOINTS[tab]}?page=${page}&page_size=${PAGE_SIZE}`;
+    const path = `${ENDPOINTS[tab]}?page=${page}&page_size=${PAGE_SIZE}&include_total=false`;
     const init: RequestInit | undefined = tab === 'online' ? { cache: 'no-store' } : undefined;
 
     apiFetch<SearchResponse>(path, init)
       .then((res) => {
         if (cancelled) return;
-        setLoaded({ tab, items: res.items ?? [], totalPages: res.total_pages ?? 1 });
+        setLoaded({
+          tab,
+          items: res.items ?? [],
+          totalPages: res.total_pages ?? 1,
+          totalExact: res.total_exact ?? true,
+          hasMore: res.has_more ?? page < (res.total_pages ?? 1),
+        });
       })
       .catch(() => {
         if (!cancelled) setError(true);
@@ -71,6 +79,8 @@ export function useProfileList(tab: HomeTab, page: number) {
   return {
     items: visible?.items ?? [],
     totalPages: visible?.totalPages ?? 1,
+    totalExact: visible?.totalExact ?? true,
+    hasMore: visible?.hasMore ?? false,
     loading,
     error,
     reload: () => setReloadKey((k) => k + 1),

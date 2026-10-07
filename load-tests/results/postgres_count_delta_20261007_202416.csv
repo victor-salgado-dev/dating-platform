@@ -1,0 +1,2 @@
+"Calls","MeanMs","TotalMs","Rows","QueryId","Query"
+"37","19,2","709,4","37","-8040854442482273184","SELECT COUNT(*) FROM profiles p JOIN users u ON u.id = p.user_id WHERE u.status = $4 AND u.deleted_at IS NULL   AND NOT EXISTS (SELECT $5 FROM blocks b WHERE b.blocker_id = $1 AND b.blocked_id = p.user_id)   AND NOT EXISTS (SELECT $6 FROM blocks b WHERE b.blocker_id = p.user_id AND b.blocked_id = $1) AND p.user_id <> $1 AND p.gender = ANY($2) AND u.last_active_at >= now() - make_interval(secs => $3::double precision)"

@@ -27,6 +27,7 @@ type RawQuery struct {
 	Page              string
 	PageSize          string
 	Sort              string
+	SkipTotal         bool
 
 	MinHeight             string
 	MaxHeight             string
@@ -133,6 +134,7 @@ func buildParams(excludeUserID uuid.UUID, raw RawQuery) (Params, error) {
 		Sort:          sortValue,
 		Page:          page,
 		PageSize:      pageSize,
+		SkipTotal:     raw.SkipTotal,
 		UseAgePrefs:   raw.UseAgePrefs,
 	}, nil
 }

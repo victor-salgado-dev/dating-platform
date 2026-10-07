@@ -37,7 +37,7 @@ function HomeContent() {
   const tab = parseTab(searchParams?.get('tab'));
   const page = parsePage(searchParams?.get('page'));
 
-  const { items: profiles, totalPages, loading, error, reload } = useProfileList(tab, page);
+  const { items: profiles, totalPages, totalExact, hasMore, loading, error, reload } = useProfileList(tab, page);
 
   // Posición del anuncio cuadrado: se sortea al cambiar de pestaña/página,
   // NO en cada fetch, para que no salte mientras cargan los datos.
@@ -107,7 +107,7 @@ function HomeContent() {
             {dictionary.home.bannerBottom}
           </div>
 
-          {totalPages > 1 && (
+          {(page > 1 || hasMore) && (
             <div className={styles.pagination}>
               <button
                 type="button"
@@ -118,15 +118,17 @@ function HomeContent() {
                 {dictionary.common.paginationPrev}
               </button>
               <span className={styles.pageInfo}>
-                {dictionary.common.paginationPage
-                  .replace('{page}', String(page))
-                  .replace('{totalPages}', String(totalPages))}
+                {totalExact
+                  ? dictionary.common.paginationPage
+                      .replace('{page}', String(page))
+                      .replace('{totalPages}', String(totalPages))
+                  : dictionary.common.paginationCurrentPage.replace('{page}', String(page))}
               </span>
               <button
                 type="button"
                 className={styles.pageBtn}
-                onClick={() => goToPage(Math.min(totalPages, page + 1))}
-                disabled={page >= totalPages || loading}
+                onClick={() => goToPage(page + 1)}
+                disabled={!hasMore || loading}
               >
                 {dictionary.common.paginationNext}
               </button>

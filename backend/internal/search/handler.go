@@ -55,6 +55,8 @@ type searchResponse struct {
 	PageSize   int                  `json:"page_size"`
 	Total      int                  `json:"total"`
 	TotalPages int                  `json:"total_pages"`
+	TotalExact bool                 `json:"total_exact"`
+	HasMore    bool                 `json:"has_more"`
 }
 
 func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
@@ -72,6 +74,7 @@ func (h *Handler) Search(w http.ResponseWriter, r *http.Request) {
 		Page:              q.Get("page"),
 		PageSize:          q.Get("page_size"),
 		Sort:              q.Get("sort"),
+		SkipTotal:         strings.EqualFold(q.Get("include_total"), "false"),
 
 		MinHeight:             q.Get("min_height"),
 		MaxHeight:             q.Get("max_height"),
@@ -161,8 +164,9 @@ func (h *Handler) Popular(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) preset(w http.ResponseWriter, r *http.Request, failMsg string, apply func(*RawQuery)) {
 	q := r.URL.Query()
 	raw := RawQuery{
-		Page:     q.Get("page"),
-		PageSize: q.Get("page_size"),
+		Page:      q.Get("page"),
+		PageSize:  q.Get("page_size"),
+		SkipTotal: strings.EqualFold(q.Get("include_total"), "false"),
 	}
 	apply(&raw)
 	h.run(w, r, raw, failMsg)
@@ -235,6 +239,8 @@ func toSearchResponse(res *Result) searchResponse {
 		PageSize:   res.PageSize,
 		Total:      res.Total,
 		TotalPages: res.TotalPages,
+		TotalExact: res.TotalExact,
+		HasMore:    res.HasMore,
 	}
 }
 

@@ -171,6 +171,7 @@ type Params struct {
 	Sort          Sort
 	Page          int
 	PageSize      int
+	SkipTotal     bool
 
 	// UseAgePrefs: aplicar también el rango de edad de las preferencias de
 	// pareja de quien mira. Solo lo activa el listado "recommended".
@@ -214,4 +215,6 @@ type Result struct {
 	Page       int
 	PageSize   int
 	TotalPages int
+	TotalExact bool
+	HasMore    bool
 }

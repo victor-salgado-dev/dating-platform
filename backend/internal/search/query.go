@@ -211,9 +211,13 @@ func buildSearchQuery(params Params, now time.Time) builtQuery {
 		LEFT JOIN profile_popularity pop ON pop.profile_id = p.id`
 	}
 
+	pageLimit := params.PageSize
+	if params.SkipTotal {
+		pageLimit++
+	}
 	limitArg := len(b.args) + 1
 	offsetArg := len(b.args) + 2
-	args := append(b.args, params.PageSize, (params.Page-1)*params.PageSize)
+	args := append(b.args, pageLimit, (params.Page-1)*params.PageSize)
 
 	sql := fmt.Sprintf(`
 		SELECT p.id

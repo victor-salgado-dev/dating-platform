@@ -70,6 +70,7 @@ function DiscoverContent() {
     const params = new URLSearchParams(searchString);
     params.set('page', page.toString());
     params.set('page_size', '24');
+    params.set('include_total', 'false');
 
     apiFetch<SearchResponse>(`/search/profiles?${params.toString()}`)
       .then((res) => {
@@ -97,6 +98,8 @@ function DiscoverContent() {
 
   const profiles = data?.items ?? [];
   const totalPages = data?.total_pages ?? 1;
+  const hasMore = data?.has_more ?? page < totalPages;
+  const totalExact = data?.total_exact ?? true;
 
   return (
     <>
@@ -144,7 +147,7 @@ function DiscoverContent() {
             </div>
           )}
 
-          {totalPages > 1 && (
+          {(page > 1 || hasMore) && (
             <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '1rem', margin: '3rem 0' }}>
               <button
                 type="button"
@@ -155,13 +158,15 @@ function DiscoverContent() {
                 {dictionary.common.paginationPrev}
               </button>
               <span style={{ fontWeight: 600, color: '#444' }}>
-                {dictionary.common.paginationPage.replace('{page}', String(data?.page ?? page)).replace('{totalPages}', String(totalPages))}
+                {totalExact
+                  ? dictionary.common.paginationPage.replace('{page}', String(data?.page ?? page)).replace('{totalPages}', String(totalPages))
+                  : dictionary.common.paginationCurrentPage.replace('{page}', String(data?.page ?? page))}
               </span>
               <button
                 type="button"
-                disabled={page >= totalPages}
+                disabled={!hasMore}
                 onClick={() => setPage((p) => p + 1)}
-                style={{ padding: '0.75rem 1.5rem', cursor: page >= totalPages ? 'not-allowed' : 'pointer', borderRadius: '8px', border: '1px solid #ccc', background: '#fff', fontWeight: 'bold' }}
+                style={{ padding: '0.75rem 1.5rem', cursor: !hasMore ? 'not-allowed' : 'pointer', borderRadius: '8px', border: '1px solid #ccc', background: '#fff', fontWeight: 'bold' }}
               >
                 {dictionary.common.paginationNext}
               </button>

@@ -1,0 +1,244 @@
+{
+  "metrics": {
+    "http_req_failed": {
+      "passes": 0,
+      "fails": 22410,
+      "thresholds": {
+        "rate<0.05": false
+      },
+      "value": 0
+    },
+    "http_req_duration{endpoint:discover}": {
+      "avg": 896.3434600511578,
+      "min": 4.6072,
+      "med": 370.64995,
+      "max": 5017.9707,
+      "p(90)": 2633.7880999999998,
+      "p(95)": 3223.65215,
+      "thresholds": {
+        "p(95)<500": true
+      }
+    },
+    "http_req_duration{endpoint:qm_batch}": {
+      "p(95)": 3322.4817000000003,
+      "avg": 832.9520958512809,
+      "min": 6.4132,
+      "med": 223.0254,
+      "max": 7328.8403,
+      "p(90)": 2593.7607,
+      "thresholds": {
+        "p(95)<500": true
+      }
+    },
+    "http_req_connecting": {
+      "avg": 0.05399702365015615,
+      "min": 0,
+      "med": 0,
+      "max": 75.0441,
+      "p(90)": 0,
+      "p(95)": 0
+    },
+    "http_req_tls_handshaking": {
+      "avg": 0,
+      "min": 0,
+      "med": 0,
+      "max": 0,
+      "p(90)": 0,
+      "p(95)": 0
+    },
+    "http_req_duration{endpoint:online}": {
+      "avg": 820.501285156249,
+      "min": 5.2417,
+      "med": 236.2203,
+      "max": 4696.6743,
+      "p(90)": 2600.90025,
+      "p(95)": 3353.05705,
+      "thresholds": {
+        "p(95)<300": true
+      }
+    },
+    "http_reqs": {
+      "rate": 56.34083610696806,
+      "count": 22410
+    },
+    "http_req_waiting": {
+      "avg": 823.6085769656393,
+      "min": 0.5346,
+      "med": 243.6828,
+      "max": 8645.7498,
+      "p(90)": 2570.569320000001,
+      "p(95)": 3260.3479749999997
+    },
+    "http_req_receiving": {
+      "avg": 2.1946529317269095,
+      "min": 0,
+      "med": 0.51155,
+      "max": 226.4163,
+      "p(90)": 4.947870000000002,
+      "p(95)": 10.838469999999996
+    },
+    "vus_max": {
+      "value": 400,
+      "min": 400,
+      "max": 400
+    },
+    "data_sent": {
+      "count": 5383925,
+      "rate": 13535.691032450157
+    },
+    "data_received": {
+      "count": 273513470,
+      "rate": 687638.4465112952
+    },
+    "http_req_blocked": {
+      "avg": 0.0940084024988845,
+      "min": 0,
+      "med": 0,
+      "max": 281.3295,
+      "p(90)": 0,
+      "p(95)": 0
+    },
+    "checks": {
+      "fails": 0,
+      "passes": 39713,
+      "value": 1
+    },
+    "http_req_duration{expected_response:true}": {
+      "avg": 825.8650027041463,
+      "min": 4.6072,
+      "med": 246.62355,
+      "max": 8646.3381,
+      "p(90)": 2575.63922,
+      "p(95)": 3264.3196599999997
+    },
+    "vus": {
+      "value": 1,
+      "min": 0,
+      "max": 400
+    },
+    "iterations": {
+      "count": 7294,
+      "rate": 18.33779824025993
+    },
+    "http_req_duration": {
+      "avg": 825.8650027041463,
+      "min": 4.6072,
+      "med": 246.62355,
+      "max": 8646.3381,
+      "p(90)": 2575.63922,
+      "p(95)": 3264.3196599999997,
+      "thresholds": {
+        "p(95)<600": true
+      }
+    },
+    "http_req_duration{endpoint:recommended}": {
+      "p(90)": 2577.18044,
+      "p(95)": 3260.4592400000006,
+      "avg": 823.0815860481101,
+      "min": 5.7792,
+      "med": 233.1758,
+      "max": 8646.3381,
+      "thresholds": {
+        "p(95)<300": true
+      }
+    },
+    "http_req_duration{endpoint:popular}": {
+      "p(90)": 2478.81865,
+      "p(95)": 3216.2385249999998,
+      "avg": 790.5713684354992,
+      "min": 5.399,
+      "med": 192.03035,
+      "max": 8418.9353,
+      "thresholds": {
+        "p(95)<300": true
+      }
+    },
+    "iteration_duration": {
+      "avg": 7331.805089936938,
+      "min": 2323.3069,
+      "med": 6199.310799999999,
+      "max": 23566.019,
+      "p(90)": 12922.89577,
+      "p(95)": 14923.57039
+    },
+    "http_req_sending": {
+      "med": 0,
+      "max": 130.3436,
+      "p(90)": 0,
+      "p(95)": 0,
+      "avg": 0.06177280678268626,
+      "min": 0
+    }
+  },
+  "root_group": {
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": {},
+    "checks": {
+      "quick match batch status 200": {
+        "path": "::quick match batch status 200",
+        "id": "0694b3a8a264ae37c487004829aa9936",
+        "passes": 4411,
+        "fails": 0,
+        "name": "quick match batch status 200"
+      },
+      "quick match batch pagination metadata": {
+        "name": "quick match batch pagination metadata",
+        "path": "::quick match batch pagination metadata",
+        "id": "650ddc25b9b86dc1d8f505904b4b146a",
+        "passes": 4411,
+        "fails": 0
+      },
+      "popular status 200": {
+        "passes": 2186,
+        "fails": 0,
+        "name": "popular status 200",
+        "path": "::popular status 200",
+        "id": "3b2439611124ec0542b149e537c431bd"
+      },
+      "online status 200": {
+        "passes": 2176,
+        "fails": 0,
+        "name": "online status 200",
+        "path": "::online status 200",
+        "id": "d65d860183bf3ac03cd9488ed972126d"
+      },
+      "new members status 200": {
+        "id": "f9c15e5e5706f6b1a432295c6bae2774",
+        "passes": 2226,
+        "fails": 0,
+        "name": "new members status 200",
+        "path": "::new members status 200"
+      },
+      "recommended status 200": {
+        "id": "769801f221cc341d3daf99dfb9dbd42e",
+        "passes": 4365,
+        "fails": 0,
+        "name": "recommended status 200",
+        "path": "::recommended status 200"
+      },
+      "discover status 200": {
+        "name": "discover status 200",
+        "path": "::discover status 200",
+        "id": "6578036ccc1848a11f0c46efc8d62b0b",
+        "passes": 6646,
+        "fails": 0
+      },
+      "discover valid items": {
+        "id": "3435d7c2381b6e179630b68f69f0b9ba",
+        "passes": 6646,
+        "fails": 0,
+        "name": "discover valid items",
+        "path": "::discover valid items"
+      },
+      "discover pagination metadata": {
+        "fails": 0,
+        "name": "discover pagination metadata",
+        "path": "::discover pagination metadata",
+        "id": "68131ab4a3fd1e9adaf612d597a06872",
+        "passes": 6646
+      }
+    },
+    "name": "",
+    "path": ""
+  }
+}

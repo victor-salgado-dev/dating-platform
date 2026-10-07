@@ -28,6 +28,7 @@ export const es = {
     paginationPrevPlain: 'Anterior',
     paginationNextPlain: 'Siguiente',
     paginationPage: 'Página {page} de {totalPages}',
+    paginationCurrentPage: 'Página {page}',
     sortLabel: 'Orden:',
     sortNewestFirst: 'Más recientes',
     sortOldestFirst: 'Más antiguos',

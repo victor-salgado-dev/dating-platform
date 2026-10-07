@@ -30,6 +30,7 @@ export const en: Dictionary = {
     paginationPrevPlain: 'Previous',
     paginationNextPlain: 'Next',
     paginationPage: 'Page {page} of {totalPages}',
+    paginationCurrentPage: 'Page {page}',
     sortLabel: 'Sort:',
     sortNewestFirst: 'Newest first',
     sortOldestFirst: 'Oldest first',

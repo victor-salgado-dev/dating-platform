@@ -164,12 +164,18 @@ func (r *PostgresRepository) loadViewerScope(ctx context.Context, userID uuid.UU
 func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result, error) {
 	now := time.Now()
 
-	// Restricciones de quien mira (género buscado y, en recommended, edad).
-	viewer, err := r.loadViewerScope(ctx, params.ExcludeUserID, params.UseAgePrefs)
-	if err != nil {
-		return nil, err
+	// Carga preferencias solo cuando la consulta las necesita. Un género enviado
+	// explícitamente sustituye seeking_genders; un rango de edad explícito también
+	// sustituye profile_partner_preferences aunque la ruta permita usarlo por defecto.
+	needsViewerScope := len(params.Filters.Genders) == 0 ||
+		(params.UseAgePrefs && params.Filters.MinAge == nil && params.Filters.MaxAge == nil)
+	if needsViewerScope {
+		viewer, err := r.loadViewerScope(ctx, params.ExcludeUserID, params.UseAgePrefs)
+		if err != nil {
+			return nil, err
+		}
+		params.Viewer = viewer
 	}
-	params.Viewer = viewer
 
 	// Listados sin filtros: desde la caché en memoria cuando es posible.
 	cached, ok, err := r.searchPreset(ctx, params, now)
@@ -201,6 +207,11 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 	if err := idRows.Err(); err != nil {
 		return nil, fmt.Errorf("search: leer resultados: %w", err)
 	}
+	hasMore := false
+	if params.SkipTotal && len(ids) > params.PageSize {
+		hasMore = true
+		ids = ids[:params.PageSize]
+	}
 	// Se libera la conexión antes de la fase 2 (el defer solo la cerraría al final).
 	idRows.Close()
 
@@ -213,17 +224,21 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 	// Total: si la página no viene llena, es exacto sin contar (todo lo que hay
 	// son las páginas anteriores más estas filas). Si viene llena, o si la página
 	// pedida está fuera de rango, hay que contar (con caché).
-	total, exact := totalFromPage(params, len(ids))
-	if !exact {
-		total, err = r.countProfiles(ctx, q)
-		if err != nil {
-			return nil, err
+	total, totalPages := 0, 0
+	totalExact := !params.SkipTotal
+	if !params.SkipTotal {
+		var exact bool
+		total, exact = totalFromPage(params, len(ids))
+		if !exact {
+			total, err = r.countProfiles(ctx, q)
+			if err != nil {
+				return nil, err
+			}
 		}
-	}
-
-	totalPages := 0
-	if total > 0 {
-		totalPages = (total + params.PageSize - 1) / params.PageSize
+		if total > 0 {
+			totalPages = (total + params.PageSize - 1) / params.PageSize
+		}
+		hasMore = params.Page < totalPages
 	}
 
 	return &Result{
@@ -232,5 +247,7 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 		Page:       params.Page,
 		PageSize:   params.PageSize,
 		TotalPages: totalPages,
+		TotalExact: totalExact,
+		HasMore:    hasMore,
 	}, nil
 }

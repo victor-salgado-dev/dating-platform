@@ -48,6 +48,7 @@ export default function QuickMatchPage() {
       const params = new URLSearchParams(savedFilters);
       params.set('page', String(pageToFetch));
       params.set('page_size', '50');
+      params.set('include_total', 'false');
 
       try {
         const res = await apiFetch<SearchResponse>(`/search/profiles?${params.toString()}`);
@@ -59,7 +60,7 @@ export default function QuickMatchPage() {
         fresh.forEach((item) => seenIds.current.add(item.profile_id));
 
         setQueue((prev) => [...prev, ...shuffle(fresh)]);
-        if (res.items.length === 0 || pageToFetch >= res.total_pages) {
+        if (res.items.length === 0 || res.has_more === false || (res.has_more === undefined && pageToFetch >= res.total_pages)) {
           setExhausted(true);
         }
       } catch {

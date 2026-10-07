@@ -89,6 +89,8 @@ func (r *PostgresRepository) searchPreset(ctx context.Context, params Params, no
 		Page:       params.Page,
 		PageSize:   params.PageSize,
 		TotalPages: totalPages,
+		TotalExact: true,
+		HasMore:    params.Page < totalPages,
 	}, true, nil
 }
 

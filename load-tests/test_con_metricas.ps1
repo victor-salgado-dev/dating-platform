@@ -4,6 +4,7 @@ param(
     [string]$BaseUrl = 'http://localhost:8080',
     [int]$Users = 100,
     [int]$MaxPage = 3,
+    [switch]$SkipExactTotal,
     [ValidateSet('random', 'stable')]
     [string]$DiscoverFilterMode = 'random',
     [int]$SampleIntervalSeconds = 3,
@@ -24,6 +25,7 @@ $topFile = Join-Path $resultsDir ("postgres_top_{0}.csv" -f $stamp)
 $deltaFile = Join-Path $resultsDir ("postgres_delta_{0}.csv" -f $stamp)
 $countDeltaFile = Join-Path $resultsDir ("postgres_count_delta_{0}.csv" -f $stamp)
 $scriptFile = Join-Path $PSScriptRoot 'prueba.js'
+$includeTotal = if ($SkipExactTotal) { 'false' } else { 'true' }
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw 'No se encontró docker en PATH.' }
 if (-not (Get-Command k6 -ErrorAction SilentlyContinue)) { throw 'No se encontró k6 en PATH.' }
@@ -132,6 +134,7 @@ $k6Args = @(
     '-e', ("BASE_URL={0}" -f $BaseUrl),
     '-e', ("USERS={0}" -f $Users),
     '-e', ("MAX_PAGE={0}" -f $MaxPage),
+    '-e', ("INCLUDE_TOTAL={0}" -f $includeTotal),
     '-e', ("DISCOVER_FILTER_MODE={0}" -f $DiscoverFilterMode),
     $scriptFile
 )
@@ -191,6 +194,7 @@ if (Test-Path -LiteralPath $summaryFile) {
     $rows.Add([pscustomobject]@{ Metric = 'k6_version'; Value = $k6Version })
     $rows.Add([pscustomobject]@{ Metric = 'k6_exit_code'; Value = $k6ExitCode })
     $rows.Add([pscustomobject]@{ Metric = 'discover_filter_mode'; Value = $DiscoverFilterMode })
+    $rows.Add([pscustomobject]@{ Metric = 'exact_total_mode'; Value = $includeTotal })
     $rows.Add([pscustomobject]@{ Metric = 'pg_stat_statements_reset_before'; Value = $statsResetBefore })
     $rows.Add([pscustomobject]@{ Metric = 'pg_stat_statements_reset_after'; Value = $statsResetAfter })
     foreach ($property in $summary.metrics.PSObject.Properties) {
@@ -198,13 +202,19 @@ if (Test-Path -LiteralPath $summaryFile) {
         $rows.Add([pscustomobject]@{ Metric = ($property.Name + '_p95_ms'); Value = $property.Value.'p(95)' })
         $rows.Add([pscustomobject]@{ Metric = ($property.Name + '_avg_ms'); Value = $property.Value.avg })
     }
-    foreach ($metricName in @('http_reqs', 'http_req_failed', 'vus_max')) {
+    foreach ($metricName in @('http_reqs', 'vus_max')) {
         $metric = $summary.metrics.PSObject.Properties[$metricName]
         if ($metric) {
             foreach ($valueProperty in $metric.Value.PSObject.Properties) {
                 $rows.Add([pscustomobject]@{ Metric = ($metricName + '_' + $valueProperty.Name); Value = $valueProperty.Value })
             }
         }
+    }
+    $failedRequests = $summary.metrics.PSObject.Properties['http_req_failed']
+    if ($failedRequests) {
+        $rows.Add([pscustomobject]@{ Metric = 'http_req_failed_rate'; Value = $failedRequests.Value.value })
+        $rows.Add([pscustomobject]@{ Metric = 'http_req_failures'; Value = $failedRequests.Value.passes })
+        $rows.Add([pscustomobject]@{ Metric = 'http_req_samples'; Value = ($failedRequests.Value.passes + $failedRequests.Value.fails) })
     }
     $rows | Export-Csv -LiteralPath $reportFile -NoTypeInformation -Encoding utf8
 }

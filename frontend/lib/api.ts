@@ -164,6 +164,8 @@ export type SearchResponse = {
   page_size: number;
   total: number;
   total_pages: number;
+  total_exact?: boolean;
+  has_more?: boolean;
 };
 
 // /search/new-members, /search/online-now y /search/popular devuelven ahora
