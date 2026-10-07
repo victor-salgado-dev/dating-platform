@@ -5,6 +5,7 @@ import { Counter } from 'k6/metrics';
 const BASE_URL = __ENV.BASE_URL || 'http://localhost:8080';
 const TOTAL_USERS = parseInt(__ENV.USERS || '100', 10);
 const MAX_PAGE = parseInt(__ENV.MAX_PAGE || '3', 10);
+const DISCOVER_FILTER_MODE = __ENV.DISCOVER_FILTER_MODE || 'random';
 const PASSWORD = __ENV.PASSWORD || 'DemoPass123!';
 const rateLimited = new Counter('rate_limited_429');
 const smoke = __ENV.MODE === 'smoke';
@@ -12,6 +13,20 @@ const smoke = __ENV.MODE === 'smoke';
 const SAMPLE_INTERESTS = ['viajar', 'cine', 'fitness', 'fotografia', 'cocina', 'musica', 'lectura', 'videojuegos', 'tecnologia', 'arte', 'senderismo'];
 const SAMPLE_LANGUAGES = ['it', 'zh_cmn', 'de', 'ar', 'es', 'ja', 'en', 'ru'];
 const SAMPLE_RELATIONSHIP_GOALS = ['casual', 'long_term', 'friendship', 'marriage', 'not_sure'];
+const STABLE_DISCOVER_FILTERS = [
+  { minAge: 18, maxAge: 30, gender: 'female', interests: ['viajar', 'cine'] },
+  { minAge: 20, maxAge: 34, gender: 'male', language: 'es' },
+  { minAge: 22, maxAge: 38, gender: 'non_binary', relationshipGoal: 'friendship' },
+  { minAge: 25, maxAge: 40, gender: '', interests: ['fitness'] },
+  { minAge: 18, maxAge: 35, gender: 'female', language: 'en' },
+  { minAge: 27, maxAge: 45, gender: 'male', relationshipGoal: 'long_term' },
+  { minAge: 19, maxAge: 33, gender: '', interests: ['musica', 'lectura'] },
+  { minAge: 24, maxAge: 42, gender: 'female', language: 'de' },
+  { minAge: 21, maxAge: 36, gender: 'male', relationshipGoal: 'casual' },
+  { minAge: 28, maxAge: 48, gender: 'non_binary', interests: ['senderismo'] },
+  { minAge: 18, maxAge: 32, gender: '', language: 'it' },
+  { minAge: 23, maxAge: 39, gender: 'female', relationshipGoal: 'marriage' },
+];
 
 export const options = {
   stages: smoke
@@ -56,15 +71,23 @@ function parseJson(res) { try { return res.json(); } catch (_) { return null; } 
 function checkRateLimit(res) { if (res.status === 429) rateLimited.add(1); }
 
 function buildDiscoverUrl(page) {
-  const minAge = randInt(18, 32);
-  const maxAge = minAge + randInt(6, 20);
+  const stableFilters = DISCOVER_FILTER_MODE === 'stable';
+  const filterProfile = stableFilters ? STABLE_DISCOVER_FILTERS[(__VU - 1) % STABLE_DISCOVER_FILTERS.length] : null;
+  const minAge = filterProfile ? filterProfile.minAge : randInt(18, 32);
+  const maxAge = filterProfile ? filterProfile.maxAge : minAge + randInt(6, 20);
   const sort = pick(['recent', 'popular', 'age_asc', 'age_desc']);
-  const gender = pick(['female', 'male', 'non_binary', '']);
+  const gender = filterProfile ? filterProfile.gender : pick(['female', 'male', 'non_binary', '']);
+  const filterType = filterProfile ? null : randInt(0, 2);
   let query = 'page=' + page + '&page_size=24&min_age=' + minAge + '&max_age=' + maxAge + '&sort=' + sort;
   if (gender) query += '&gender=' + encodeURIComponent(gender);
 
-  const filterType = randInt(0, 2);
-  if (filterType === 0) {
+  if (filterProfile && filterProfile.interests) {
+    query += '&interests=' + encodeURIComponent(filterProfile.interests.join(','));
+  } else if (filterProfile && filterProfile.language) {
+    query += '&language=' + encodeURIComponent(filterProfile.language);
+  } else if (filterProfile && filterProfile.relationshipGoal) {
+    query += '&relationship_goals=' + encodeURIComponent(filterProfile.relationshipGoal);
+  } else if (filterType === 0) {
     const interestCount = randInt(1, 3);
     const pickedInterests = [];
     while (pickedInterests.length < interestCount) {

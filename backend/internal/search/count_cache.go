@@ -1,8 +1,10 @@
 package search
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"sync"
 	"time"
@@ -30,15 +32,27 @@ type countEntry struct {
 	expires time.Time
 }
 
+type countCall struct {
+	done  chan struct{}
+	total int
+	err   error
+}
+
 type countCache struct {
-	mu  sync.Mutex
-	ttl time.Duration
-	max int
-	m   map[string]countEntry
+	mu       sync.Mutex
+	ttl      time.Duration
+	max      int
+	m        map[string]countEntry
+	inflight map[string]*countCall
 }
 
 func newCountCache(ttl time.Duration, max int) *countCache {
-	return &countCache{ttl: ttl, max: max, m: make(map[string]countEntry)}
+	return &countCache{
+		ttl:      ttl,
+		max:      max,
+		m:        make(map[string]countEntry),
+		inflight: make(map[string]*countCall),
+	}
 }
 
 // countKey resume la consulta de recuento y sus argumentos en una clave corta.
@@ -47,24 +61,49 @@ func countKey(q builtQuery) string {
 	return hex.EncodeToString(sum[:16])
 }
 
-func (c *countCache) get(key string) (int, bool) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	e, ok := c.m[key]
-	if !ok {
-		return 0, false
+// getOrLoad stores one calculation per key at a time. Concurrent misses wait
+// for the same database query instead of stampeding the database.
+func (c *countCache) getOrLoad(ctx context.Context, key string, load func() (int, error)) (int, error) {
+	for {
+		c.mu.Lock()
+		e, ok := c.m[key]
+		if ok && time.Now().Before(e.expires) {
+			c.mu.Unlock()
+			return e.total, nil
+		}
+		if ok {
+			delete(c.m, key)
+		}
+		if call, ok := c.inflight[key]; ok {
+			c.mu.Unlock()
+			select {
+			case <-call.done:
+				if ctx.Err() == nil && (errors.Is(call.err, context.Canceled) || errors.Is(call.err, context.DeadlineExceeded)) {
+					continue
+				}
+				return call.total, call.err
+			case <-ctx.Done():
+				return 0, ctx.Err()
+			}
+		}
+		call := &countCall{done: make(chan struct{})}
+		c.inflight[key] = call
+		c.mu.Unlock()
+
+		call.total, call.err = load()
+
+		c.mu.Lock()
+		if call.err == nil {
+			c.setLocked(key, call.total)
+		}
+		delete(c.inflight, key)
+		close(call.done)
+		c.mu.Unlock()
+		return call.total, call.err
 	}
-	if time.Now().After(e.expires) {
-		delete(c.m, key)
-		return 0, false
-	}
-	return e.total, true
 }
 
-func (c *countCache) set(key string, total int) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-
+func (c *countCache) setLocked(key string, total int) {
 	if len(c.m) >= c.max {
 		now := time.Now()
 		for k, e := range c.m {

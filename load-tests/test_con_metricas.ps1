@@ -4,6 +4,8 @@ param(
     [string]$BaseUrl = 'http://localhost:8080',
     [int]$Users = 100,
     [int]$MaxPage = 3,
+    [ValidateSet('random', 'stable')]
+    [string]$DiscoverFilterMode = 'random',
     [int]$SampleIntervalSeconds = 3,
     [string]$PostgresContainer = 'dating-platform-postgres-1',
     [string]$BackendContainer = 'dating-platform-backend-1'
@@ -20,6 +22,7 @@ $reportFile = Join-Path $resultsDir ("run_summary_{0}.csv" -f $stamp)
 $presetFile = Join-Path $resultsDir ("preset_delta_{0}.csv" -f $stamp)
 $topFile = Join-Path $resultsDir ("postgres_top_{0}.csv" -f $stamp)
 $deltaFile = Join-Path $resultsDir ("postgres_delta_{0}.csv" -f $stamp)
+$countDeltaFile = Join-Path $resultsDir ("postgres_count_delta_{0}.csv" -f $stamp)
 $scriptFile = Join-Path $PSScriptRoot 'prueba.js'
 
 if (-not (Get-Command docker -ErrorAction SilentlyContinue)) { throw 'No se encontró docker en PATH.' }
@@ -129,6 +132,7 @@ $k6Args = @(
     '-e', ("BASE_URL={0}" -f $BaseUrl),
     '-e', ("USERS={0}" -f $Users),
     '-e', ("MAX_PAGE={0}" -f $MaxPage),
+    '-e', ("DISCOVER_FILTER_MODE={0}" -f $DiscoverFilterMode),
     $scriptFile
 )
 $k6ExitCode = 1
@@ -181,11 +185,12 @@ if ($deltas) {
 
 if (Test-Path -LiteralPath $summaryFile) {
     $summary = Get-Content -LiteralPath $summaryFile -Raw | ConvertFrom-Json
-$summary.PSObject.Properties.Remove('setup_data') | Out-Null
-$summary | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $summaryFile -Encoding utf8
+    $summary.PSObject.Properties.Remove('setup_data') | Out-Null
+    $summary | ConvertTo-Json -Depth 100 | Set-Content -LiteralPath $summaryFile -Encoding utf8
     $rows = [System.Collections.Generic.List[object]]::new()
     $rows.Add([pscustomobject]@{ Metric = 'k6_version'; Value = $k6Version })
     $rows.Add([pscustomobject]@{ Metric = 'k6_exit_code'; Value = $k6ExitCode })
+    $rows.Add([pscustomobject]@{ Metric = 'discover_filter_mode'; Value = $DiscoverFilterMode })
     $rows.Add([pscustomobject]@{ Metric = 'pg_stat_statements_reset_before'; Value = $statsResetBefore })
     $rows.Add([pscustomobject]@{ Metric = 'pg_stat_statements_reset_after'; Value = $statsResetAfter })
     foreach ($property in $summary.metrics.PSObject.Properties) {
@@ -236,9 +241,17 @@ if ($statsResetAfter -eq $statsResetBefore) {
     } else {
         'Calls,MeanMs,TotalMs,Rows,QueryId,Query' | Set-Content -LiteralPath $deltaFile -Encoding utf8
     }
+    $countDeltas = @($queryDeltas | Where-Object { $_.Query -match '^SELECT COUNT\(\*\)' })
+    if ($countDeltas.Count -gt 0) {
+        $countDeltas | Sort-Object TotalMs -Descending |
+            Export-Csv -LiteralPath $countDeltaFile -NoTypeInformation -Encoding utf8
+    } else {
+        'Calls,MeanMs,TotalMs,Rows,QueryId,Query' | Set-Content -LiteralPath $countDeltaFile -Encoding utf8
+    }
 } else {
     Write-Warning 'pg_stat_statements se reinició durante la prueba; no se puede calcular el delta SQL.'
     'Calls,MeanMs,TotalMs,Rows,QueryId,Query' | Set-Content -LiteralPath $deltaFile -Encoding utf8
+    'Calls,MeanMs,TotalMs,Rows,QueryId,Query' | Set-Content -LiteralPath $countDeltaFile -Encoding utf8
 }
 
 Write-Host ("Prueba terminada. Código k6: {0}" -f $k6ExitCode)
@@ -247,5 +260,6 @@ Write-Host ("Deltas de presets: {0}" -f $presetFile)
 Write-Host ("CPU/RAM: {0}" -f $resourceFile)
 Write-Host ("Top PostgreSQL acumulado: {0}" -f $topFile)
 Write-Host ("Deltas SQL PostgreSQL: {0}" -f $deltaFile)
+Write-Host ("Deltas de COUNT(*) PostgreSQL: {0}" -f $countDeltaFile)
 Write-Host ("Resumen k6 original: {0}" -f $summaryFile)
 if ($k6ExitCode -ne 0) { exit $k6ExitCode }

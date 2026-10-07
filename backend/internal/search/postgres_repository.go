@@ -47,16 +47,13 @@ func totalFromPage(params Params, got int) (int, bool) {
 // unos segundos para que paginar no repita el recuento.
 func (r *PostgresRepository) countProfiles(ctx context.Context, q builtQuery) (int, error) {
 	key := countKey(q)
-	if total, ok := r.counts.get(key); ok {
+	return r.counts.getOrLoad(ctx, key, func() (int, error) {
+		var total int
+		if err := r.db.QueryRow(ctx, q.CountSQL, q.CountArgs...).Scan(&total); err != nil {
+			return 0, fmt.Errorf("search: contar perfiles: %w", err)
+		}
 		return total, nil
-	}
-
-	var total int
-	if err := r.db.QueryRow(ctx, q.CountSQL, q.CountArgs...).Scan(&total); err != nil {
-		return 0, fmt.Errorf("search: contar perfiles: %w", err)
-	}
-	r.counts.set(key, total)
-	return total, nil
+	})
 }
 
 // loadCards carga los datos de tarjeta de los ids de una página, en ese mismo
