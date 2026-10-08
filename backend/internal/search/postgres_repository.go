@@ -22,13 +22,18 @@ type PostgresRepository struct {
 
 	// counts recuerda unos segundos el total de las búsquedas con filtros.
 	counts *countCache
+
+	// viewerScopes evita releer seeking_genders y las preferencias de edad en
+	// cada búsqueda. ProfilesService invalida la entrada al guardar esos campos.
+	viewerScopes *viewerScopeCache
 }
 
 func NewPostgresRepository(db *pgxpool.Pool) *PostgresRepository {
 	return &PostgresRepository{
-		db:      db,
-		presets: newPresetCache(presetCacheTTL),
-		counts:  newCountCache(countCacheTTL, countCacheMax),
+		db:           db,
+		presets:      newPresetCache(presetCacheTTL),
+		counts:       newCountCache(countCacheTTL, countCacheMax),
+		viewerScopes: newViewerScopeCache(viewerScopeCacheTTL, viewerScopeCacheMax),
 	}
 }
 
@@ -128,6 +133,28 @@ func (r *PostgresRepository) loadCards(ctx context.Context, viewerUserID uuid.UU
 // withAge, el rango de edad de las preferencias de pareja de quien mira.
 // Sin perfil o sin datos => sin restricción (nil = "no lo ha dicho").
 func (r *PostgresRepository) loadViewerScope(ctx context.Context, userID uuid.UUID, withAge bool) (ViewerScope, error) {
+	scope, err := r.viewerScopes.getOrLoad(ctx, userID, func() (ViewerScope, error) {
+		return r.readViewerScope(ctx, userID)
+	})
+	if err != nil {
+		return ViewerScope{}, err
+	}
+	if !withAge {
+		scope.MinAge = nil
+		scope.MaxAge = nil
+	}
+	return scope, nil
+}
+
+// InvalidateViewerScope se llama tras guardar los campos del perfil que
+// condicionan la búsqueda (géneros y límites de edad preferidos).
+func (r *PostgresRepository) InvalidateViewerScope(userID uuid.UUID) {
+	if r.viewerScopes != nil {
+		r.viewerScopes.invalidate(userID)
+	}
+}
+
+func (r *PostgresRepository) readViewerScope(ctx context.Context, userID uuid.UUID) (ViewerScope, error) {
 	var (
 		genders        []string
 		ageMin, ageMax *int16
@@ -148,15 +175,13 @@ func (r *PostgresRepository) loadViewerScope(ctx context.Context, userID uuid.UU
 	for _, g := range genders {
 		s.SeekingGenders = append(s.SeekingGenders, profiles.Gender(g))
 	}
-	if withAge {
-		if ageMin != nil {
-			v := int(*ageMin)
-			s.MinAge = &v
-		}
-		if ageMax != nil {
-			v := int(*ageMax)
-			s.MaxAge = &v
-		}
+	if ageMin != nil {
+		v := int(*ageMin)
+		s.MinAge = &v
+	}
+	if ageMax != nil {
+		v := int(*ageMax)
+		s.MaxAge = &v
 	}
 	return s, nil
 }

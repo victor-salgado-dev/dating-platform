@@ -100,6 +100,12 @@ type ProfileIDResolver interface {
 	ProfileID(ctx context.Context, userID uuid.UUID) (uuid.UUID, error)
 }
 
+// ViewerScopeInvalidator clears the searcher's cached discovery preferences
+// after seeking genders or preferred age limits change.
+type ViewerScopeInvalidator interface {
+	InvalidateViewerScope(userID uuid.UUID)
+}
+
 // VisitRecorder permite registrar una visita a un perfil.
 type VisitRecorder interface {
 	Record(ctx context.Context, visitorProfileID, visitedProfileID uuid.UUID) error
@@ -111,6 +117,8 @@ type Service struct {
 
 	// ids es opcional; sin él, profileID cae a repo.GetByUserID.
 	ids ProfileIDResolver
+
+	viewerScopeInvalidator ViewerScopeInvalidator
 
 	interests interestCatalogCache
 
@@ -138,6 +146,12 @@ func (s *Service) SetInteractionDeps(favs FavoriteChecker, likes LikeChecker, vi
 // cada operación sobre el propio perfil carga la fila entera solo para leer su ID.
 func (s *Service) SetIDResolver(r ProfileIDResolver) {
 	s.ids = r
+}
+
+// SetViewerScopeInvalidator connects successful profile preference updates to
+// the in-process search scope cache.
+func (s *Service) SetViewerScopeInvalidator(i ViewerScopeInvalidator) {
+	s.viewerScopeInvalidator = i
 }
 
 // profileID devuelve el id del perfil de un usuario (ErrNotFound si no tiene).
@@ -441,6 +455,9 @@ func (s *Service) CreateProfile(ctx context.Context, userID uuid.UUID, p *Profil
 	if err := s.repo.Create(ctx, &profile); err != nil {
 		return nil, err
 	}
+	if s.viewerScopeInvalidator != nil {
+		s.viewerScopeInvalidator.InvalidateViewerScope(userID)
+	}
 
 	return &profile, nil
 }
@@ -499,7 +516,11 @@ func (s *Service) UpdateProfile(ctx context.Context, userID uuid.UUID, patch Pro
 		}
 	}
 
-	return s.repo.Update(ctx, userID, patch)
+	updated, err := s.repo.Update(ctx, userID, patch)
+	if err == nil && patch.SeekingGenders.Set && s.viewerScopeInvalidator != nil {
+		s.viewerScopeInvalidator.InvalidateViewerScope(userID)
+	}
+	return updated, err
 }
 
 func (s *Service) UploadPhoto(ctx context.Context, userID uuid.UUID, declaredContentType string, size int64, r io.Reader) (*Photo, error) {
@@ -857,7 +878,11 @@ func (s *Service) UpdatePartnerPreferences(ctx context.Context, userID uuid.UUID
 	if err != nil {
 		return nil, err
 	}
-	return s.repo.UpsertPartnerPreferences(ctx, profileID, patch)
+	updated, err := s.repo.UpsertPartnerPreferences(ctx, profileID, patch)
+	if err == nil && (patch.AgeMin.Set || patch.AgeMax.Set) && s.viewerScopeInvalidator != nil {
+		s.viewerScopeInvalidator.InvalidateViewerScope(userID)
+	}
+	return updated, err
 }
 
 // --- Validaciones auxiliares ---

@@ -131,6 +131,7 @@ func main() {
 	profilesHandler := profiles.NewHandler(profilesService)
 
 	searchRepo := search.NewPostgresRepository(pool)
+	profilesService.SetViewerScopeInvalidator(searchRepo)
 	searchService := search.NewService(searchRepo)
 	searchHandler := search.NewHandler(searchService)
 

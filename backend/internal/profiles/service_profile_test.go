@@ -23,6 +23,14 @@ type fakeRepo struct {
 	noProfile   bool      // GetByUserID devuelve ErrNotFound
 }
 
+type viewerScopeInvalidatorSpy struct {
+	users []uuid.UUID
+}
+
+func (s *viewerScopeInvalidatorSpy) InvalidateViewerScope(userID uuid.UUID) {
+	s.users = append(s.users, userID)
+}
+
 func (f *fakeRepo) Create(_ context.Context, p *Profile) error {
 	p.ID = uuid.New()
 	f.created = p
@@ -77,11 +85,11 @@ func (f *fakeRepo) UpsertPartnerPreferences(_ context.Context, _ uuid.UUID, patc
 func validProfile() *Profile {
 	nat := " de "
 	return &Profile{
-		DisplayName: "  Ana  ",
-		BirthDate:   time.Date(1990, 5, 17, 0, 0, 0, 0, time.UTC),
-		Gender:      GenderFemale,
+		DisplayName:    "  Ana  ",
+		BirthDate:      time.Date(1990, 5, 17, 0, 0, 0, 0, time.UTC),
+		Gender:         GenderFemale,
 		SeekingGenders: []Gender{GenderMale},
-		CountryCode: " es ",
+		CountryCode:    " es ",
 		ProfileDetails: ProfileDetails{
 			Nationality:       &nat,
 			RelationshipGoals: []RelationshipGoal{RelationshipLongTerm},
@@ -154,6 +162,33 @@ func TestUpdateProfile_EmptyPatchPassesThrough(t *testing.T) {
 	}
 	if cols, _ := setColumns(*repo.updatedWith); len(cols) != 0 {
 		t.Errorf("no debía haber columnas, hay %v", cols)
+	}
+}
+
+func TestViewerScopeInvalidatedAfterRelevantPreferenceUpdates(t *testing.T) {
+	userID := uuid.New()
+	invalidator := &viewerScopeInvalidatorSpy{}
+	svc := &Service{repo: &fakeRepo{}, viewerScopeInvalidator: invalidator}
+
+	if _, err := svc.UpdateProfile(context.Background(), userID, ProfilePatch{
+		SeekingGenders: FieldOf([]Gender{GenderFemale}),
+	}); err != nil {
+		t.Fatalf("actualizar géneros: %v", err)
+	}
+	minAge := 30
+	if _, err := svc.UpdatePartnerPreferences(context.Background(), userID, PartnerPreferencesPatch{
+		AgeMin: FieldOf(&minAge),
+	}); err != nil {
+		t.Fatalf("actualizar edad preferida: %v", err)
+	}
+	if _, err := svc.UpdatePartnerPreferences(context.Background(), userID, PartnerPreferencesPatch{
+		AboutPartnerText: FieldOf[*string](nil),
+	}); err != nil {
+		t.Fatalf("actualizar texto: %v", err)
+	}
+
+	if len(invalidator.users) != 2 || invalidator.users[0] != userID || invalidator.users[1] != userID {
+		t.Fatalf("invalidaciones = %v; se esperaban dos para el usuario %s", invalidator.users, userID)
 	}
 }
 
