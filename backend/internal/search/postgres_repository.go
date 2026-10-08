@@ -186,6 +186,27 @@ func (r *PostgresRepository) readViewerScope(ctx context.Context, userID uuid.UU
 	return s, nil
 }
 
+func (r *PostgresRepository) queryProfileIDs(ctx context.Context, query string, args ...any) ([]uuid.UUID, error) {
+	rows, err := r.db.Query(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("search: consultar perfiles: %w", err)
+	}
+	defer rows.Close()
+
+	var ids []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, fmt.Errorf("search: leer resultado: %w", err)
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("search: leer resultados: %w", err)
+	}
+	return ids, nil
+}
+
 func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result, error) {
 	now := time.Now()
 
@@ -215,31 +236,25 @@ func (r *PostgresRepository) Search(ctx context.Context, params Params) (*Result
 
 	// Fase 1: solo los ids de la página. Es barata: no calcula likes, favoritos
 	// ni foto, y como no cuenta, Postgres se detiene al juntar PageSize filas.
-	idRows, err := r.db.Query(ctx, q.SQL, q.Args...)
+	ids, err := r.queryProfileIDs(ctx, q.SQL, q.Args...)
 	if err != nil {
-		return nil, fmt.Errorf("search: consultar perfiles: %w", err)
+		return nil, err
 	}
-	defer idRows.Close()
-
-	var ids []uuid.UUID
-	for idRows.Next() {
-		var id uuid.UUID
-		if err := idRows.Scan(&id); err != nil {
-			return nil, fmt.Errorf("search: leer resultado: %w", err)
+	pageLimit := params.PageSize
+	if params.SkipTotal {
+		pageLimit++
+	}
+	if q.FallbackSQL != "" && len(ids) < pageLimit {
+		ids, err = r.queryProfileIDs(ctx, q.FallbackSQL, q.FallbackArgs...)
+		if err != nil {
+			return nil, err
 		}
-		ids = append(ids, id)
-	}
-	if err := idRows.Err(); err != nil {
-		return nil, fmt.Errorf("search: leer resultados: %w", err)
 	}
 	hasMore := false
 	if params.SkipTotal && len(ids) > params.PageSize {
 		hasMore = true
 		ids = ids[:params.PageSize]
 	}
-	// Se libera la conexión antes de la fase 2 (el defer solo la cerraría al final).
-	idRows.Close()
-
 	// Fase 2: datos de tarjeta y relación con quien mira, solo de esos ids.
 	items, err := r.loadCards(ctx, params.ExcludeUserID, ids, now)
 	if err != nil {

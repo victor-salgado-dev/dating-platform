@@ -1,0 +1,251 @@
+{
+  "metrics": {
+    "http_req_blocked": {
+      "min": 0,
+      "med": 0,
+      "max": 41.8982,
+      "p(90)": 0,
+      "p(95)": 0,
+      "avg": 0.03052944611819236
+    },
+    "data_received": {
+      "count": 267252103,
+      "rate": 709631.9500588218
+    },
+    "http_reqs": {
+      "count": 21575,
+      "rate": 57.287890911448066
+    },
+    "iteration_duration": {
+      "max": 20711.0778,
+      "p(90)": 12550.515580000001,
+      "p(95)": 14374.822039999988,
+      "avg": 7441.343542658308,
+      "min": 2341.3981,
+      "med": 6450.5733
+    },
+    "vus_max": {
+      "value": 400,
+      "min": 400,
+      "max": 400
+    },
+    "http_req_duration{endpoint:discover}": {
+      "p(90)": 2583.72524,
+      "p(95)": 2969.7339399999996,
+      "avg": 969.9390055740338,
+      "min": 1.0888,
+      "med": 650.6301,
+      "max": 5094.7847,
+      "thresholds": {
+        "p(95)<500": true
+      }
+    },
+    "iterations": {
+      "count": 7185,
+      "rate": 19.078261700985138
+    },
+    "http_req_sending": {
+      "p(95)": 0,
+      "avg": 0.008096597914252608,
+      "min": 0,
+      "med": 0,
+      "max": 11.1536,
+      "p(90)": 0
+    },
+    "http_req_duration{endpoint:popular}": {
+      "avg": 864.7557619756423,
+      "min": 0.7039,
+      "med": 428.9961,
+      "max": 11834.902,
+      "p(90)": 2376.51722,
+      "p(95)": 2708.7792199999994,
+      "thresholds": {
+        "p(95)<300": true
+      }
+    },
+    "checks": {
+      "passes": 40579,
+      "fails": 0,
+      "value": 1
+    },
+    "vus": {
+      "value": 1,
+      "min": 0,
+      "max": 400
+    },
+    "http_req_duration{endpoint:qm_batch}": {
+      "avg": 884.8665456140357,
+      "min": 2.6491,
+      "med": 432.28520000000003,
+      "max": 8383.9412,
+      "p(90)": 2438.6701399999997,
+      "p(95)": 2792.1798099999996,
+      "thresholds": {
+        "p(95)<500": true
+      }
+    },
+    "http_req_duration{endpoint:recommended}": {
+      "avg": 879.9250936475404,
+      "min": 0.7037,
+      "med": 419.99805,
+      "max": 4832.2766,
+      "p(90)": 2406.93408,
+      "p(95)": 2767.593965,
+      "thresholds": {
+        "p(95)<300": true
+      }
+    },
+    "http_req_tls_handshaking": {
+      "avg": 0,
+      "min": 0,
+      "med": 0,
+      "max": 0,
+      "p(90)": 0,
+      "p(95)": 0
+    },
+    "data_sent": {
+      "count": 5382014,
+      "rate": 14290.810239438528
+    },
+    "http_req_receiving": {
+      "avg": 1.4073851772885302,
+      "min": 0,
+      "med": 0.56,
+      "max": 195.7453,
+      "p(90)": 2.7738,
+      "p(95)": 4.514469999999999
+    },
+    "http_req_connecting": {
+      "avg": 0.021965033603708,
+      "min": 0,
+      "med": 0,
+      "max": 36.7572,
+      "p(90)": 0,
+      "p(95)": 0
+    },
+    "http_req_duration{endpoint:online}": {
+      "avg": 903.5070769374422,
+      "min": 2.7643,
+      "med": 477.66345,
+      "max": 3981.226,
+      "p(90)": 2437.67116,
+      "p(95)": 2797.8274149999993,
+      "thresholds": {
+        "p(95)<300": true
+      }
+    },
+    "http_req_waiting": {
+      "avg": 898.4609407879509,
+      "min": 0.5657,
+      "med": 481.6904,
+      "max": 11833.7167,
+      "p(90)": 2451.202360000002,
+      "p(95)": 2822.17524
+    },
+    "http_req_duration{expected_response:true}": {
+      "max": 11834.902,
+      "p(90)": 2452.925420000001,
+      "p(95)": 2824.32375,
+      "avg": 899.8764225631535,
+      "min": 0.7037,
+      "med": 482.8147
+    },
+    "http_req_duration": {
+      "avg": 899.8764225631535,
+      "min": 0.7037,
+      "med": 482.8147,
+      "max": 11834.902,
+      "p(90)": 2452.925420000001,
+      "p(95)": 2824.32375,
+      "thresholds": {
+        "p(95)<600": true
+      }
+    },
+    "http_req_failed": {
+      "passes": 0,
+      "fails": 21575,
+      "thresholds": {
+        "rate<0.05": false
+      },
+      "value": 0
+    }
+  },
+  "root_group": {
+    "name": "",
+    "path": "",
+    "id": "d41d8cd98f00b204e9800998ecf8427e",
+    "groups": {},
+    "checks": {
+      "new members status 200": {
+        "name": "new members status 200",
+        "path": "::new members status 200",
+        "id": "f9c15e5e5706f6b1a432295c6bae2774",
+        "passes": 2077,
+        "fails": 0
+      },
+      "discover status 200": {
+        "path": "::discover status 200",
+        "id": "6578036ccc1848a11f0c46efc8d62b0b",
+        "passes": 6315,
+        "fails": 0,
+        "name": "discover status 200"
+      },
+      "discover valid items": {
+        "fails": 0,
+        "name": "discover valid items",
+        "path": "::discover valid items",
+        "id": "3435d7c2381b6e179630b68f69f0b9ba",
+        "passes": 6315
+      },
+      "discover pagination metadata": {
+        "name": "discover pagination metadata",
+        "path": "::discover pagination metadata",
+        "id": "68131ab4a3fd1e9adaf612d597a06872",
+        "passes": 6315,
+        "fails": 0
+      },
+      "popular status 200": {
+        "id": "3b2439611124ec0542b149e537c431bd",
+        "passes": 2217,
+        "fails": 0,
+        "name": "popular status 200",
+        "path": "::popular status 200"
+      },
+      "recommended status 200": {
+        "path": "::recommended status 200",
+        "id": "769801f221cc341d3daf99dfb9dbd42e",
+        "passes": 4392,
+        "fails": 0,
+        "name": "recommended status 200"
+      },
+      "online status 200": {
+        "name": "online status 200",
+        "path": "::online status 200",
+        "id": "d65d860183bf3ac03cd9488ed972126d",
+        "passes": 2142,
+        "fails": 0
+      },
+      "online pagination metadata": {
+        "id": "bb4fb69b8abc1fff3824d8577267437e",
+        "passes": 2142,
+        "fails": 0,
+        "name": "online pagination metadata",
+        "path": "::online pagination metadata"
+      },
+      "quick match batch status 200": {
+        "name": "quick match batch status 200",
+        "path": "::quick match batch status 200",
+        "id": "0694b3a8a264ae37c487004829aa9936",
+        "passes": 4332,
+        "fails": 0
+      },
+      "quick match batch pagination metadata": {
+        "name": "quick match batch pagination metadata",
+        "path": "::quick match batch pagination metadata",
+        "id": "650ddc25b9b86dc1d8f505904b4b146a",
+        "passes": 4332,
+        "fails": 0
+      }
+    }
+  }
+}

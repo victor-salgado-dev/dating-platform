@@ -27,6 +27,12 @@ type builtQuery struct {
 	SQL  string // fase 1: ids de la página pedida
 	Args []any
 
+	// La primera página popular prueba primero solo los perfiles puntuados. Si
+	// no llena la página, el repositorio repite la consulta original, que puede
+	// elegir el mejor plan para filtros muy selectivos.
+	FallbackSQL  string
+	FallbackArgs []any
+
 	// CountSQL/CountArgs cuentan los perfiles que cumplen los filtros, sin
 	// paginación. Se usan para el total cuando la página no lo da por sí sola.
 	CountSQL  string
@@ -217,8 +223,8 @@ func buildSearchQuery(params Params, now time.Time) builtQuery {
 	}
 	limitArg := len(b.args) + 1
 	offsetArg := len(b.args) + 2
+	popularFirstPage := params.Sort == SortPopular && !f.OnlineNow && params.Page == 1
 	args := append(b.args, pageLimit, (params.Page-1)*params.PageSize)
-
 	sql := fmt.Sprintf(`
 		SELECT p.id
 		FROM profiles p
@@ -227,6 +233,26 @@ func buildSearchQuery(params Params, now time.Time) builtQuery {
 		ORDER BY %s
 		LIMIT $%d OFFSET $%d
 	`, joins, whereSQL, orderBy, limitArg, offsetArg)
+	var fallbackSQL string
+	var fallbackArgs []any
+	if popularFirstPage {
+		// Los scores de profile_popularity son siempre positivos. Para la primera
+		// página, los perfiles con score preceden a los que no tienen fila; el
+		// índice de score permite parar al encontrar pageLimit coincidencias. Si
+		// no alcanza, se reintenta la consulta original, que también incluye los
+		// perfiles sin score y puede usar índices de filtros más selectivos.
+		sql = buildPopularFirstPageSQL(whereSQL, limitArg)
+		fallbackSQL = fmt.Sprintf(`
+			SELECT p.id
+			FROM profiles p
+			%s
+			WHERE %s
+			ORDER BY %s
+			LIMIT $%d OFFSET $%d
+		`, joins, whereSQL, orderBy, limitArg, offsetArg)
+		fallbackArgs = args
+		args = args[:len(args)-1] // la consulta rápida no usa OFFSET
+	}
 
 	countSQL := fmt.Sprintf(`
 			SELECT COUNT(*)
@@ -242,7 +268,22 @@ func buildSearchQuery(params Params, now time.Time) builtQuery {
 	countArgs := append([]any(nil), args[:filterArgs]...)
 	countArgs[0] = uuid.Nil
 
-	return builtQuery{SQL: sql, Args: args, CountSQL: countSQL, CountArgs: countArgs}
+	return builtQuery{
+		SQL: sql, Args: args, FallbackSQL: fallbackSQL, FallbackArgs: fallbackArgs,
+		CountSQL: countSQL, CountArgs: countArgs,
+	}
+}
+
+func buildPopularFirstPageSQL(whereSQL string, limitArg int) string {
+	return fmt.Sprintf(`
+		SELECT p.id
+		FROM profile_popularity pop
+		JOIN profiles p ON p.id = pop.profile_id
+		JOIN users u ON u.id = p.user_id
+		WHERE %s
+		ORDER BY pop.score DESC, p.created_at DESC, p.id ASC
+		LIMIT $%d
+	`, whereSQL, limitArg)
 }
 
 func (b *queryBuilder) interestExists(itf InterestFilter) {

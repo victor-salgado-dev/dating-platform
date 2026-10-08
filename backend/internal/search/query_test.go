@@ -113,6 +113,35 @@ func TestBuildSearchQuery_PlaceholdersMatchArguments(t *testing.T) {
 	}
 }
 
+func TestBuildSearchQuery_PopularFirstPageUsesScoredIndexAndFallback(t *testing.T) {
+	p := baseParams()
+	p.Sort = SortPopular
+	q := buildSearchQuery(p, testNow)
+
+	assertExactlyUses(t, "consulta popular primera página", q.SQL, len(q.Args))
+	if !strings.Contains(q.SQL, "FROM profile_popularity pop") ||
+		!strings.Contains(q.SQL, "ORDER BY pop.score DESC, p.created_at DESC, p.id ASC") {
+		t.Errorf("la primera página popular debe empezar por el score:\n%s", q.SQL)
+	}
+	if strings.Contains(q.SQL, "OFFSET") {
+		t.Errorf("la primera página popular no debe llevar OFFSET:\n%s", q.SQL)
+	}
+	if q.FallbackSQL == "" || !strings.Contains(q.FallbackSQL, "LEFT JOIN profile_popularity pop") ||
+		!strings.Contains(q.FallbackSQL, "COALESCE(pop.score, 0) DESC") {
+		t.Errorf("debe existir la consulta completa como fallback:\n%s", q.FallbackSQL)
+	}
+	assertExactlyUses(t, "fallback popular", q.FallbackSQL, len(q.FallbackArgs))
+	if len(q.Args) == 0 || q.Args[len(q.Args)-1] != p.PageSize {
+		t.Errorf("argumentos de paginación inesperados: %#v", q.Args)
+	}
+	if len(q.FallbackArgs) != len(q.Args)+1 || q.FallbackArgs[len(q.FallbackArgs)-1] != 0 {
+		t.Errorf("argumentos de fallback inesperados: %#v", q.FallbackArgs)
+	}
+	if len(q.CountArgs) != len(q.Args)-1 || strings.Contains(q.CountSQL, "LIMIT") {
+		t.Errorf("el recuento debe conservar solo los argumentos de filtros: %#v", q.CountArgs)
+	}
+}
+
 // Cada campo de Filters tiene que alterar la consulta: si alguien añade un filtro
 // y olvida cablearlo en buildSearchQuery, la búsqueda lo ignoraría en silencio.
 func TestEveryFilterAffectsTheQuery(t *testing.T) {
@@ -160,21 +189,23 @@ func TestBuildSearchQuery_Ordering(t *testing.T) {
 		name       string
 		sort       Sort
 		online     bool
+		page       int
 		wantOrder  string
 		wantJoinOn bool
 	}{
-		{"recientes", SortRecent, false, "ORDER BY p.created_at DESC, p.id ASC", false},
-		{"edad ascendente", SortAgeAsc, false, "ORDER BY p.birth_date DESC, p.id ASC", false},
-		{"edad descendente", SortAgeDesc, false, "ORDER BY p.birth_date ASC, p.id ASC", false},
-		{"populares", SortPopular, false, "ORDER BY COALESCE(pop.score, 0) DESC, p.created_at DESC, p.id ASC", true},
-		{"orden desconocido cae en recientes", Sort("otro"), false, "ORDER BY p.created_at DESC, p.id ASC", false},
-		{"online-now manda sobre el orden pedido", SortPopular, true, "ORDER BY u.last_active_at DESC, p.id ASC", false},
+		{"recientes", SortRecent, false, 1, "ORDER BY p.created_at DESC, p.id ASC", false},
+		{"edad ascendente", SortAgeAsc, false, 1, "ORDER BY p.birth_date DESC, p.id ASC", false},
+		{"edad descendente", SortAgeDesc, false, 1, "ORDER BY p.birth_date ASC, p.id ASC", false},
+		{"populares página posterior", SortPopular, false, 2, "ORDER BY COALESCE(pop.score, 0) DESC, p.created_at DESC, p.id ASC", true},
+		{"orden desconocido cae en recientes", Sort("otro"), false, 1, "ORDER BY p.created_at DESC, p.id ASC", false},
+		{"online-now manda sobre el orden pedido", SortPopular, true, 1, "ORDER BY u.last_active_at DESC, p.id ASC", false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			p := baseParams()
 			p.Sort = tc.sort
 			p.Filters.OnlineNow = tc.online
+			p.Page = tc.page
 			q := buildSearchQuery(p, testNow)
 
 			if !strings.Contains(q.SQL, tc.wantOrder) {
